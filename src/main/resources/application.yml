@@ -5,9 +5,9 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:local}
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:rentflow}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:rentflow}
     username: ${DB_USER:rentflow}
-    password: ${DB_PASSWORD:rentflow123}
+    password: ${DB_PASSWORD:rentflow}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -31,11 +31,6 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: true
-
-  security:
-    user:
-      name: admin
-      password: ${ADMIN_PASSWORD:admin123}
 
 server:
   error:
@@ -65,4 +60,4 @@ springdoc:
 logging:
   level:
     com.rentflow: INFO
-    org.springframework.security: INFO
+    # Spring Security logging enabled in Phase 2 when SecurityConfig is introduced.

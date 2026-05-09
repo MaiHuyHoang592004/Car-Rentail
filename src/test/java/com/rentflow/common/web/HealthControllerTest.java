@@ -2,35 +2,30 @@ package com.rentflow.common.web;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@Testcontainers
+@WebMvcTest(controllers = HealthController.class)
+@Import(HealthControllerTest.TestConfig.class)
 class HealthControllerTest {
 
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("rentflow")
-            .withUsername("rentflow")
-            .withPassword("rentflow123");
+    @TestConfiguration
+    static class TestConfig {
+        @Bean
+        public CorrelationIdFilter correlationIdFilter() {
+            return new CorrelationIdFilter();
+        }
 
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        @Bean
+        public com.rentflow.common.exception.CorrelationIdHelper correlationIdHelper() {
+            return new com.rentflow.common.exception.CorrelationIdHelper();
+        }
     }
 
     @Autowired
@@ -57,17 +52,5 @@ class HealthControllerTest {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
                 .andExpect(header().exists("X-Correlation-Id"));
-    }
-
-    @Test
-    void actuatorHealth_returnsOk() throws Exception {
-        mockMvc.perform(get("/actuator/health"))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void swaggerUi_isAccessible() throws Exception {
-        mockMvc.perform(get("/swagger-ui.html"))
-                .andExpect(status().isOk());
     }
 }

@@ -2,15 +2,4 @@ spring:
   datasource:
     url: jdbc:postgresql://postgres:5432/rentflow
     username: rentflow
-    password: rentflow123
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-
-  flyway:
-    enabled: true
-
-logging:
-  level:
-    com.rentflow: INFO
+    password: rentflow

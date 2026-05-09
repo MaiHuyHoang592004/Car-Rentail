@@ -1,19 +1,25 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/rentflow
+    url: jdbc:postgresql://localhost:5433/rentflow
     username: rentflow
-    password: rentflow123
+    password: rentflow
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
 
   jpa:
     properties:
       hibernate:
         format_sql: true
 
-  flyway:
-    enabled: true
-
 logging:
   level:
     com.rentflow: DEBUG
-    org.springframework.security: DEBUG
     org.hibernate.SQL: DEBUG
+    org.springframework.jdbc: DEBUG
+    org.springframework.boot.context.config: DEBUG
+
+server:
+  port: 8087

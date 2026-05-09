@@ -5,9 +5,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -35,21 +32,8 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of("VALIDATION_ERROR", "Request validation failed", errors, cid));
     }
 
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
-        String cid = correlationIdHelper.getCorrelationId();
-        log.warn("Access denied [{}]: {}", cid, ex.getMessage());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ErrorResponse.of("ACCESS_DENIED", "Access denied", cid));
-    }
-
-    @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
-        String cid = correlationIdHelper.getCorrelationId();
-        log.warn("Authentication error [{}]: {}", cid, ex.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ErrorResponse.of("AUTHENTICATION_ERROR", "Authentication failed", cid));
-    }
+    // NOTE: Spring Security exception handlers (AccessDeniedException, AuthenticationException)
+    // will be added in Phase 2 when SecurityConfig is introduced.
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
