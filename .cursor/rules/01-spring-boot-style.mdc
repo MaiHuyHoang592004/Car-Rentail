@@ -1,0 +1,48 @@
+# Spring Boot Style Guide
+
+## Annotations
+
+- Use `@Service` for business logic, `@Repository` for data access.
+- Use `@Transactional` at service layer, not controller.
+- Use `@Valid` + `@Validated` on DTOs, not on entities.
+- Use `@JsonIgnore` on sensitive entity fields. Never expose entities directly as API response.
+- Use `@Version` for optimistic locking on Listing entity.
+- Use `@EntityListeners(AuditingEntityListener.class)` for automatic audit timestamps.
+
+## Transaction Boundaries
+
+- Lock order must be deterministic: always `ORDER BY available_date ASC` to prevent deadlocks.
+- Never do business logic after transaction commits.
+- Never catch `Exception` and suppress — let transaction rollback.
+- For critical operations (booking, payment), lock idempotency key FIRST with `FOR UPDATE`.
+- Use `FOR UPDATE SKIP LOCKED` for scheduled jobs to prevent duplicate processing.
+- Process in bounded batches (default: 100 records per batch).
+
+## Entity Design
+
+- All entities extend `BaseEntity` with: `id` (UUID), `createdAt`, `updatedAt`.
+- Use JPA `@Version` for optimistic locking.
+- Never use `EntityManager` directly — use Spring Data JPA repositories.
+- Never expose JPA entities as API request/response objects — use DTOs.
+
+## DTOs
+
+- Separate Request and Response DTOs.
+- Use Java 21 `record` for simple DTOs (immutable data carriers).
+- Use `@NotNull`, `@NotBlank`, `@Min`, `@Max` for validation on request DTOs.
+- Never use entity as request/response object.
+
+## Security
+
+- Never expose in API: `passwordHash`, `tokenHash`, `plateNumberEncrypted`, `vinEncrypted`, `licenseNumberEncrypted`.
+- Always hash tokens and sensitive data before storage.
+- Use BCrypt for passwords (strength 12).
+- Return 401 JSON, never HTML redirect, for unauthenticated requests.
+- Return 403 JSON for access denied.
+
+## Code Organization
+
+- One class per file.
+- Package-private visibility for repository interfaces (Spring handles implementation).
+- Use constructor injection (`@RequiredArgsConstructor`) over field injection.
+- Keep service methods focused — one method per use case.

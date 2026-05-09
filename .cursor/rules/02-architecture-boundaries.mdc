@@ -1,0 +1,49 @@
+# Architecture Boundaries
+
+## Module Isolation
+
+- `common/` module: shared utilities, config, exceptions, security, pagination.
+- `common/` is NOT a dumping ground — each submodule must be justified.
+- Business logic belongs in its own module, not in common.
+- Module may depend on `common/*`.
+- Module may NOT depend on another business module's service directly.
+
+## Cross-Module Calls
+
+- If booking module needs listing data: use listing repository, not listing service.
+- If service-to-service call is needed: create an application-level facade or use repository directly.
+- Never create circular dependencies between modules.
+- Example: `BookingService` can use `ListingRepository`, not `ListingService`.
+
+## Package Structure Per Module
+
+Each module follows this structure:
+
+```
+module/
+├── controller/     # REST controllers
+├── service/        # Business logic
+├── entity/         # JPA entities (one per file)
+├── repository/      # Spring Data JPA interfaces
+├── dto/
+│   ├── request/    # Request DTOs
+│   └── response/   # Response DTOs
+├── mapper/         # Entity <-> DTO mapping (if needed)
+├── event/          # Domain events
+└── policy/         # Business policies
+```
+
+## State Machine Pattern
+
+- Use explicit state machine classes or enums for complex state transitions.
+- Vehicle: `DRAFT -> ACTIVE -> MAINTENANCE/SUSPENDED/ARCHIVED`
+- Listing: `DRAFT -> PENDING_APPROVAL -> ACTIVE -> SUSPENDED -> ARCHIVED`
+- Booking: `HELD -> CONFIRMED/PENDING_HOST_APPROVAL -> IN_PROGRESS -> COMPLETED`
+- Payment: `UNPAID -> AUTHORIZED -> CAPTURED -> REFUNDED`
+
+## No Shared State
+
+- No static mutable state.
+- No singleton services holding user-specific data.
+- All state in database or passed as parameters.
+- Scheduled jobs must be stateless and idempotent.

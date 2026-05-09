@@ -1,0 +1,75 @@
+# Testing Strategy
+
+## Test Placement
+
+| Test Type | What to Test |
+|---|---|
+| Unit | Pure business logic: validators, calculators, state machines, domain logic |
+| Integration | Real DB via Testcontainers: service layer, repositories, controllers |
+| E2E | Full flow: rare, only for critical paths |
+
+**Rule: Never mock the database in integration tests. Use Testcontainers for real PostgreSQL.**
+
+## Required Test for Every Feature
+
+1. Happy path works correctly
+2. Validation failures return correct error codes
+3. Unauthorized access returns 401/403
+4. Concurrency edge cases for booking/payment operations
+
+## Test Naming Convention
+
+Use: `methodName_context_expectedBehavior`
+
+Examples:
+
+- `createBooking_sameIdempotencyKey_returnsSameResponse`
+- `concurrentBooking_10requests_only1Succeeds`
+- `authorizePayment_instantBook_confirmsBooking`
+- `cancelConfirmed_partialPenalty_captureThenVoid`
+
+## Critical Test: Concurrent Booking
+
+This is the portfolio proof:
+
+```java
+@Test
+void concurrentBooking_sameListingSameDates_onlyOneSucceeds() {
+    // 10 threads concurrently book the same listing + date range
+    // Expected: exactly 1 booking SUCCESS
+    //           9 bookings return 409 LISTING_NOT_AVAILABLE
+    // Use CountDownLatch + ExecutorService
+    // Verify: exactly 1 row in bookings table with status CONFIRMED
+}
+```
+
+This test proves:
+- Database transaction skill
+- Pessimistic locking
+- Idempotency behavior
+- Business rule correctness
+- API error handling
+
+## Testcontainers Setup
+
+```java
+@Testcontainers
+class BaseIntegrationTest {
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+}
+```
+
+## Avoid
+
+- Don't write tests without assertions.
+- Don't mock repositories in integration tests.
+- Don't skip tests for "known" failures.
+- Don't write tests that only pass in isolation.

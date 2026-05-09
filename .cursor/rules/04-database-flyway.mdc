@@ -1,0 +1,74 @@
+# Database and Flyway Conventions
+
+## Migrations
+
+- All migrations in `src/main/resources/db/migration/`.
+- Naming: `V{version}__{description}.sql` (e.g., `V1__init_schema.sql`).
+- Never modify existing migration files — create new ones.
+- Each migration should be idempotent where possible.
+
+## Schema Design
+
+- All IDs: UUID.
+- All timestamps: `TIMESTAMPTZ` (stored as UTC).
+- All dates: `DATE` (no time component).
+- All monetary amounts: `NUMERIC(12,2)`.
+- All JSON: `JSONB` for queryable JSON fields.
+- Soft delete: use `status = 'ARCHIVED'` or `deleted_at` column, never physical delete.
+- Constraints at database level, not just application level.
+
+## Key Constraints
+
+```sql
+-- One ACTIVE listing per vehicle
+CREATE UNIQUE INDEX uq_listings_one_active_per_vehicle
+ON listings(vehicle_id) WHERE status = 'ACTIVE';
+
+-- One PENDING/APPROVED driver verification per customer
+CREATE UNIQUE INDEX uq_driver_verification_active
+ON driver_verifications(customer_id)
+WHERE status IN ('PENDING', 'APPROVED');
+
+-- Idempotency key uniqueness
+ALTER TABLE idempotency_keys
+ADD CONSTRAINT uq_idempotency_scope_key UNIQUE (user_id, scope, key);
+
+-- Booking date range
+ALTER TABLE bookings
+ADD CONSTRAINT chk_bookings_date_range CHECK (pickup_date < return_date);
+
+-- Payment amounts
+ALTER TABLE booking_payments
+ADD CONSTRAINT chk_booking_payment_amounts CHECK (
+  authorized_amount >= 0
+  AND captured_amount >= 0
+  AND refunded_amount >= 0
+  AND captured_amount <= authorized_amount
+  AND refunded_amount <= captured_amount
+);
+```
+
+## Indexes
+
+Create indexes for:
+
+- Foreign keys used in WHERE clauses
+- Composite indexes for common query patterns
+- Partial indexes for unique constraints
+- Index on `status + timestamp` for scheduled job queries
+
+## Testcontainers
+
+- Use `@Testcontainers` annotation.
+- PostgreSQL 16 container: `postgres:16`.
+- Set JDBC URL from container's `getJdbcUrl()`.
+- Use `@Container static` for shared container across tests.
+- Keep test DB isolated from dev DB.
+
+## Naming Conventions
+
+- Table names: snake_case, plural (e.g., `auth_users`, `booking_payments`)
+- Column names: snake_case (e.g., `created_at`, `base_price_per_day`)
+- Foreign keys: `{referenced_table_singular}_id` (e.g., `booking_id`)
+- Indexes: `idx_{table}_{columns}` or `uq_{table}_{columns}`
+- Constraints: `chk_{table}_{description}` or `uq_{table}_{description}`

@@ -1,0 +1,53 @@
+# No Scope Creep
+
+## Never Implement Unless Current Phase Explicitly Asks
+
+- Kafka or message queue integration
+- Real payment gateway
+- Frontend (web, mobile, or SPA)
+- Microservices architecture
+- Kubernetes deployment
+- OAuth or social login
+- Email provider integration (SendGrid, SES, etc.)
+- SMS provider integration
+- Advanced reporting beyond basic revenue/earnings
+- Trip photos or file uploads (P9 only)
+- Reviews or disputes (P9 only)
+- CI/CD beyond basic GitHub Actions (P9 only)
+- Observability beyond basic actuator (P9 only)
+- Kubernetes or advanced container orchestration
+
+## Phase Gate
+
+If the SRS says a feature is P1, do not implement it in P0.
+If the SRS says a feature is P2, do not implement it before P1.
+
+## The Portfolio Proof
+
+The most important thing to build is the concurrent booking test:
+
+```
+10 customers try to book the same listing for the same date range.
+Only one booking succeeds.
+The other 9 requests return 409 LISTING_NOT_AVAILABLE.
+The test runs automatically with Testcontainers and PostgreSQL.
+```
+
+This proves: database transaction skill, pessimistic locking, idempotency behavior, business rule correctness, API error handling, production-style backend thinking.
+
+Do not get distracted by P2 features before this works.
+
+## Allowed in P0
+
+- Redis for rate limiting and refresh token blacklist
+- Docker Compose for local development
+- Testcontainers for integration tests
+- Flyway for migrations
+- SpringDoc OpenAPI for documentation
+
+## Feature Flags
+
+Use feature flags for P0/P1 boundary features:
+
+- `rentflow.booking.require-driver-verification=false` — disables driver verification gate in P0
+- These can be removed in later phases when features are fully implemented

@@ -1,0 +1,59 @@
+# Agent Behavior Rules
+
+## Before Implementing
+
+1. Read the current phase plan: `docs/phase-*.md`
+2. Read the relevant SRS sections referenced in the plan
+3. Inspect existing files in the module
+4. If DB schema needed: create or update Flyway migration
+5. Summarize: what files will be created/modified
+
+## Before Editing an Existing File
+
+1. Read the existing file
+2. Understand its current state
+3. Make minimal changes — do not rewrite unrelated code
+4. Do not silently change API contracts
+5. Do not rename packages unless required by the change
+
+## During Implementation
+
+- Create files in this order: Entity -> Repository -> Service -> Controller
+- Run compilation after every 2-3 files to catch errors early
+- Add or update tests alongside the feature
+- Update `docs/phase-*.md` acceptance criteria when criteria are met
+- Do not implement future phases
+- Do not rename existing methods unless fixing a bug
+
+## After Implementation
+
+1. List all files created/modified
+2. List all tests added
+3. State: what works, what doesn't, what's blocked
+4. State: what commands to run to verify
+5. State: what's the next action
+
+## Workflow for Each Phase
+
+1. Read the phase plan (`docs/phase-*.md`)
+2. Check off items as you implement them
+3. Run tests after each major feature
+4. Mark acceptance criteria as done
+5. Report completion status
+
+## DO
+
+- Keep changes focused and minimal
+- Write tests alongside features
+- Run `mvn compile` frequently
+- Update documentation when behavior changes
+- Report blockers clearly
+
+## DON'T
+
+- Implement P1 features in P0
+- Implement P2 features before P1
+- Rewrite entire modules for style changes
+- Add features not in the current phase plan
+- Skip tests for "simplicity"
+- Leave compilation errors unfixed

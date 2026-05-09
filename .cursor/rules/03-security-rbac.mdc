@@ -1,0 +1,68 @@
+# Security and Authorization
+
+## Role-Based Access Control
+
+Roles: `CUSTOMER`, `HOST`, `ADMIN`.
+A user may have multiple roles through `user_roles` table.
+
+## Resource-Level Authorization
+
+Role checks are NOT enough. Always check resource ownership:
+
+| Operation | Required Check |
+|---|---|
+| Host vehicle operations | `vehicle.hostId == authUserId` |
+| Host listing operations | `listing.hostId == authUserId` |
+| Customer booking access | `booking.customerId == authUserId` |
+| Host booking access | `booking.hostId == authUserId` |
+| Admin endpoints | `@PreAuthorize("hasRole('ADMIN')")` |
+
+## Idempotency
+
+- All state-changing operations require `Idempotency-Key` header.
+- Invalid format: `400 VALIDATION_ERROR`
+- Duplicate key + same body: return stored response
+- Duplicate key + different body: `409 IDEMPOTENCY_KEY_CONFLICT`
+- Idempotency scopes: `CREATE_BOOKING`, `AUTHORIZE_PAYMENT`, `CAPTURE_PAYMENT`, `VOID_PAYMENT`, `REFUND_PAYMENT`, `CANCEL_BOOKING`, `HOST_APPROVE_BOOKING`, `HOST_REJECT_BOOKING`
+
+## Never Expose in API
+
+- `passwordHash`
+- `tokenHash`
+- `plateNumberEncrypted`
+- `vinEncrypted`
+- `licenseNumberEncrypted`
+- `license document object key`
+- Internal error details to client: return `correlationId` only
+
+## Audit Data Sanitization
+
+Audit logs must NOT store:
+
+- `passwordHash`
+- `refresh token hash`
+- `plate_number_encrypted`
+- `vin_encrypted`
+- `license_number_encrypted`
+- Payment-sensitive data
+
+## JWT Configuration
+
+- Access token: short-lived (15 minutes).
+- Refresh token: long-lived (7 days), stored as hash in DB, rotated on use.
+- JWT secret from environment variable `JWT_SECRET`.
+- Never log JWT tokens.
+
+## Host Visibility Restrictions
+
+When host views a `PENDING_HOST_APPROVAL` booking, they can see:
+
+- listing summary
+- vehicle summary
+- booking dates
+- pickup location
+- customer full name
+- driver verification status only
+- price snapshot
+
+Host must NOT see: customer address, phone, license number, license document, payment details, token/payment provider references.

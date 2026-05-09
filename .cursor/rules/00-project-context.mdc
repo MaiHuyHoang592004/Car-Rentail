@@ -1,0 +1,62 @@
+# RentFlow Project Context
+
+Project: RentFlow — Car Rental Booking System Rebuild.
+Architecture: modular monolith REST API.
+Stack: Java 21, Spring Boot, PostgreSQL, Redis, MinIO, Flyway, Docker Compose, Testcontainers.
+Goal: production-style backend portfolio.
+
+Core portfolio proof:
+Idempotency-Key + PostgreSQL SELECT FOR UPDATE + Testcontainers concurrent booking test.
+
+## Tech Stack
+
+| Component | Technology |
+|---|---|
+| Language | Java 21 |
+| Framework | Spring Boot |
+| Database | PostgreSQL 16 |
+| Migrations | Flyway |
+| Cache/Session | Redis 7 |
+| File Storage | MinIO / S3 |
+| API Docs | SpringDoc OpenAPI |
+| Testing | JUnit 5, Mockito, Testcontainers |
+| Build | Maven |
+| Container | Docker Compose |
+
+## Package Structure
+
+```
+com.rentflow
+├── auth          # Authentication: register, login, refresh, logout
+├── user          # User profile, driver verification
+├── vehicle       # Vehicle CRUD and state machine
+├── listing       # Listing CRUD, submit, admin approval
+├── availability  # Availability calendar, block/unblock
+├── booking       # Booking creation, cancellation
+├── payment       # Payment stub: authorize, capture, void, refund
+├── common        # Shared: config, exception, security, pagination
+├── audit         # Audit logging
+├── notification  # User notifications
+├── outbox        # Event outbox
+├── file         # File metadata
+├── trip         # Trip check-in/check-out
+├── review       # Reviews
+├── dispute      # Disputes
+└── report       # Reports
+```
+
+## Always Follow
+
+- docs/srs.md — Full requirements reference
+- docs/roadmap.md — Implementation phases
+- docs/p0-priorities.md — P0 feature checklist
+- current docs/phase-*.md — Current phase plan
+
+## Critical Rules
+
+1. Never implement P1/P2 features before completing P0.
+2. Never implement Kafka before outbox pattern works.
+3. Never implement real payment gateway — use payment stub.
+4. The concurrent booking test (10 requests, 1 success) is the portfolio proof.
+5. All state-changing operations require Idempotency-Key.
+6. SELECT FOR UPDATE order must be deterministic: always `ORDER BY available_date ASC`.
