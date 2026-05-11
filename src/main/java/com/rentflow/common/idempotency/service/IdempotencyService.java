@@ -25,6 +25,11 @@ public class IdempotencyService {
 
     private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final Clock clock;
+    private final CanonicalJsonHasher canonicalJsonHasher;
+
+    public String computeHash(Object request) {
+        return canonicalJsonHasher.hash(request);
+    }
 
     @Transactional
     public IdempotencyResolution resolve(

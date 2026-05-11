@@ -47,7 +47,7 @@ class IdempotencyServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        service = new IdempotencyService(repository, clock);
+        service = new IdempotencyService(repository, clock, new CanonicalJsonHasher());
     }
 
     @Test

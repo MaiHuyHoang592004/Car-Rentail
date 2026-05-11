@@ -61,6 +61,15 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of("ACCESS_DENIED", "Access denied: insufficient permissions", cid));
     }
 
+    @ExceptionHandler(DriverLicenseNotApprovedException.class)
+    public ResponseEntity<ErrorResponse> handleDriverLicenseNotApproved(
+            DriverLicenseNotApprovedException ex, HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        log.warn("Driver verification error [{}]: {} - {}", cid, ex.getCode(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
         String cid = correlationIdHelper.getCorrelationId();
