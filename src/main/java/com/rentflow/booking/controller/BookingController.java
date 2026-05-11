@@ -1,10 +1,12 @@
 package com.rentflow.booking.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.service.BookingResponse;
 import com.rentflow.booking.service.BookingService;
 import com.rentflow.booking.service.BookingSummaryResponse;
 import com.rentflow.booking.service.CreateBookingRequest;
+import com.rentflow.booking.service.PatchBookingLocationRequest;
 import com.rentflow.common.exception.IdempotencyException;
 import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.web.PageResponse;
@@ -16,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Iterator;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -60,6 +64,14 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getBooking(id));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<BookingResponse> patchBookingLocations(
+            @PathVariable UUID id,
+            @RequestBody JsonNode requestBody) {
+        PatchBookingLocationRequest request = parsePatchRequest(requestBody);
+        return ResponseEntity.ok(bookingService.patchBookingLocations(id, request));
+    }
+
     private void validateIdempotencyKey(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new IdempotencyException("IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key header is required");
@@ -78,5 +90,46 @@ public class BookingController {
         } catch (IllegalArgumentException e) {
             throw new ValidationException("Invalid booking status: " + status);
         }
+    }
+
+    private PatchBookingLocationRequest parsePatchRequest(JsonNode requestBody) {
+        if (requestBody == null || !requestBody.isObject()) {
+            throw new ValidationException("Booking patch body must be a JSON object");
+        }
+
+        String pickupLocation = null;
+        String returnLocation = null;
+        boolean hasNonNullAllowedField = false;
+        Iterator<String> fieldNames = requestBody.fieldNames();
+        while (fieldNames.hasNext()) {
+            String fieldName = fieldNames.next();
+            JsonNode value = requestBody.get(fieldName);
+            switch (fieldName) {
+                case "pickupLocation" -> {
+                    pickupLocation = readOptionalLocation(value, fieldName);
+                    hasNonNullAllowedField = hasNonNullAllowedField || pickupLocation != null;
+                }
+                case "returnLocation" -> {
+                    returnLocation = readOptionalLocation(value, fieldName);
+                    hasNonNullAllowedField = hasNonNullAllowedField || returnLocation != null;
+                }
+                default -> throw new ValidationException("Unknown booking patch field: " + fieldName);
+            }
+        }
+
+        if (!hasNonNullAllowedField) {
+            throw new ValidationException("At least one location field must be provided");
+        }
+        return new PatchBookingLocationRequest(pickupLocation, returnLocation);
+    }
+
+    private String readOptionalLocation(JsonNode value, String fieldName) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isTextual()) {
+            throw new ValidationException(fieldName + " must be a string");
+        }
+        return value.asText();
     }
 }

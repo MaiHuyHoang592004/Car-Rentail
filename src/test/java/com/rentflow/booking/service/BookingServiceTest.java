@@ -13,6 +13,7 @@ import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingExtraRepository;
 import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.common.exception.AccessDeniedException;
+import com.rentflow.common.exception.BookingNotFoundException;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.DriverLicenseNotApprovedException;
 import com.rentflow.common.exception.ListingNotFoundException;
@@ -374,6 +375,52 @@ class BookingServiceTest {
         assertThatThrownBy(() -> bookingService.getBooking(BOOKING_ID))
                 .isInstanceOf(com.rentflow.common.exception.BookingNotFoundException.class)
                 .hasFieldOrPropertyWithValue("code", "BOOKING_NOT_FOUND");
+    }
+
+    @Test
+    void patchBookingLocationsUpdatesOwnerBookingUsingLock() {
+        Booking booking = booking();
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(listingRepository.findById(LISTING_ID)).thenReturn(Optional.of(activeListing()));
+
+        BookingResponse result = bookingService.patchBookingLocations(
+                BOOKING_ID,
+                new PatchBookingLocationRequest("New pickup", "New return"));
+
+        assertThat(result.pickupLocation()).isEqualTo("New pickup");
+        assertThat(result.returnLocation()).isEqualTo("New return");
+        assertThat(booking.getPickupLocation()).isEqualTo("New pickup");
+        assertThat(booking.getReturnLocation()).isEqualTo("New return");
+        verify(bookingRepository).findByIdForUpdate(BOOKING_ID);
+    }
+
+    @Test
+    void patchBookingLocationsRejectsNonOwnerAsNotFound() {
+        Booking booking = booking();
+        UUID otherUserId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        when(securityContext.currentUserId()).thenReturn(otherUserId);
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.patchBookingLocations(
+                BOOKING_ID,
+                new PatchBookingLocationRequest("New pickup", null)))
+                .isInstanceOf(BookingNotFoundException.class)
+                .hasFieldOrPropertyWithValue("code", "BOOKING_NOT_FOUND");
+    }
+
+    @Test
+    void patchBookingLocationsRejectsInvalidStatus() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CANCELLED);
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.patchBookingLocations(
+                BOOKING_ID,
+                new PatchBookingLocationRequest("New pickup", null)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "BOOKING_INVALID_STATUS");
     }
 
     private void mockProceed() {

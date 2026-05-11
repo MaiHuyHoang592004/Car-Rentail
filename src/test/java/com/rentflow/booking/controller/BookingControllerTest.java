@@ -8,6 +8,7 @@ import com.rentflow.booking.service.BookingResponse;
 import com.rentflow.booking.service.BookingService;
 import com.rentflow.booking.service.BookingSummaryResponse;
 import com.rentflow.booking.service.CreateBookingRequest;
+import com.rentflow.booking.service.PatchBookingLocationRequest;
 import com.rentflow.booking.service.RequestedExtra;
 import com.rentflow.common.exception.CorrelationIdHelper;
 import com.rentflow.common.exception.GlobalExceptionHandler;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -125,6 +127,77 @@ class BookingControllerTest {
                 .andExpect(jsonPath("$.listingTitle").value("Toyota Vios 2022"));
     }
 
+    @Test
+    void patchBookingLocationsDelegatesAndReturnsDetail() throws Exception {
+        BookingResponse patched = response("New pickup", "New return");
+        when(bookingService.patchBookingLocations(eq(BOOKING_ID), any(PatchBookingLocationRequest.class)))
+                .thenReturn(patched);
+
+        mockMvc.perform(patch("/api/v1/bookings/{id}", BOOKING_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pickupLocation":"New pickup","returnLocation":"New return"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pickupLocation").value("New pickup"))
+                .andExpect(jsonPath("$.returnLocation").value("New return"));
+
+        verify(bookingService).patchBookingLocations(eq(BOOKING_ID), any(PatchBookingLocationRequest.class));
+    }
+
+    @Test
+    void patchBookingLocationsRejectsUnknownFields() throws Exception {
+        mockMvc.perform(patch("/api/v1/bookings/{id}", BOOKING_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pickupLocation":"New pickup","totalAmount":1000}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void patchBookingLocationsRejectsDateFields() throws Exception {
+        mockMvc.perform(patch("/api/v1/bookings/{id}", BOOKING_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pickupDate":"2026-06-02"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void patchBookingLocationsRejectsStatusField() throws Exception {
+        mockMvc.perform(patch("/api/v1/bookings/{id}", BOOKING_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"CANCELLED"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void patchBookingLocationsRejectsNullOnlyBody() throws Exception {
+        mockMvc.perform(patch("/api/v1/bookings/{id}", BOOKING_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pickupLocation":null,"returnLocation":null}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void patchBookingLocationsRejectsEmptyBody() throws Exception {
+        mockMvc.perform(patch("/api/v1/bookings/{id}", BOOKING_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
     private CreateBookingRequest request() {
         return new CreateBookingRequest(
                 LISTING_ID,
@@ -136,6 +209,10 @@ class BookingControllerTest {
     }
 
     private BookingResponse response() {
+        return response("Hanoi", "Hanoi");
+    }
+
+    private BookingResponse response(String pickupLocation, String returnLocation) {
         return new BookingResponse(
                 BOOKING_ID,
                 BookingStatus.HELD,
@@ -145,8 +222,8 @@ class BookingControllerTest {
                 UUID.fromString("55555555-5555-4555-8555-555555555555"),
                 LocalDate.of(2026, 6, 1),
                 LocalDate.of(2026, 6, 3),
-                "Hanoi",
-                "Hanoi",
+                pickupLocation,
+                returnLocation,
                 Instant.parse("2026-05-11T00:15:00Z"),
                 new BigDecimal("1500000.00"),
                 "VND",

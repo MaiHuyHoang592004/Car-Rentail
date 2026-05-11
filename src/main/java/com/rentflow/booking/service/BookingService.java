@@ -52,6 +52,10 @@ public class BookingService {
             BookingStatus.HELD,
             BookingStatus.PENDING_HOST_APPROVAL,
             BookingStatus.CONFIRMED);
+    private static final List<BookingStatus> PATCHABLE_STATUSES = List.of(
+            BookingStatus.HELD,
+            BookingStatus.PENDING_HOST_APPROVAL,
+            BookingStatus.CONFIRMED);
 
     private final BookingRepository bookingRepository;
     private final BookingExtraRepository bookingExtraRepository;
@@ -143,6 +147,31 @@ public class BookingService {
 
         if (!canViewBooking(booking, currentUserId)) {
             throw new BookingNotFoundException(String.valueOf(id));
+        }
+
+        return toBookingResponse(booking);
+    }
+
+    @Transactional
+    public BookingResponse patchBookingLocations(UUID id, PatchBookingLocationRequest request) {
+        UUID currentUserId = securityContext.currentUserId();
+        Booking booking = bookingRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BookingNotFoundException(String.valueOf(id)));
+
+        if (!booking.getCustomerId().equals(currentUserId)) {
+            throw new BookingNotFoundException(String.valueOf(id));
+        }
+        if (!PATCHABLE_STATUSES.contains(booking.getStatus())) {
+            throw new BusinessRuleException(
+                    "BOOKING_INVALID_STATUS",
+                    "Booking cannot be patched in its current status");
+        }
+
+        if (request.pickupLocation() != null) {
+            booking.setPickupLocation(request.pickupLocation());
+        }
+        if (request.returnLocation() != null) {
+            booking.setReturnLocation(request.returnLocation());
         }
 
         return toBookingResponse(booking);
