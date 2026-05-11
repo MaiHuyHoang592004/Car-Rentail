@@ -13,6 +13,7 @@ import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingExtraRepository;
 import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.common.exception.AccessDeniedException;
+import com.rentflow.common.exception.BookingNotFoundException;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.DriverLicenseNotApprovedException;
 import com.rentflow.common.exception.ListingNotFoundException;
@@ -29,15 +30,20 @@ import com.rentflow.user.entity.UserProfile;
 import com.rentflow.user.repository.UserProfileRepository;
 import com.rentflow.vehicle.entity.VehicleStatus;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import com.rentflow.common.web.PageResponse;
 
 @Service
 public class BookingService {
@@ -110,6 +116,36 @@ public class BookingService {
             // TODO: Consider a REQUIRES_NEW failure marker in a later idempotency hardening step.
             throw e;
         }
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<BookingSummaryResponse> listMyBookings(BookingStatus status, Pageable pageable) {
+        UUID customerId = securityContext.currentUserId();
+        securityContext.requireRole(Role.CUSTOMER);
+
+        Page<Booking> bookings = status == null
+                ? bookingRepository.findByCustomerIdOrderByCreatedAtDesc(customerId, pageable)
+                : bookingRepository.findByCustomerIdAndStatusOrderByCreatedAtDesc(customerId, status, pageable);
+
+        return new PageResponse<>(
+                bookings.getContent().stream().map(this::toSummaryResponse).toList(),
+                bookings.getNumber(),
+                bookings.getSize(),
+                bookings.getTotalElements(),
+                bookings.getTotalPages());
+    }
+
+    @Transactional(readOnly = true)
+    public BookingResponse getBooking(UUID id) {
+        UUID currentUserId = securityContext.currentUserId();
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new BookingNotFoundException(String.valueOf(id)));
+
+        if (!canViewBooking(booking, currentUserId)) {
+            throw new BookingNotFoundException(String.valueOf(id));
+        }
+
+        return toBookingResponse(booking);
     }
 
     private BookingResponse createBookingAfterIdempotency(UUID customerId, CreateBookingRequest request) {
@@ -185,6 +221,12 @@ public class BookingService {
         if (profile.getDriverVerificationStatus() != UserProfile.DriverVerificationStatus.APPROVED) {
             throw new DriverLicenseNotApprovedException();
         }
+    }
+
+    private boolean canViewBooking(Booking booking, UUID currentUserId) {
+        return booking.getCustomerId().equals(currentUserId)
+                || booking.getHostId().equals(currentUserId)
+                || securityContext.hasRole(Role.ADMIN);
     }
 
     private boolean vehicleIsActive(Listing listing) {
@@ -313,5 +355,57 @@ public class BookingService {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Unable to read booking JSON", e);
         }
+    }
+
+    private BookingSummaryResponse toSummaryResponse(Booking booking) {
+        JsonNode priceSnapshot = readTree(booking.getPriceSnapshot());
+        return new BookingSummaryResponse(
+                booking.getId(),
+                booking.getStatus(),
+                booking.getListingId(),
+                findListingTitle(booking.getListingId()),
+                booking.getPickupDate(),
+                booking.getReturnDate(),
+                booking.getHoldExpiresAt(),
+                amountFromSnapshot(priceSnapshot, "totalAmount"),
+                textFromSnapshot(priceSnapshot, "currency"),
+                booking.getCreatedAt());
+    }
+
+    private BookingResponse toBookingResponse(Booking booking) {
+        JsonNode priceSnapshot = readTree(booking.getPriceSnapshot());
+        JsonNode policySnapshot = readTree(booking.getPolicySnapshot());
+        return new BookingResponse(
+                booking.getId(),
+                booking.getStatus(),
+                booking.getListingId(),
+                findListingTitle(booking.getListingId()),
+                booking.getCustomerId(),
+                booking.getHostId(),
+                booking.getPickupDate(),
+                booking.getReturnDate(),
+                booking.getPickupLocation(),
+                booking.getReturnLocation(),
+                booking.getHoldExpiresAt(),
+                amountFromSnapshot(priceSnapshot, "totalAmount"),
+                textFromSnapshot(priceSnapshot, "currency"),
+                priceSnapshot,
+                policySnapshot,
+                booking.getCreatedAt());
+    }
+
+    private String findListingTitle(UUID listingId) {
+        Optional<Listing> listing = listingRepository.findById(listingId);
+        return listing.map(Listing::getTitle).orElse(null);
+    }
+
+    private BigDecimal amountFromSnapshot(JsonNode snapshot, String field) {
+        JsonNode value = snapshot.get(field);
+        return value == null || value.isNull() ? null : value.decimalValue();
+    }
+
+    private String textFromSnapshot(JsonNode snapshot, String field) {
+        JsonNode value = snapshot.get(field);
+        return value == null || value.isNull() ? null : value.asText();
     }
 }

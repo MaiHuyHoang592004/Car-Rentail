@@ -37,6 +37,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -303,6 +305,77 @@ class BookingServiceTest {
                 .hasFieldOrPropertyWithValue("code", "LISTING_NOT_AVAILABLE");
     }
 
+    @Test
+    void listMyBookingsReturnsCurrentCustomerBookings() {
+        Booking booking = booking();
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(bookingRepository.findByCustomerIdAndStatusOrderByCreatedAtDesc(
+                CUSTOMER_ID, BookingStatus.HELD, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(booking), PageRequest.of(0, 20), 1));
+        when(listingRepository.findById(LISTING_ID)).thenReturn(Optional.of(activeListing()));
+
+        var result = bookingService.listMyBookings(BookingStatus.HELD, PageRequest.of(0, 20));
+
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.content().get(0).id()).isEqualTo(BOOKING_ID);
+        assertThat(result.content().get(0).listingTitle()).isEqualTo("Toyota Vios 2022");
+        assertThat(result.content().get(0).totalAmount()).isEqualByComparingTo("1500000.00");
+        verify(securityContext).requireRole(Role.CUSTOMER);
+    }
+
+    @Test
+    void getBookingAllowsCustomerOwner() {
+        Booking booking = booking();
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(listingRepository.findById(LISTING_ID)).thenReturn(Optional.of(activeListing()));
+
+        BookingResponse result = bookingService.getBooking(BOOKING_ID);
+
+        assertThat(result.id()).isEqualTo(BOOKING_ID);
+        assertThat(result.customerId()).isEqualTo(CUSTOMER_ID);
+        assertThat(result.totalAmount()).isEqualByComparingTo("1500000.00");
+    }
+
+    @Test
+    void getBookingAllowsHostOwner() {
+        Booking booking = booking();
+        when(securityContext.currentUserId()).thenReturn(HOST_ID);
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(listingRepository.findById(LISTING_ID)).thenReturn(Optional.of(activeListing()));
+
+        BookingResponse result = bookingService.getBooking(BOOKING_ID);
+
+        assertThat(result.hostId()).isEqualTo(HOST_ID);
+    }
+
+    @Test
+    void getBookingAllowsAdmin() {
+        Booking booking = booking();
+        UUID adminId = UUID.fromString("88888888-8888-8888-8888-888888888888");
+        when(securityContext.currentUserId()).thenReturn(adminId);
+        when(securityContext.hasRole(Role.ADMIN)).thenReturn(true);
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(listingRepository.findById(LISTING_ID)).thenReturn(Optional.of(activeListing()));
+
+        BookingResponse result = bookingService.getBooking(BOOKING_ID);
+
+        assertThat(result.id()).isEqualTo(BOOKING_ID);
+    }
+
+    @Test
+    void getBookingRejectsUnauthorizedAsNotFound() {
+        Booking booking = booking();
+        UUID otherUserId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        when(securityContext.currentUserId()).thenReturn(otherUserId);
+        when(securityContext.hasRole(Role.ADMIN)).thenReturn(false);
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.getBooking(BOOKING_ID))
+                .isInstanceOf(com.rentflow.common.exception.BookingNotFoundException.class)
+                .hasFieldOrPropertyWithValue("code", "BOOKING_NOT_FOUND");
+    }
+
     private void mockProceed() {
         mockProceed(request());
     }
@@ -381,5 +454,27 @@ class BookingServiceTest {
         AvailabilityCalendar dayTwo = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 6, 2));
         dayTwo.setStatus(second);
         return List.of(dayOne, dayTwo);
+    }
+
+    private Booking booking() {
+        Booking booking = new Booking();
+        booking.setId(BOOKING_ID);
+        booking.setStatus(BookingStatus.HELD);
+        booking.setListingId(LISTING_ID);
+        booking.setCustomerId(CUSTOMER_ID);
+        booking.setHostId(HOST_ID);
+        booking.setPickupDate(LocalDate.of(2026, 6, 1));
+        booking.setReturnDate(LocalDate.of(2026, 6, 3));
+        booking.setPickupLocation("Hanoi");
+        booking.setReturnLocation("Hanoi");
+        booking.setHoldExpiresAt(NOW.plusSeconds(900));
+        booking.setPriceSnapshot("""
+                {"totalAmount":1500000.00,"currency":"VND","extras":[]}
+                """);
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"FLEXIBLE","instantBook":true,"dailyKmLimit":200}
+                """);
+        booking.setCreatedAt(NOW);
+        return booking;
     }
 }

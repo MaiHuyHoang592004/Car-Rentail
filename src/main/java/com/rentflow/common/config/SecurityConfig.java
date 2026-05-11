@@ -62,6 +62,10 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/listings").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/listings/{id}").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/listings/{id}/availability").permitAll()
+                    // Booking endpoints require authentication; service layer enforces roles and ownership
+                    .requestMatchers(HttpMethod.POST, "/api/v1/bookings").authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/bookings/me").authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{id}").authenticated()
                     // Admin endpoints require ADMIN
                     .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                     .requestMatchers("/api/v1/host/**").hasRole("HOST")
