@@ -9,10 +9,10 @@ public record ErrorResponse(
         String code,
         String message,
         List<FieldError> details,
-        String correlationId
+    String correlationId
 ) {
     public static ErrorResponse of(String code, String message, String correlationId) {
-        return new ErrorResponse(code, message, null, correlationId);
+        return new ErrorResponse(code, message, List.of(), correlationId);
     }
 
     public static ErrorResponse of(String code, String message, List<FieldError> details, String correlationId) {

@@ -32,6 +32,11 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
+jwt:
+  secret: ${JWT_SECRET:}
+  access-token-expiry: PT15M
+  refresh-token-expiry: P7D
+
 server:
   error:
     include-message: never

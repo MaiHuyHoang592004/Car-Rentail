@@ -1,18 +1,29 @@
 package com.rentflow.common.web;
 
+import com.rentflow.common.config.SecurityConfig;
+import com.rentflow.common.exception.CorrelationIdHelper;
+import com.rentflow.common.security.JwtAuthenticationEntryPoint;
+import com.rentflow.common.security.JwtAuthenticationFilter;
+import com.rentflow.common.security.JwtTokenProvider;
+import com.rentflow.common.security.JsonAccessDeniedHandler;
+import com.rentflow.common.security.SecurityContext;
+import com.rentflow.common.security.SecurityContextImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Duration;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = HealthController.class)
-@Import(HealthControllerTest.TestConfig.class)
+@Import({HealthControllerTest.TestConfig.class, SecurityConfig.class})
 class HealthControllerTest {
 
     @TestConfiguration
@@ -23,8 +34,38 @@ class HealthControllerTest {
         }
 
         @Bean
-        public com.rentflow.common.exception.CorrelationIdHelper correlationIdHelper() {
-            return new com.rentflow.common.exception.CorrelationIdHelper();
+        public CorrelationIdHelper correlationIdHelper() {
+            return new CorrelationIdHelper();
+        }
+
+        @Bean
+        public JwtTokenProvider jwtTokenProvider() {
+            return new JwtTokenProvider(
+                    "test-jwt-secret-key-for-unit-tests-only-minimum-60-bytes-required-for-hs512",
+                    Duration.ofMinutes(15),
+                    Duration.ofDays(7)
+            );
+        }
+
+        @Bean
+        public JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint() {
+            return new JwtAuthenticationEntryPoint(new com.fasterxml.jackson.databind.ObjectMapper());
+        }
+
+        @Bean
+        public JsonAccessDeniedHandler jsonAccessDeniedHandler() {
+            return new JsonAccessDeniedHandler(new com.fasterxml.jackson.databind.ObjectMapper());
+        }
+
+        @Bean
+        public JwtAuthenticationFilter jwtAuthenticationFilter(JwtTokenProvider tokenProvider,
+                                                             JwtAuthenticationEntryPoint entryPoint) {
+            return new JwtAuthenticationFilter(tokenProvider, entryPoint);
+        }
+
+        @Bean
+        public SecurityContext securityContext() {
+            return new SecurityContextImpl();
         }
     }
 
