@@ -23,3 +23,7 @@ jwt:
 encryption:
   secret: Q6iaj8bzwS3UjXZTvgin7MChtBS6lhUZmj19bHF6z1o=
 
+rentflow:
+  scheduler:
+    expire-held-bookings:
+      enabled: false

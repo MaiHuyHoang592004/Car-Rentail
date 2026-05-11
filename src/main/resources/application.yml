@@ -37,6 +37,13 @@ jwt:
   access-token-expiry: PT15M
   refresh-token-expiry: P7D
 
+rentflow:
+  scheduler:
+    expire-held-bookings:
+      enabled: ${EXPIRE_HELD_BOOKINGS_ENABLED:true}
+      batch-size: ${EXPIRE_HELD_BOOKINGS_BATCH_SIZE:100}
+      fixed-delay-ms: ${EXPIRE_HELD_BOOKINGS_FIXED_DELAY_MS:60000}
+
 server:
   error:
     include-message: never
