@@ -28,7 +28,7 @@ public class IdempotencyKey extends BaseEntity {
     @Column(nullable = false, length = 80)
     private IdempotencyScope scope;
 
-    @Column(name = "key", nullable = false, length = 120)
+    @Column(name = "\"key\"", nullable = false, length = 120)
     private String key;
 
     @Column(name = "request_hash", nullable = false, length = 128)
