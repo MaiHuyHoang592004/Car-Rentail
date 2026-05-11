@@ -77,6 +77,14 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
     }
 
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<ErrorResponse> handleValidationException(ValidationException ex, HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        log.warn("Validation error [{}]: {} - {}", cid, ex.getCode(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
+    }
+
     @ExceptionHandler(ConcurrencyException.class)
     public ResponseEntity<ErrorResponse> handleConcurrency(ConcurrencyException ex, HttpServletRequest request) {
         String cid = correlationIdHelper.getCorrelationId();
