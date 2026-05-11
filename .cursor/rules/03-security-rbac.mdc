@@ -25,6 +25,13 @@ Role checks are NOT enough. Always check resource ownership:
 - Duplicate key + different body: `409 IDEMPOTENCY_KEY_CONFLICT`
 - Idempotency scopes: `CREATE_BOOKING`, `AUTHORIZE_PAYMENT`, `CAPTURE_PAYMENT`, `VOID_PAYMENT`, `REFUND_PAYMENT`, `CANCEL_BOOKING`, `HOST_APPROVE_BOOKING`, `HOST_REJECT_BOOKING`
 
+## Idempotency key lock behavior
+- Row must be locked with FOR UPDATE before checking status
+- PROCESSING + locked_until > now → 409 REQUEST_ALREADY_PROCESSING
+- COMPLETED + same request hash → return stored response (do not re-execute)
+- COMPLETED + different request hash → 409 IDEMPOTENCY_KEY_CONFLICT
+- FAILED + lock expired → retry allowed
+
 ## Never Expose in API
 
 - `passwordHash`

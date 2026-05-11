@@ -11,10 +11,14 @@
 
 ## Transaction Boundaries
 
-- Lock order must be deterministic: always `ORDER BY available_date ASC` to prevent deadlocks.
 - Never do business logic after transaction commits.
 - Never catch `Exception` and suppress — let transaction rollback.
-- For critical operations (booking, payment), lock idempotency key FIRST with `FOR UPDATE`.
+- Full lock order for booking/payment operations:
+  1. Idempotency key (FOR UPDATE) — always first
+  2. Booking row (FOR UPDATE)
+  3. BookingPayment row (FOR UPDATE) — if payment involved
+  4. Availability rows (SELECT FOR UPDATE ORDER BY available_date ASC) — always last
+  Never acquire locks in a different order — this prevents deadlocks.
 - Use `FOR UPDATE SKIP LOCKED` for scheduled jobs to prevent duplicate processing.
 - Process in bounded batches (default: 100 records per batch).
 
