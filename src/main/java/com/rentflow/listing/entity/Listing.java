@@ -1,0 +1,75 @@
+package com.rentflow.listing.entity;
+
+import com.rentflow.common.BaseEntity;
+import com.rentflow.vehicle.entity.Vehicle;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Table(name = "listings")
+@Getter
+@Setter
+public class Listing extends BaseEntity {
+
+    @Column(name = "vehicle_id", nullable = false)
+    private UUID vehicleId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_id", referencedColumnName = "id",
+                insertable = false, updatable = false)
+    private Vehicle vehicle;
+
+    @Column(name = "host_id", nullable = false)
+    private UUID hostId;
+
+    @Column(nullable = false, length = 200)
+    private String title;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(nullable = false, length = 100)
+    private String city;
+
+    @Column(columnDefinition = "TEXT")
+    private String address;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal longitude;
+
+    @Column(name = "base_price_per_day", nullable = false, precision = 10, scale = 2)
+    private BigDecimal basePricePerDay;
+
+    @Column(nullable = false, length = 3)
+    private String currency = "VND";
+
+    @Column(name = "daily_km_limit")
+    private Integer dailyKmLimit;
+
+    @Column(name = "instant_book", nullable = false)
+    private Boolean instantBook = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancellation_policy", nullable = false, length = 20)
+    private CancellationPolicy cancellationPolicy = CancellationPolicy.FLEXIBLE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private ListingStatus status = ListingStatus.DRAFT;
+
+    @Version
+    @Column(nullable = false)
+    private Long version = 0L;
+
+    @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Extra> extras = new ArrayList<>();
+}

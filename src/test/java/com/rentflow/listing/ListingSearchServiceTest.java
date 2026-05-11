@@ -1,0 +1,150 @@
+package com.rentflow.listing;
+
+import com.rentflow.common.web.PageResponse;
+import com.rentflow.listing.dto.ListingSearchCriteria;
+import com.rentflow.listing.dto.ListingSearchRequest;
+import com.rentflow.listing.dto.ListingSearchResponse;
+import com.rentflow.listing.entity.Listing;
+import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.listing.service.ListingSearchService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("ListingSearchService")
+class ListingSearchServiceTest {
+
+    @Mock
+    private ListingRepository listingRepository;
+
+    private ListingSearchService searchService;
+
+    @BeforeEach
+    void setUp() {
+        searchService = new ListingSearchService(listingRepository);
+    }
+
+    private Listing aListing(UUID id, String city) {
+        Listing listing = new Listing();
+        listing.setId(id);
+        listing.setTitle("Test Listing");
+        listing.setCity(city);
+        listing.setBasePricePerDay(BigDecimal.valueOf(500));
+        listing.setCurrency("VND");
+        return listing;
+    }
+
+    @Nested
+    @DisplayName("search")
+    class Search {
+
+        @Test
+        @DisplayName("with city — forwards city to repository criteria")
+        void search_withCity_forwardsCityToCriteria() {
+            ListingSearchRequest request = new ListingSearchRequest(
+                    "Ho Chi Minh City", null, null, null,
+                    null, null, null, null, null, 0, 20);
+
+            ArgumentCaptor<ListingSearchCriteria> criteriaCaptor =
+                    ArgumentCaptor.forClass(ListingSearchCriteria.class);
+            ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+
+            when(listingRepository.search(criteriaCaptor.capture(), pageableCaptor.capture()))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+            PageResponse<ListingSearchResponse> result = searchService.search(request);
+
+            assertThat(result.content()).isEmpty();
+            assertThat(criteriaCaptor.getValue().city()).isEqualTo("Ho Chi Minh City");
+            assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("with date range — forwards dates to repository criteria")
+        void search_withDateRange_forwardsDatesToCriteria() {
+            LocalDate pickup = LocalDate.of(2026, 5, 15);
+            LocalDate ret    = LocalDate.of(2026, 5, 18);
+            ListingSearchRequest request = new ListingSearchRequest(
+                    null, null, pickup, ret,
+                    null, null, null, null, null, 0, 20);
+
+            ArgumentCaptor<ListingSearchCriteria> criteriaCaptor =
+                    ArgumentCaptor.forClass(ListingSearchCriteria.class);
+
+            when(listingRepository.search(criteriaCaptor.capture(), any()))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+            searchService.search(request);
+
+            ListingSearchCriteria captured = criteriaCaptor.getValue();
+            assertThat(captured.pickupDate()).isEqualTo(pickup);
+            assertThat(captured.returnDate()).isEqualTo(ret);
+        }
+
+        @Test
+        @DisplayName("with oversized page size — caps to 100")
+        void search_withOversizedPageSize_cappedTo100() {
+            // ListingSearchRequest constructor normalises size > 100 to 100
+            ListingSearchRequest request = new ListingSearchRequest(
+                    null, null, null, null,
+                    null, null, null, null, null, 0, 200);
+
+            ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+
+            when(listingRepository.search(any(), pageableCaptor.capture()))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 200), 0));
+
+            searchService.search(request);
+
+            assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(100);
+        }
+
+        @Test
+        @DisplayName("with no dates — returns listings without date filter")
+        void search_withNoDates_returnsActiveListings() {
+            Listing listing = aListing(UUID.randomUUID(), "Hanoi");
+
+            when(listingRepository.search(any(), any()))
+                    .thenReturn(new PageImpl<>(List.of(listing), PageRequest.of(0, 20), 1));
+
+            PageResponse<ListingSearchResponse> result = searchService.search(
+                    new ListingSearchRequest(
+                            null, null, null, null,
+                            null, null, null, null, null, 0, 20));
+
+            assertThat(result.content()).hasSize(1);
+            assertThat(result.content().get(0).city()).isEqualTo("Hanoi");
+        }
+
+        @Test
+        @DisplayName("with pickup but no return — throws validation error")
+        void search_withPartialDateRange_throwsValidationError() {
+            ListingSearchRequest request = new ListingSearchRequest(
+                    null, null, LocalDate.of(2026, 5, 15), null,
+                    null, null, null, null, null, 0, 20);
+
+            assertThatThrownBy(() -> searchService.search(request))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Both pickupDate and returnDate must be provided together");
+        }
+    }
+}
