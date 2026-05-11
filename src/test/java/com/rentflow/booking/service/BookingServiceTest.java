@@ -52,7 +52,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -252,6 +251,101 @@ class BookingServiceTest {
                 LISTING_ID,
                 LocalDate.of(2026, 5, 10),
                 LocalDate.of(2026, 5, 11),
+                "Hanoi",
+                "Hanoi",
+                List.of());
+        mockProceed(request);
+        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+                .thenReturn(Optional.of(activeListing()));
+
+        assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request))
+                .isInstanceOf(ValidationException.class)
+                .hasFieldOrPropertyWithValue("code", "VALIDATION_ERROR");
+    }
+
+    @Test
+    void returnDateBeforePickupDateThrowsValidationError() {
+        CreateBookingRequest request = new CreateBookingRequest(
+                LISTING_ID,
+                LocalDate.of(2026, 6, 3),
+                LocalDate.of(2026, 6, 1),
+                "Hanoi",
+                "Hanoi",
+                List.of());
+        mockProceed(request);
+        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+                .thenReturn(Optional.of(activeListing()));
+
+        assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request))
+                .isInstanceOf(ValidationException.class)
+                .hasFieldOrPropertyWithValue("code", "VALIDATION_ERROR");
+    }
+
+    @Test
+    void returnDateEqualPickupDateThrowsValidationError() {
+        CreateBookingRequest request = new CreateBookingRequest(
+                LISTING_ID,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 6, 1),
+                "Hanoi",
+                "Hanoi",
+                List.of());
+        mockProceed(request);
+        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+                .thenReturn(Optional.of(activeListing()));
+
+        assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request))
+                .isInstanceOf(ValidationException.class)
+                .hasFieldOrPropertyWithValue("code", "VALIDATION_ERROR");
+    }
+
+    @Test
+    void oneDayBookingIsValid() {
+        CreateBookingRequest request = new CreateBookingRequest(
+                LISTING_ID,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 6, 2),
+                "Hanoi",
+                "Hanoi",
+                List.of());
+        mockValidCreate(request, availabilityRows(AvailabilityStatus.FREE));
+
+        BookingResponse response = bookingService.createBooking(IDEMPOTENCY_KEY, request);
+
+        assertThat(response.status()).isEqualTo(BookingStatus.HELD);
+        assertThat(response.priceSnapshot().get("rentalDays").asLong()).isEqualTo(1);
+    }
+
+    @Test
+    void thirtyDayBookingIsValid() {
+        CreateBookingRequest request = new CreateBookingRequest(
+                LISTING_ID,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 7, 1),
+                "Hanoi",
+                "Hanoi",
+                List.of());
+        List<AvailabilityCalendar> rows = java.util.stream.IntStream.range(0, 30)
+                .mapToObj(day -> {
+                    AvailabilityCalendar row = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 6, 1).plusDays(day));
+                    row.setStatus(AvailabilityStatus.FREE);
+                    return row;
+                })
+                .toList();
+        mockValidCreate(request, rows);
+
+        BookingResponse response = bookingService.createBooking(IDEMPOTENCY_KEY, request);
+
+        assertThat(response.status()).isEqualTo(BookingStatus.HELD);
+        assertThat(response.priceSnapshot().get("rentalDays").asLong()).isEqualTo(30);
+    }
+
+    @Test
+    void moreThanThirtyDaysThrowsValidationError() {
+        CreateBookingRequest request = new CreateBookingRequest(
+                LISTING_ID,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 7, 2),
                 "Hanoi",
                 "Hanoi",
                 List.of());
@@ -577,6 +671,24 @@ class BookingServiceTest {
                 .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
     }
 
+    private void mockValidCreate(CreateBookingRequest request, List<AvailabilityCalendar> availabilityRows) {
+        mockProceed(request);
+        Listing listing = activeListing();
+        listing.setExtras(List.of());
+        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+                .thenReturn(Optional.of(listing));
+        when(bookingRepository.existsOverlappingActiveBooking(eq(CUSTOMER_ID), any(), any(), any()))
+                .thenReturn(false);
+        when(availabilityRepository.findForBookingRangeForUpdate(
+                LISTING_ID, request.pickupDate(), request.returnDate()))
+                .thenReturn(availabilityRows);
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
+            Booking booking = invocation.getArgument(0);
+            booking.setId(BOOKING_ID);
+            return booking;
+        });
+    }
+
     private void mockCancelProceed() {
         when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
         when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
@@ -651,6 +763,12 @@ class BookingServiceTest {
         AvailabilityCalendar dayTwo = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 6, 2));
         dayTwo.setStatus(second);
         return List.of(dayOne, dayTwo);
+    }
+
+    private List<AvailabilityCalendar> availabilityRows(AvailabilityStatus first) {
+        AvailabilityCalendar dayOne = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 6, 1));
+        dayOne.setStatus(first);
+        return List.of(dayOne);
     }
 
     private List<AvailabilityCalendar> heldAvailabilityRows(Booking booking, UUID holdToken) {

@@ -61,6 +61,16 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of("ACCESS_DENIED", "Access denied: insufficient permissions", cid));
     }
 
+    @ExceptionHandler(com.rentflow.common.exception.AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleRentFlowAccessDenied(
+            com.rentflow.common.exception.AccessDeniedException ex,
+            HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        log.warn("Access denied [{}]: {} - {}", cid, ex.getCode(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
+    }
+
     @ExceptionHandler(DriverLicenseNotApprovedException.class)
     public ResponseEntity<ErrorResponse> handleDriverLicenseNotApproved(
             DriverLicenseNotApprovedException ex, HttpServletRequest request) {
