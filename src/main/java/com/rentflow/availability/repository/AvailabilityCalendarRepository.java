@@ -38,6 +38,17 @@ public interface AvailabilityCalendarRepository extends JpaRepository<Availabili
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT ac FROM AvailabilityCalendar ac " +
+           "WHERE ac.listingId = :listingId " +
+           "AND ac.availableDate >= :pickupDate " +
+           "AND ac.availableDate < :returnDate " +
+           "ORDER BY ac.availableDate ASC")
+    List<AvailabilityCalendar> findForBookingRangeForUpdate(
+            @Param("listingId") UUID listingId,
+            @Param("pickupDate") LocalDate pickupDate,
+            @Param("returnDate") LocalDate returnDate);
+
     @Query("SELECT ac FROM AvailabilityCalendar ac " +
            "WHERE ac.listingId = :listingId " +
            "AND ac.availableDate >= :from " +
