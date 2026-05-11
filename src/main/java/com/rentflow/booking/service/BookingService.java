@@ -177,6 +177,60 @@ public class BookingService {
         return toBookingResponse(booking);
     }
 
+    @Transactional
+    public CancelBookingResponse cancelBooking(UUID id, String idempotencyKey, CancelBookingRequest request) {
+        CancelBookingRequest cancelRequest = request == null ? new CancelBookingRequest(null) : request;
+        UUID customerId = securityContext.currentUserId();
+        String requestHash = idempotencyService.computeHash(new CancelHashInput(id, cancelRequest));
+        IdempotencyResolution resolution = idempotencyService.resolve(
+                customerId,
+                IdempotencyScope.CANCEL_BOOKING,
+                idempotencyKey,
+                requestHash);
+
+        if (resolution instanceof IdempotencyResolution.Replay replay) {
+            return deserializeCancelResponse(replay.responseBodyJson());
+        }
+
+        UUID idempotencyKeyId = ((IdempotencyResolution.Proceed) resolution).idempotencyKeyId();
+        try {
+            Booking booking = bookingRepository.findByIdForUpdate(id)
+                    .orElseThrow(() -> new BookingNotFoundException(String.valueOf(id)));
+            if (!booking.getCustomerId().equals(customerId)) {
+                throw new BookingNotFoundException(String.valueOf(id));
+            }
+            if (booking.getStatus() != BookingStatus.HELD) {
+                throw new BusinessRuleException(
+                        "BOOKING_INVALID_STATUS",
+                        "Booking cannot be cancelled in its current status");
+            }
+
+            List<AvailabilityCalendar> availabilityRows = availabilityCalendarRepository.findForBookingRangeForUpdate(
+                    booking.getListingId(),
+                    booking.getPickupDate(),
+                    booking.getReturnDate());
+            String cancellationReason = sanitizeCancellationReason(cancelRequest.reason());
+            booking.setStatus(BookingStatus.CANCELLED);
+            booking.setCancellationReason(cancellationReason);
+            bookingRepository.save(booking);
+
+            List<AvailabilityCalendar> releasedRows = releaseHeldAvailability(availabilityRows, booking);
+            if (!releasedRows.isEmpty()) {
+                availabilityCalendarRepository.saveAll(releasedRows);
+            }
+
+            CancelBookingResponse response = new CancelBookingResponse(
+                    booking.getId(),
+                    booking.getStatus(),
+                    booking.getCancellationReason());
+            idempotencyService.complete(idempotencyKeyId, 200, serialize(response));
+            return response;
+        } catch (RuntimeException e) {
+            // TODO: Consider a REQUIRES_NEW failure marker in a later idempotency hardening step.
+            throw e;
+        }
+    }
+
     private BookingResponse createBookingAfterIdempotency(UUID customerId, CreateBookingRequest request) {
         securityContext.requireRole(Role.CUSTOMER);
         validateDriverVerification(customerId);
@@ -378,6 +432,39 @@ public class BookingService {
         }
     }
 
+    private CancelBookingResponse deserializeCancelResponse(String responseJson) {
+        try {
+            return objectMapper.readValue(responseJson, CancelBookingResponse.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Unable to deserialize idempotency response", e);
+        }
+    }
+
+    private String sanitizeCancellationReason(String reason) {
+        if (reason == null) {
+            return null;
+        }
+        String sanitized = reason.replaceAll("<[^>]*>", "").trim();
+        if (sanitized.isBlank()) {
+            return null;
+        }
+        return sanitized.length() > 500 ? sanitized.substring(0, 500) : sanitized;
+    }
+
+    private List<AvailabilityCalendar> releaseHeldAvailability(List<AvailabilityCalendar> rows, Booking booking) {
+        return rows.stream()
+                .filter(row -> row.getStatus() == AvailabilityStatus.HOLD)
+                .filter(row -> booking.getId().equals(row.getBookingId()))
+                .filter(row -> booking.getHoldToken() == null || booking.getHoldToken().equals(row.getHoldToken()))
+                .peek(row -> {
+                    row.setStatus(AvailabilityStatus.FREE);
+                    row.setBookingId(null);
+                    row.setHoldToken(null);
+                    row.setHoldExpiresAt(null);
+                })
+                .toList();
+    }
+
     private JsonNode readTree(String json) {
         try {
             return objectMapper.readTree(json);
@@ -436,5 +523,8 @@ public class BookingService {
     private String textFromSnapshot(JsonNode snapshot, String field) {
         JsonNode value = snapshot.get(field);
         return value == null || value.isNull() ? null : value.asText();
+    }
+
+    private record CancelHashInput(UUID bookingId, CancelBookingRequest request) {
     }
 }

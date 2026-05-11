@@ -5,6 +5,8 @@ import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.service.BookingResponse;
 import com.rentflow.booking.service.BookingService;
 import com.rentflow.booking.service.BookingSummaryResponse;
+import com.rentflow.booking.service.CancelBookingRequest;
+import com.rentflow.booking.service.CancelBookingResponse;
 import com.rentflow.booking.service.CreateBookingRequest;
 import com.rentflow.booking.service.PatchBookingLocationRequest;
 import com.rentflow.common.exception.IdempotencyException;
@@ -70,6 +72,16 @@ public class BookingController {
             @RequestBody JsonNode requestBody) {
         PatchBookingLocationRequest request = parsePatchRequest(requestBody);
         return ResponseEntity.ok(bookingService.patchBookingLocations(id, request));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<CancelBookingResponse> cancelBooking(
+            @PathVariable UUID id,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestBody(required = false) CancelBookingRequest request) {
+        validateIdempotencyKey(idempotencyKey);
+        CancelBookingRequest cancelRequest = request == null ? new CancelBookingRequest(null) : request;
+        return ResponseEntity.ok(bookingService.cancelBooking(id, idempotencyKey, cancelRequest));
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {

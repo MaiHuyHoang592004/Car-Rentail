@@ -52,6 +52,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -423,6 +424,148 @@ class BookingServiceTest {
                 .hasFieldOrPropertyWithValue("code", "BOOKING_INVALID_STATUS");
     }
 
+    @Test
+    void cancelBookingCancelsHeldBookingReleasesAvailabilityAndCompletesIdempotency() {
+        Booking booking = booking();
+        UUID holdToken = UUID.fromString("12121212-1212-4212-8212-121212121212");
+        booking.setHoldToken(holdToken);
+        List<AvailabilityCalendar> rows = heldAvailabilityRows(booking, holdToken);
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(availabilityRepository.findForBookingRangeForUpdate(
+                LISTING_ID, booking.getPickupDate(), booking.getReturnDate()))
+                .thenReturn(rows);
+
+        CancelBookingResponse response = bookingService.cancelBooking(
+                BOOKING_ID,
+                IDEMPOTENCY_KEY,
+                new CancelBookingRequest(" <b>Change</b> of <script>x</script> plan "));
+
+        assertThat(response.id()).isEqualTo(BOOKING_ID);
+        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(response.cancellationReason()).isEqualTo("Change of x plan");
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(booking.getCancellationReason()).isEqualTo("Change of x plan");
+        assertThat(rows).allSatisfy(row -> {
+            assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.FREE);
+            assertThat(row.getBookingId()).isNull();
+            assertThat(row.getHoldToken()).isNull();
+            assertThat(row.getHoldExpiresAt()).isNull();
+        });
+        verify(bookingRepository).findByIdForUpdate(BOOKING_ID);
+        verify(bookingRepository).save(booking);
+        verify(availabilityRepository).saveAll(rows);
+        verify(idempotencyService).complete(eq(IDEMPOTENCY_ID), eq(200), any());
+    }
+
+    @Test
+    void cancelBookingReplayReturnsStoredResponseWithoutBusinessLogic() throws Exception {
+        CancelBookingRequest request = new CancelBookingRequest("Change of plan");
+        CancelBookingResponse replayed = new CancelBookingResponse(BOOKING_ID, BookingStatus.CANCELLED, "Change of plan");
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.replay(200, objectMapper.writeValueAsString(replayed)));
+
+        CancelBookingResponse result = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, request);
+
+        assertThat(result).isEqualTo(replayed);
+        verify(bookingRepository, never()).findByIdForUpdate(any());
+        verifyNoInteractions(availabilityRepository);
+    }
+
+    @Test
+    void cancelBookingConfirmedStatusThrowsBookingInvalidStatus() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(
+                BOOKING_ID,
+                IDEMPOTENCY_KEY,
+                new CancelBookingRequest("Change of plan")))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "BOOKING_INVALID_STATUS");
+    }
+
+    @Test
+    void cancelBookingNonOwnerThrowsBookingNotFound() {
+        Booking booking = booking();
+        UUID otherUserId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        when(securityContext.currentUserId()).thenReturn(otherUserId);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(otherUserId, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(
+                BOOKING_ID,
+                IDEMPOTENCY_KEY,
+                new CancelBookingRequest("Change of plan")))
+                .isInstanceOf(BookingNotFoundException.class)
+                .hasFieldOrPropertyWithValue("code", "BOOKING_NOT_FOUND");
+    }
+
+    @Test
+    void cancelBookingHashInputIncludesBookingIdAndRequest() {
+        Booking booking = booking();
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
+
+        bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Change of plan"));
+
+        ArgumentCaptor<Object> hashCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(idempotencyService).computeHash(hashCaptor.capture());
+        assertThat(hashCaptor.getValue())
+                .usingRecursiveComparison()
+                .isEqualTo(new Object() {
+                    @SuppressWarnings("unused")
+                    public final UUID bookingId = BOOKING_ID;
+                    @SuppressWarnings("unused")
+                    public final CancelBookingRequest request = new CancelBookingRequest("Change of plan");
+                });
+    }
+
+    @Test
+    void cancelBookingSanitizesBlankReasonToNull() {
+        Booking booking = booking();
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
+
+        CancelBookingResponse response = bookingService.cancelBooking(
+                BOOKING_ID,
+                IDEMPOTENCY_KEY,
+                new CancelBookingRequest(" <b> </b> "));
+
+        assertThat(response.cancellationReason()).isNull();
+        assertThat(booking.getCancellationReason()).isNull();
+    }
+
+    @Test
+    void cancelBookingTruncatesReasonToFiveHundredCharacters() {
+        Booking booking = booking();
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
+
+        CancelBookingResponse response = bookingService.cancelBooking(
+                BOOKING_ID,
+                IDEMPOTENCY_KEY,
+                new CancelBookingRequest("a".repeat(550)));
+
+        assertThat(response.cancellationReason()).hasSize(500);
+        assertThat(booking.getCancellationReason()).hasSize(500);
+    }
+
     private void mockProceed() {
         mockProceed(request());
     }
@@ -431,6 +574,13 @@ class BookingServiceTest {
         when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
         when(idempotencyService.computeHash(request)).thenReturn(REQUEST_HASH);
         when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CREATE_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+    }
+
+    private void mockCancelProceed() {
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
                 .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
     }
 
@@ -500,6 +650,20 @@ class BookingServiceTest {
         dayOne.setStatus(first);
         AvailabilityCalendar dayTwo = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 6, 2));
         dayTwo.setStatus(second);
+        return List.of(dayOne, dayTwo);
+    }
+
+    private List<AvailabilityCalendar> heldAvailabilityRows(Booking booking, UUID holdToken) {
+        AvailabilityCalendar dayOne = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 6, 1));
+        dayOne.setStatus(AvailabilityStatus.HOLD);
+        dayOne.setBookingId(booking.getId());
+        dayOne.setHoldToken(holdToken);
+        dayOne.setHoldExpiresAt(booking.getHoldExpiresAt());
+        AvailabilityCalendar dayTwo = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 6, 2));
+        dayTwo.setStatus(AvailabilityStatus.HOLD);
+        dayTwo.setBookingId(booking.getId());
+        dayTwo.setHoldToken(holdToken);
+        dayTwo.setHoldExpiresAt(booking.getHoldExpiresAt());
         return List.of(dayOne, dayTwo);
     }
 

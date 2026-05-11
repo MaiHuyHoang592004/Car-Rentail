@@ -7,6 +7,8 @@ import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.service.BookingResponse;
 import com.rentflow.booking.service.BookingService;
 import com.rentflow.booking.service.BookingSummaryResponse;
+import com.rentflow.booking.service.CancelBookingRequest;
+import com.rentflow.booking.service.CancelBookingResponse;
 import com.rentflow.booking.service.CreateBookingRequest;
 import com.rentflow.booking.service.PatchBookingLocationRequest;
 import com.rentflow.booking.service.RequestedExtra;
@@ -29,6 +31,8 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentCaptor.forClass;
+import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -198,6 +202,63 @@ class BookingControllerTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
+    @Test
+    void cancelBookingMissingIdempotencyKeyReturnsRequiredError() throws Exception {
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", BOOKING_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Change of plan"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
+    }
+
+    @Test
+    void cancelBookingInvalidIdempotencyKeyReturnsValidationError() throws Exception {
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", BOOKING_ID)
+                        .header("Idempotency-Key", "not-a-v4-uuid")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Change of plan"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void cancelBookingValidHeaderDelegatesAndReturnsOk() throws Exception {
+        when(bookingService.cancelBooking(eq(BOOKING_ID), eq(VALID_IDEMPOTENCY_KEY), any(CancelBookingRequest.class)))
+                .thenReturn(cancelResponse("Change of plan"));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", BOOKING_ID)
+                        .header("Idempotency-Key", VALID_IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Change of plan"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(BOOKING_ID.toString()))
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.cancellationReason").value("Change of plan"));
+
+        verify(bookingService).cancelBooking(eq(BOOKING_ID), eq(VALID_IDEMPOTENCY_KEY), any(CancelBookingRequest.class));
+    }
+
+    @Test
+    void cancelBookingMissingBodyDelegatesWithNullReason() throws Exception {
+        when(bookingService.cancelBooking(eq(BOOKING_ID), eq(VALID_IDEMPOTENCY_KEY), any(CancelBookingRequest.class)))
+                .thenReturn(cancelResponse(null));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", BOOKING_ID)
+                        .header("Idempotency-Key", VALID_IDEMPOTENCY_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        ArgumentCaptor<CancelBookingRequest> requestCaptor = forClass(CancelBookingRequest.class);
+        verify(bookingService).cancelBooking(eq(BOOKING_ID), eq(VALID_IDEMPOTENCY_KEY), requestCaptor.capture());
+        org.assertj.core.api.Assertions.assertThat(requestCaptor.getValue().reason()).isNull();
+    }
+
     private CreateBookingRequest request() {
         return new CreateBookingRequest(
                 LISTING_ID,
@@ -244,5 +305,9 @@ class BookingControllerTest {
                 new BigDecimal("1500000.00"),
                 "VND",
                 Instant.parse("2026-05-11T00:00:00Z"));
+    }
+
+    private CancelBookingResponse cancelResponse(String cancellationReason) {
+        return new CancelBookingResponse(BOOKING_ID, BookingStatus.CANCELLED, cancellationReason);
     }
 }
