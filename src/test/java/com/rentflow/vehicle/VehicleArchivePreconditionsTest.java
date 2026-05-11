@@ -3,7 +3,8 @@ package com.rentflow.vehicle;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.VehicleArchiveNotAllowedException;
 import com.rentflow.common.util.EncryptionUtil;
-import com.rentflow.listing.entity.Listing;
+import com.rentflow.booking.entity.BookingStatus;
+import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.vehicle.dto.CreateVehicleRequest;
@@ -37,6 +38,9 @@ class VehicleArchivePreconditionsTest {
     @Mock
     private ListingRepository listingRepository;
 
+    @Mock
+    private BookingRepository bookingRepository;
+
     @Spy
     private VehicleStateMachine stateMachine = new VehicleStateMachine();
 
@@ -55,7 +59,7 @@ class VehicleArchivePreconditionsTest {
     void setUp() {
         mapper = new VehicleMapper();
         vehicleService = new VehicleService(
-            vehicleRepository, listingRepository, stateMachine, mapper, encryptionUtil);
+            vehicleRepository, listingRepository, bookingRepository, stateMachine, mapper, encryptionUtil);
 
         hostId = UUID.randomUUID();
         vehicleId = UUID.randomUUID();
@@ -76,7 +80,10 @@ class VehicleArchivePreconditionsTest {
     @Test
     void archiveVehicle_succeedsWhenNoActiveListings() {
         when(vehicleRepository.findByIdForUpdate(vehicleId)).thenReturn(Optional.of(vehicle));
-        when(listingRepository.existsNonArchivedListingsWithActiveAvailability(vehicleId)).thenReturn(false);
+        when(bookingRepository.existsActiveBookingsForVehicle(
+                vehicleId,
+                List.of(BookingStatus.HELD, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS)))
+                .thenReturn(false);
         when(listingRepository.findAllByVehicleIdAndStatusNot(vehicleId, ListingStatus.ARCHIVED))
             .thenReturn(List.of());
         when(vehicleRepository.save(any())).thenReturn(vehicle);
@@ -90,7 +97,10 @@ class VehicleArchivePreconditionsTest {
     @Test
     void archiveVehicle_failsWhenActiveListingsExist() {
         when(vehicleRepository.findByIdForUpdate(vehicleId)).thenReturn(Optional.of(vehicle));
-        when(listingRepository.existsNonArchivedListingsWithActiveAvailability(vehicleId)).thenReturn(true);
+        when(bookingRepository.existsActiveBookingsForVehicle(
+                vehicleId,
+                List.of(BookingStatus.HELD, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS)))
+                .thenReturn(true);
 
         assertThatThrownBy(() -> vehicleService.archiveVehicle(vehicleId, hostId))
             .isInstanceOf(VehicleArchiveNotAllowedException.class);

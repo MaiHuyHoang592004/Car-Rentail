@@ -4,6 +4,8 @@ import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.VehicleArchiveNotAllowedException;
 import com.rentflow.common.exception.VehicleNotFoundException;
 import com.rentflow.common.util.EncryptionUtil;
+import com.rentflow.booking.entity.BookingStatus;
+import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
@@ -31,6 +33,7 @@ public class VehicleService {
 
     private final VehicleRepository vehicleRepository;
     private final ListingRepository listingRepository;
+    private final BookingRepository bookingRepository;
     private final VehicleStateMachine stateMachine;
     private final VehicleMapper mapper;
     private final EncryptionUtil encryptionUtil;
@@ -124,16 +127,9 @@ public class VehicleService {
     }
 
     private boolean hasActiveBookings(UUID vehicleId) {
-        // TODO (Phase 4): Replace with bookings table check:
-        //   SELECT EXISTS(SELECT 1 FROM bookings b
-        //     JOIN listings l ON b.listing_id = l.id
-        //     WHERE l.vehicle_id = :vehicleId
-        //     AND b.status IN ('HELD', 'CONFIRMED', 'IN_PROGRESS'))
-        //
-        // For Phase 3, check availability_calendar for non-FREE rows.
-        // This returns true if any date has HOLD/BOOKED status, which implies
-        // an active booking exists. After Phase 4, update to query the bookings table directly.
-        return listingRepository.existsNonArchivedListingsWithActiveAvailability(vehicleId);
+        return bookingRepository.existsActiveBookingsForVehicle(
+                vehicleId,
+                List.of(BookingStatus.HELD, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS));
     }
 
     private void propagateListingStateOnVehicleStatusChange(Vehicle vehicle,
