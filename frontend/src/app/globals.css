@@ -1,0 +1,139 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-heading);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-manrope);
+  --font-mono: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+  --background: #faf8ff;
+  --foreground: #191b23;
+  --card: #ffffff;
+  --card-foreground: #191b23;
+  --popover: #ffffff;
+  --popover-foreground: #191b23;
+  --primary: #003fb1;
+  --primary-foreground: #ffffff;
+  --secondary: #fd761a;
+  --secondary-foreground: #ffffff;
+  --muted: #ededf8;
+  --muted-foreground: #434654;
+  --accent: #f3f3fe;
+  --accent-foreground: #191b23;
+  --destructive: #ba1a1a;
+  --border: #c3c5d7;
+  --input: #c3c5d7;
+  --ring: #1353d8;
+  --chart-1: #003fb1;
+  --chart-2: #fd761a;
+  --chart-3: #852b00;
+  --chart-4: #7383d9;
+  --chart-5: #ad3b00;
+  --radius: 0.5rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #191b23;
+  --sidebar-primary: #003fb1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f3f3fe;
+  --sidebar-accent-foreground: #191b23;
+  --sidebar-border: #c3c5d7;
+  --sidebar-ring: #1353d8;
+}
+
+.dark {
+  --background: #191b23;
+  --foreground: #f0f0fb;
+  --card: #2e3039;
+  --card-foreground: #f0f0fb;
+  --popover: #2e3039;
+  --popover-foreground: #f0f0fb;
+  --primary: #b5c4ff;
+  --primary-foreground: #00174d;
+  --secondary: #ffb690;
+  --secondary-foreground: #341100;
+  --muted: #434654;
+  --muted-foreground: #c3c5d7;
+  --accent: #434654;
+  --accent-foreground: #f0f0fb;
+  --destructive: #ffb4ab;
+  --border: #737686;
+  --input: #737686;
+  --ring: #b5c4ff;
+  --chart-1: #b5c4ff;
+  --chart-2: #ffb690;
+  --chart-3: #ffd4c5;
+  --chart-4: #d4dcff;
+  --chart-5: #ffdbca;
+  --sidebar: #2e3039;
+  --sidebar-foreground: #f0f0fb;
+  --sidebar-primary: #b5c4ff;
+  --sidebar-primary-foreground: #00174d;
+  --sidebar-accent: #434654;
+  --sidebar-accent-foreground: #f0f0fb;
+  --sidebar-border: #737686;
+  --sidebar-ring: #b5c4ff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading), var(--font-sans), sans-serif;
+  }
+}
