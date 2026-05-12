@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RentFlow Admin Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+<style data-purpose="custom-fonts">
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F8F9FA;
+    }
+  </style>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f5f7fa',
+              100: '#e4e7eb',
+              800: '#1e293b',
+              900: '#0f172a',
+            },
+            accent: {
+              red: '#fef2f2',
+              redText: '#dc2626',
+              orange: '#fff7ed',
+              orangeText: '#ea580c',
+              blue: '#eff6ff',
+              blueText: '#2563eb'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="text-gray-800 antialiased flex flex-col min-h-screen">
+<!-- BEGIN: MainHeader -->
+<header class="bg-white border-b border-gray-200 sticky top-0 z-30">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16 items-center">
+<!-- Logo -->
+<div class="flex-shrink-0 flex items-center">
+<a class="text-2xl font-bold text-gray-900 tracking-tight" href="#">RentFlow</a>
+</div>
+<!-- Navigation -->
+<nav class="hidden md:flex space-x-8">
+<a class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium" href="#">Home</a>
+<a class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium" href="#">Search</a>
+<a class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium" href="#">My Bookings</a>
+<a class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium" href="#">Host Dashboard</a>
+<a class="text-gray-900 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-gray-900" href="#">Admin</a>
+</nav>
+<!-- Right Actions -->
+<div class="flex items-center space-x-4">
+<button class="text-gray-500 hover:text-gray-900 relative">
+<i class="fa-regular fa-bell text-xl"></i>
+</button>
+<button class="text-gray-500 hover:text-gray-900">
+<i class="fa-regular fa-user-circle text-xl"></i>
+</button>
+<a class="text-gray-700 hover:text-gray-900 font-medium text-sm" href="#">Login</a>
+</div>
+</div>
+</div>
+</header>
+<!-- END: MainHeader -->
+<!-- BEGIN: MainLayout -->
+<div class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
+<!-- BEGIN: Sidebar -->
+<aside class="w-full md:w-64 flex-shrink-0">
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden sticky top-24">
+<div class="p-4 border-b border-gray-100">
+<h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin Navigation</h2>
+</div>
+<nav class="p-2 space-y-1">
+<a class="bg-brand-900 text-white group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg" href="#">
+<i class="fa-solid fa-border-all mr-3 text-gray-300 w-5 text-center"></i>
+            Overview
+          </a>
+<a class="text-gray-700 hover:bg-gray-50 group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg" href="#">
+<i class="fa-solid fa-car mr-3 text-gray-400 w-5 text-center"></i>
+            Fleet Management
+          </a>
+<a class="text-gray-700 hover:bg-gray-50 group flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg" href="#">
+<div class="flex items-center">
+<i class="fa-solid fa-shield-halved mr-3 text-gray-400 w-5 text-center"></i>
+              Verifications
+            </div>
+<span class="bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-semibold">12</span>
+</a>
+<a class="text-gray-700 hover:bg-gray-50 group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg" href="#">
+<i class="fa-solid fa-user-group mr-3 text-gray-400 w-5 text-center"></i>
+            Users
+          </a>
+<a class="text-gray-700 hover:bg-gray-50 group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg mb-4" href="#">
+<i class="fa-solid fa-file-invoice-dollar mr-3 text-gray-400 w-5 text-center"></i>
+            Transactions
+          </a>
+<div class="border-t border-gray-100 pt-2 mt-2">
+<a class="text-gray-700 hover:bg-gray-50 group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg" href="#">
+<i class="fa-solid fa-gear mr-3 text-gray-400 w-5 text-center"></i>
+              System Settings
+            </a>
+</div>
+</nav>
+</div>
+</aside>
+<!-- END: Sidebar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 min-w-0">
+<!-- Page Header -->
+<div class="mb-8">
+<h1 class="text-3xl font-bold text-gray-900 mb-2">System Overview</h1>
+<p class="text-gray-600">High-level metrics and priority tasks for RentFlow administration.</p>
+</div>
+<!-- BEGIN: Metrics Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<!-- Pending Listings Card -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<h3 class="text-lg font-medium text-gray-900">Pending Listings</h3>
+<div class="bg-orange-100 p-2 rounded-lg">
+<i class="fa-solid fa-car text-orange-600"></i>
+</div>
+</div>
+<div class="mt-auto">
+<div class="text-5xl font-bold text-gray-900 mb-2">42</div>
+<div class="flex items-center text-sm text-gray-600">
+<i class="fa-solid fa-arrow-up text-green-500 mr-1"></i>
+<span>12% from last week</span>
+</div>
+</div>
+</div>
+<!-- Verifications Card -->
+<div class="bg-white rounded-xl shadow-sm border border-red-200 p-6 flex flex-col relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<h3 class="text-lg font-medium text-gray-900">Verifications</h3>
+<div class="bg-red-100 p-2 rounded-lg">
+<i class="fa-solid fa-shield-exclamation text-red-600"></i>
+</div>
+</div>
+<div class="mt-auto">
+<div class="text-5xl font-bold text-red-600 mb-2">12</div>
+<div class="text-sm font-medium text-red-600">
+              Requires immediate action
+            </div>
+</div>
+</div>
+<!-- Active Users Card -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<h3 class="text-lg font-medium text-gray-900">Active Users</h3>
+<div class="bg-blue-100 p-2 rounded-lg">
+<i class="fa-solid fa-users text-blue-600"></i>
+</div>
+</div>
+<div class="mt-auto flex justify-between items-end">
+<div>
+<div class="text-5xl font-bold text-gray-900 mb-2">8,409</div>
+<div class="flex items-center text-sm text-gray-600">
+<i class="fa-solid fa-arrow-up text-gray-500 mr-1"></i>
+<span>Steady growth</span>
+</div>
+</div>
+<!-- Mini Bar Chart Placeholder -->
+<div class="flex items-end space-x-1 h-10">
+<div class="w-4 bg-gray-300 rounded-t-sm" style="height: 40%"></div>
+<div class="w-4 bg-gray-300 rounded-t-sm" style="height: 60%"></div>
+<div class="w-4 bg-gray-400 rounded-t-sm" style="height: 75%"></div>
+<div class="w-4 bg-gray-500 rounded-t-sm" style="height: 100%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- END: Metrics Cards -->
+<!-- BEGIN: Bottom Section -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- BEGIN: Chart Area -->
+<div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col">
+<div class="p-6 border-b border-gray-100 flex justify-between items-center">
+<h3 class="text-lg font-medium text-gray-900">Platform Activity</h3>
+<select class="text-sm border-gray-300 rounded-md shadow-sm focus:border-gray-500 focus:ring-gray-500 py-1.5 pl-3 pr-8 text-gray-700">
+<option>Last 30 Days</option>
+<option>Last 7 Days</option>
+<option>This Year</option>
+</select>
+</div>
+<div class="p-6 flex-1 flex flex-col items-center justify-center min-h-[400px] bg-gray-50 rounded-b-xl relative overflow-hidden">
+<!-- Grid lines background -->
+<div class="absolute inset-0 flex flex-col justify-between opacity-5 pointer-events-none">
+<div class="w-full h-px bg-black"></div><div class="w-full h-px bg-black"></div><div class="w-full h-px bg-black"></div><div class="w-full h-px bg-black"></div><div class="w-full h-px bg-black"></div><div class="w-full h-px bg-black"></div><div class="w-full h-px bg-black"></div><div class="w-full h-px bg-black"></div>
+</div>
+<div class="absolute inset-0 flex justify-between opacity-5 pointer-events-none">
+<div class="h-full w-px bg-black"></div><div class="h-full w-px bg-black"></div><div class="h-full w-px bg-black"></div><div class="h-full w-px bg-black"></div><div class="h-full w-px bg-black"></div><div class="h-full w-px bg-black"></div><div class="h-full w-px bg-black"></div><div class="h-full w-px bg-black"></div>
+</div>
+<div class="text-center z-10">
+<i class="fa-solid fa-chart-line text-4xl text-gray-300 mb-4 block"></i>
+<h4 class="text-lg font-medium text-gray-600 mb-1">Interactive Chart Visualization Canvas</h4>
+<p class="text-sm text-gray-500 max-w-sm mx-auto">Data hook integration required for dynamic rendering of transaction volume and user sign-ups.</p>
+</div>
+</div>
+</div>
+<!-- END: Chart Area -->
+<!-- BEGIN: Action Required List -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
+<div class="p-6 border-b border-gray-100 flex items-center">
+<i class="fa-regular fa-clipboard text-xl text-gray-700 mr-3"></i>
+<h3 class="text-lg font-medium text-gray-900">Action Required</h3>
+</div>
+<div class="flex-1 overflow-y-auto">
+<ul class="divide-y divide-gray-100">
+<!-- Task 1 -->
+<li class="p-6 hover:bg-gray-50 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<h4 class="text-sm font-semibold text-gray-900">Host Identity Verification</h4>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                    HIGH
+                  </span>
+</div>
+<p class="text-sm text-gray-600 mb-3">User ID #8920 requires manual review of submitted documents.</p>
+<div class="flex items-center text-xs text-gray-500">
+<i class="fa-regular fa-clock mr-1.5"></i>
+                  2 hours ago
+                </div>
+</li>
+<!-- Task 2 -->
+<li class="p-6 hover:bg-gray-50 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<h4 class="text-sm font-semibold text-gray-900">Flagged Listing Review</h4>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                    MEDIUM
+                  </span>
+</div>
+<p class="text-sm text-gray-600 mb-3">Listing '2023 Tesla Model 3' flagged by automated system for pricing anomaly.</p>
+<div class="flex items-center text-xs text-gray-500">
+<i class="fa-regular fa-clock mr-1.5"></i>
+                  5 hours ago
+                </div>
+</li>
+<!-- Task 3 -->
+<li class="p-6 hover:bg-gray-50 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<h4 class="text-sm font-semibold text-gray-900">Payout Failure Notification</h4>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                    HIGH
+                  </span>
+</div>
+<p class="text-sm text-gray-600 mb-3">Weekly payout to Host ID #441 failed due to invalid routing number.</p>
+<div class="flex items-center text-xs text-gray-500">
+<i class="fa-regular fa-clock mr-1.5"></i>
+                  1 day ago
+                </div>
+</li>
+</ul>
+</div>
+<div class="p-4 border-t border-gray-100 text-center">
+<a class="text-sm font-semibold text-gray-900 hover:text-gray-700 w-full block py-2" href="#">
+              View All Tasks
+            </a>
+</div>
+</div>
+<!-- END: Action Required List -->
+</div>
+<!-- END: Bottom Section -->
+</main>
+<!-- END: MainContent -->
+</div>
+<!-- END: MainLayout -->
+<!-- BEGIN: Footer -->
+<footer class="bg-gray-100 border-t border-gray-200 mt-auto">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row justify-between items-center gap-4">
+<div>
+<h2 class="text-lg font-bold text-gray-900 mb-1">RentFlow</h2>
+<p class="text-sm text-gray-600">© 2024 RentFlow. Professional Grade Fleet Management.</p>
+</div>
+<div class="flex flex-wrap gap-4 text-sm font-medium text-gray-600">
+<a class="hover:text-gray-900 underline decoration-gray-300 underline-offset-4" href="#">Terms of Service</a>
+<a class="hover:text-gray-900 underline decoration-gray-300 underline-offset-4" href="#">Privacy Policy</a>
+<a class="hover:text-gray-900 underline decoration-gray-300 underline-offset-4" href="#">Help Center</a>
+<a class="hover:text-gray-900 underline decoration-gray-300 underline-offset-4" href="#">Become a Host</a>
+<a class="hover:text-gray-900 underline decoration-gray-300 underline-offset-4" href="#">Contact Support</a>
+</div>
+</div>
+</footer>
+<!-- END: Footer -->
+</body></html>

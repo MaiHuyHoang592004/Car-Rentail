@@ -1,0 +1,182 @@
+﻿[
+    {
+        "key":  "guest-landing-page",
+        "screen":  "Trang chu - RentFlow",
+        "html":  "html/guest-landing-page.html",
+        "screenshot":  "screenshots/guest-landing-page.png"
+    },
+    {
+        "key":  "guest-search-results",
+        "screen":  "Ket qua tim kiem - RentFlow",
+        "html":  "html/guest-search-results.html",
+        "screenshot":  "screenshots/guest-search-results.png"
+    },
+    {
+        "key":  "guest-listing-detail",
+        "screen":  "Chi tiet xe Meridian - RentFlow",
+        "html":  "html/guest-listing-detail.html",
+        "screenshot":  "screenshots/guest-listing-detail.png"
+    },
+    {
+        "key":  "guest-login-error",
+        "screen":  "Dang nhap loi - RentFlow",
+        "html":  "html/guest-login-error.html",
+        "screenshot":  "screenshots/guest-login-error.png"
+    },
+    {
+        "key":  "guest-register",
+        "screen":  "Dang ky tai khoan - RentFlow Automotive",
+        "html":  "html/guest-register.html",
+        "screenshot":  "screenshots/guest-register.png"
+    },
+    {
+        "key":  "customer-book-your-ride",
+        "screen":  "Book Your Ride - RentFlow",
+        "html":  "html/customer-book-your-ride.html",
+        "screenshot":  "screenshots/customer-book-your-ride.png"
+    },
+    {
+        "key":  "customer-review-book",
+        "screen":  "Review \u0026 Dat xe - RentFlow",
+        "html":  "html/customer-review-book.html",
+        "screenshot":  "screenshots/customer-review-book.png"
+    },
+    {
+        "key":  "customer-account-settings",
+        "screen":  "Cai dat tai khoan - RentFlow",
+        "html":  "html/customer-account-settings.html",
+        "screenshot":  "screenshots/customer-account-settings.png"
+    },
+    {
+        "key":  "customer-booking-details",
+        "screen":  "Booking Details - RentFlow",
+        "html":  "html/customer-booking-details.html",
+        "screenshot":  "screenshots/customer-booking-details.png"
+    },
+    {
+        "key":  "customer-edit-locations-modal",
+        "screen":  "Edit Locations Modal - RentFlow",
+        "html":  "html/customer-edit-locations-modal.html",
+        "screenshot":  "screenshots/customer-edit-locations-modal.png"
+    },
+    {
+        "key":  "customer-cancel-hold",
+        "screen":  "Huy giu xe - RentFlow",
+        "html":  "html/customer-cancel-hold.html",
+        "screenshot":  "screenshots/customer-cancel-hold.png"
+    },
+    {
+        "key":  "host-dashboard",
+        "screen":  "Bang dieu khien - RentFlow Host",
+        "html":  "html/host-dashboard.html",
+        "screenshot":  "screenshots/host-dashboard.png"
+    },
+    {
+        "key":  "host-fleet-management",
+        "screen":  "Quan ly doi xe - RentFlow Host",
+        "html":  "html/host-fleet-management.html",
+        "screenshot":  "screenshots/host-fleet-management.png"
+    },
+    {
+        "key":  "host-add-vehicle",
+        "screen":  "Them xe moi - RentFlow Host",
+        "html":  "html/host-add-vehicle.html",
+        "screenshot":  "screenshots/host-add-vehicle.png"
+    },
+    {
+        "key":  "host-availability",
+        "screen":  "Lich kha dung - RentFlow Host",
+        "html":  "html/host-availability.html",
+        "screenshot":  "screenshots/host-availability.png"
+    },
+    {
+        "key":  "host-listing-detail",
+        "screen":  "Chi tiet bai dang - RentFlow Host",
+        "html":  "html/host-listing-detail.html",
+        "screenshot":  "screenshots/host-listing-detail.png"
+    },
+    {
+        "key":  "admin-system-overview",
+        "screen":  "Tong quan he thong - RentFlow Admin",
+        "html":  "html/admin-system-overview.html",
+        "screenshot":  "screenshots/admin-system-overview.png"
+    },
+    {
+        "key":  "admin-listing-approval",
+        "screen":  "Phe duyet bai dang - RentFlow Admin",
+        "html":  "html/admin-listing-approval.html",
+        "screenshot":  "screenshots/admin-listing-approval.png"
+    },
+    {
+        "key":  "admin-approval-detail",
+        "screen":  "Chi tiet phe duyet - RentFlow Admin",
+        "html":  "html/admin-approval-detail.html",
+        "screenshot":  "screenshots/admin-approval-detail.png"
+    },
+    {
+        "key":  "admin-driver-profile-review",
+        "screen":  "Duyet ho so lai xe - RentFlow Admin",
+        "html":  "html/admin-driver-profile-review.html",
+        "screenshot":  "screenshots/admin-driver-profile-review.png"
+    },
+    {
+        "key":  "admin-reject-approval",
+        "screen":  "Tu choi phe duyet - RentFlow Admin",
+        "html":  "html/admin-reject-approval.html",
+        "screenshot":  "screenshots/admin-reject-approval.png"
+    },
+    {
+        "key":  "admin-suspend-listing",
+        "screen":  "Suspend Listing - RentFlow Admin",
+        "html":  "html/admin-suspend-listing.html",
+        "screenshot":  "screenshots/admin-suspend-listing.png"
+    },
+    {
+        "key":  "global-page-not-found",
+        "screen":  "Page Not Found - RentFlow",
+        "html":  "html/global-page-not-found.html",
+        "screenshot":  "screenshots/global-page-not-found.png"
+    },
+    {
+        "key":  "global-system-error",
+        "screen":  "System Error - RentFlow",
+        "html":  "html/global-system-error.html",
+        "screenshot":  "screenshots/global-system-error.png"
+    },
+    {
+        "key":  "global-states-skeletons",
+        "screen":  "States \u0026 Skeletons - RentFlow Design System",
+        "html":  "html/global-states-skeletons.html",
+        "screenshot":  "screenshots/global-states-skeletons.png"
+    },
+    {
+        "key":  "global-component-kit",
+        "screen":  "RentFlow Component Kit",
+        "html":  "html/global-component-kit.html",
+        "screenshot":  "screenshots/global-component-kit.png"
+    },
+    {
+        "key":  "future-payment",
+        "screen":  "Thanh toan - RentFlow",
+        "html":  "html/future-payment.html",
+        "screenshot":  "screenshots/future-payment.png"
+    },
+    {
+        "key":  "future-driver-verification",
+        "screen":  "Xac thuc bang lai - RentFlow",
+        "html":  "html/future-driver-verification.html",
+        "screenshot":  "screenshots/future-driver-verification.png"
+    },
+    {
+        "key":  "future-audit-logs",
+        "screen":  "Nhat ky he thong - RentFlow Admin",
+        "html":  "html/future-audit-logs.html",
+        "screenshot":  "screenshots/future-audit-logs.png"
+    },
+    {
+        "key":  "future-support-center",
+        "screen":  "Trung tam ho tro - RentFlow",
+        "html":  "html/future-support-center.html",
+        "screenshot":  "screenshots/future-support-center.png"
+    }
+]

@@ -1,90 +1,112 @@
-# UI User Flow Spec — RentFlow
+# RentFlow UI User Flow Spec
 
-**Version:** 1.1  
-**Synced with:** RentFlow SRS v5.1  
-**Audience:** Frontend developer, product reviewer, UI designer
+Version: 2026-05-11  
+Source: current backend code plus SRS/phase docs.  
+Audience: frontend developer and UI designer.
 
----
-
-## 1. Purpose
-
-This document describes the main user flows for the RentFlow UI. The frontend consumes REST APIs and must not rely on backend-rendered pages.
-
----
-
-## 2. Role-Based Navigation
+## Navigation By Role
 
 ### Guest
 
-Visible: Home, Search Cars, Login, Register.  
-Hidden: My Bookings, Host Dashboard, Admin Dashboard, Notifications.
+Visible:
+
+- Search cars
+- Login
+- Register
+
+Hidden:
+
+- My bookings
+- Host
+- Admin
+- Profile
 
 ### Customer
 
-Visible: Search Cars, My Bookings, Profile, Driver Verification, Notifications, Logout.  
-Conditional: Host Dashboard if user has HOST role, Admin Dashboard if user has ADMIN role.
+Visible:
+
+- Search cars
+- My bookings
+- Profile
+- Logout
+
+Conditional:
+
+- Host links if user also has `HOST`
+- Admin links if user also has `ADMIN`
 
 ### Host
 
-Visible: Host Dashboard, Vehicles, Listings, Availability, Host Bookings, Profile, Notifications, Logout.
+Visible:
+
+- Host vehicles
+- Host listings
+- Host listing availability
+- Profile
+- Logout
 
 ### Admin
 
-Visible: Admin Dashboard, Listing Approvals, Driver Verifications, Users, Audit Logs, Reports P2, Logout.
+Visible:
 
----
+- Admin listings
+- Admin users
+- Profile
+- Logout
 
-## 3. Flow 1 — Guest Searches Listings
+Driver verification, notifications, audit logs, reports, host booking approval, and payments are future flows until backend endpoints exist.
 
-Goal: guest finds available cars.
+## Flow 1: Guest Searches Cars
+
+Goal: user finds a rentable car.
 
 Steps:
 
 ```text
 1. Guest opens /listings.
-2. UI shows search filters.
-3. Guest enters city and optional dates.
-4. UI validates date pair if both dates are entered.
+2. UI displays filters and an initial listing page.
+3. Guest enters city, optional dates, and optional vehicle filters.
+4. UI validates date pair when both dates exist.
 5. UI calls GET /api/v1/listings.
 6. UI renders listing cards.
-7. Guest clicks a listing.
-8. UI opens listing detail page.
+7. Guest opens a listing detail page.
+8. UI calls GET /api/v1/listings/{id}.
+9. UI calls GET /api/v1/listings/{id}/availability when a date window is needed.
 ```
 
 Empty state:
 
 ```text
-No cars found for your search. Try changing dates, city, or filters.
+No cars match the selected filters.
 ```
 
 Errors:
 
 | Error | UI response |
 |---|---|
-| VALIDATION_ERROR | Show field error |
-| INTERNAL_ERROR | Show retry CTA |
-| TOO_MANY_REQUESTS | Show Retry-After message |
+| `VALIDATION_ERROR` | Show filter-level error |
+| `LISTING_NOT_FOUND` | Show unavailable listing page |
+| `INTERNAL_ERROR` | Show retry action |
 
----
+## Flow 2: Register And Login
 
-## 4. Flow 2 — Register and Login
-
-Register:
+### Register
 
 ```text
 1. Guest opens /register.
-2. Guest enters email, password, full name, and optional role choice.
+2. Guest enters email, password, full name, and optional roles.
 3. UI calls POST /api/v1/auth/register.
-4. On success, redirect to login or auto-login if backend supports it.
+4. UI stores returned auth tokens when present.
+5. UI redirects to intended page or /listings.
 ```
 
-Login:
+### Login
 
 ```text
 1. Guest opens /login.
-2. Guest enters email/password.
+2. Guest enters email and password.
 3. UI calls POST /api/v1/auth/login.
-4. UI stores auth state.
+4. UI stores tokens and current user.
 5. UI redirects to intended page or /listings.
 ```
 
@@ -92,474 +114,305 @@ Error handling:
 
 | Error | UI response |
 |---|---|
-| AUTH_INVALID_CREDENTIALS | Show email/password error |
-| USER_EMAIL_EXISTS | Link to login |
-| TOO_MANY_REQUESTS | Disable form temporarily |
+| `AUTH_INVALID_CREDENTIALS` | Show login error |
+| `USER_EMAIL_EXISTS` | Link to login |
+| `VALIDATION_ERROR` | Show field errors |
 
----
+## Flow 3: Profile Update
 
-## 5. Flow 3 — Customer Creates Booking
+```text
+1. Authenticated user opens /me/profile.
+2. UI calls GET /api/v1/users/me.
+3. User edits full name, phone, date of birth, or address.
+4. UI calls PATCH /api/v1/users/me.
+5. UI updates local current-user state from the response.
+```
+
+Driver verification status is read-only in current backend.
+
+## Flow 4: Customer Creates Booking Hold
 
 Preconditions:
 
 ```text
-User is authenticated as CUSTOMER.
-Listing is ACTIVE.
+User is authenticated.
+User has CUSTOMER role.
+Listing exists and is ACTIVE.
 Vehicle is ACTIVE.
-Selected dates are available.
 pickupDate < returnDate.
-Rental duration <= 30 days.
-Driver verification is APPROVED if gate is enabled.
+Rental duration is between 1 and 30 days.
+Selected availability rows are FREE.
+Customer is not booking own hosted listing.
+Customer has no overlapping active booking.
 ```
 
 Steps:
 
 ```text
-1. Customer opens listing detail.
+1. Customer opens /listings/:id.
 2. Customer selects pickupDate and returnDate.
-3. UI validates pickupDate < returnDate.
-4. UI validates rental duration <= 30 days.
-5. Customer clicks Book.
-6. UI generates Idempotency-Key.
+3. UI validates date range.
+4. Customer opens /listings/:id/book.
+5. Customer enters pickup/return locations and optional extras.
+6. UI generates UUID-v4 Idempotency-Key.
 7. UI calls POST /api/v1/bookings.
-8. Backend returns booking status HELD.
-9. UI shows hold timer and Continue Payment CTA if payment phase is available.
+8. Backend returns status HELD.
+9. UI shows booking detail and a countdown to holdExpiresAt.
 ```
 
-Success:
+Success state:
 
 ```text
-Booking is held for 15 minutes. Please authorize payment to confirm your booking.
+Booking is held. Payment confirmation is not available until payment backend is implemented.
 ```
 
-Conflicts:
+Conflict handling:
 
 | Backend code | UI behavior |
 |---|---|
-| LISTING_NOT_AVAILABLE | Show unavailable message and refresh availability |
-| BOOKING_OVERLAP_CUSTOMER | Show link to user's existing booking |
-| DRIVER_LICENSE_NOT_APPROVED | Show driver verification CTA |
-| REQUEST_ALREADY_PROCESSING | Show processing state and retry status |
-| IDEMPOTENCY_KEY_CONFLICT | Start a new booking action with a new key |
+| `LISTING_NOT_AVAILABLE` | Refresh availability and ask for another date range |
+| `BOOKING_OVERLAP_CUSTOMER` | Link to /me/bookings |
+| `DRIVER_LICENSE_NOT_APPROVED` | Future: route to driver verification |
+| `REQUEST_ALREADY_PROCESSING` | Keep submit disabled and show processing |
+| `IDEMPOTENCY_KEY_CONFLICT` | Stop retrying with the same key |
 
----
-
-## 6. Flow 4 — Customer Authorizes Payment
-
-P1.
-
-Steps:
+## Flow 5: Customer Views Bookings
 
 ```text
-1. Customer opens /bookings/:id/payment.
-2. UI shows booking summary and amount.
-3. Customer clicks Authorize Payment.
-4. UI generates Idempotency-Key.
-5. UI calls POST /api/v1/bookings/{id}/payments/authorize.
-6. Backend returns booking and payment status.
+1. Customer opens /me/bookings.
+2. UI calls GET /api/v1/bookings/me.
+3. Customer filters by status if needed.
+4. UI calls GET /api/v1/bookings/me?status={status}.
+5. Customer opens /bookings/:id.
+6. UI calls GET /api/v1/bookings/{id}.
 ```
 
-Instant booking success:
+Current actions by status:
+
+| Status | UI action |
+|---|---|
+| `HELD` | View detail, patch locations, cancel |
+| `CANCELLED` | View detail |
+| `EXPIRED` | View detail, book again manually |
+| Other statuses | Display read-only until later backend phases |
+
+## Flow 6: Customer Patches Booking Locations
 
 ```text
-booking.status = CONFIRMED
-payment.status = AUTHORIZED
+1. Customer opens /bookings/:id.
+2. Booking status is HELD, PENDING_HOST_APPROVAL, or CONFIRMED.
+3. Customer edits pickupLocation and/or returnLocation.
+4. UI calls PATCH /api/v1/bookings/{id}.
+5. UI replaces local booking detail with response.
 ```
 
-Manual approval success:
+Rules:
+
+- At least one location field must be non-null.
+- Do not send unknown fields.
+- Do not allow date/status/listing edits through this endpoint.
+
+## Flow 7: Customer Cancels HELD Booking
+
+Current backend allows only `HELD` cancellation.
 
 ```text
-booking.status = PENDING_HOST_APPROVAL
-payment.status = AUTHORIZED
+1. Customer opens /bookings/:id.
+2. Customer clicks Cancel.
+3. UI opens confirmation modal.
+4. Customer optionally enters reason.
+5. UI enforces max 500 chars and strips/blocks HTML-like input.
+6. UI generates UUID-v4 Idempotency-Key.
+7. UI calls POST /api/v1/bookings/{id}/cancel.
+8. Backend returns status CANCELLED.
+9. UI refreshes booking detail and availability if user came from listing page.
 ```
 
 Errors:
 
-| Backend code | UI behavior |
+| Error | UI response |
 |---|---|
-| BOOKING_INVALID_STATUS | Refresh booking detail |
-| PAYMENT_FAILED | Show payment retry CTA |
-| REQUEST_ALREADY_PROCESSING | Keep button disabled temporarily |
+| `BOOKING_INVALID_STATUS` | Refresh detail and disable cancel |
+| `BOOKING_NOT_FOUND` | Show not found |
+| `IDEMPOTENCY_KEY_CONFLICT` | Stop retrying with same key |
 
----
-
-## 7. Flow 5 — Customer Views My Bookings
-
-Route: `/me/bookings`
-
-Steps:
+## Flow 8: Host Creates Vehicle
 
 ```text
-1. Customer opens My Bookings.
-2. UI calls GET /api/v1/bookings/me.
-3. UI renders booking cards grouped/filterable by status.
-```
-
-Status actions:
-
-| Status | Primary action |
-|---|---|
-| HELD | Continue payment / cancel |
-| PENDING_HOST_APPROVAL | View status / cancel |
-| CONFIRMED | View detail / cancel |
-| IN_PROGRESS | View trip |
-| COMPLETED | Review, P2 |
-| CANCELLED | View detail |
-| REJECTED | View detail |
-| EXPIRED | Book again |
-
----
-
-## 8. Flow 6 — Customer Cancels Booking
-
-Allowed: HELD, PENDING_HOST_APPROVAL, CONFIRMED.  
-Not allowed: IN_PROGRESS, COMPLETED.
-
-Steps:
-
-```text
-1. Customer opens booking detail.
-2. Customer clicks Cancel.
-3. UI opens confirmation modal.
-4. UI shows cancellation policy.
-5. Customer enters reason.
-6. UI validates reason max 500 chars and strips/rejects HTML.
-7. UI generates Idempotency-Key.
-8. UI calls POST /api/v1/bookings/{id}/cancel.
-9. UI shows result.
-```
-
-Success states:
-
-```text
-Booking cancelled.
-```
-
-```text
-Booking cancelled. The remaining payment authorization will be released shortly.
-```
-
----
-
-## 9. Flow 7 — Host Creates Vehicle
-
-Route: `/host/vehicles/new`
-
-Steps:
-
-```text
-1. Host opens Create Vehicle.
-2. Host enters vehicle data.
-3. If status omitted, backend creates ACTIVE vehicle.
-4. Host may explicitly save as DRAFT.
-5. UI calls POST /api/v1/host/vehicles.
-6. UI redirects to vehicle detail or listing creation.
+1. Host opens /host/vehicles/new.
+2. Host enters vehicle category, make, model, year, plate, transmission, fuel, seats, and optional status.
+3. UI calls POST /api/v1/host/vehicles.
+4. Backend returns created vehicle.
+5. UI routes to vehicle detail or prompts host to create listing.
 ```
 
 Notes:
 
+- If status is omitted, backend defaults to `ACTIVE`.
+- Plate number and VIN are submitted but not returned in `VehicleResponse`.
+
+## Flow 9: Host Updates Or Archives Vehicle
+
 ```text
-DRAFT vehicle cannot be linked to ACTIVE listing.
-ACTIVE vehicle can be used for listing submission.
+1. Host opens /host/vehicles/:id.
+2. UI calls GET /api/v1/host/vehicles/{id}.
+3. Host edits allowed fields.
+4. UI calls PATCH /api/v1/host/vehicles/{id}.
+5. Host can archive using DELETE /api/v1/host/vehicles/{id}.
 ```
 
----
-
-## 10. Flow 8 — Host Creates and Submits Listing
-
-Route: `/host/listings/new`
-
-Steps:
+Archive rejection:
 
 ```text
-1. Host selects own ACTIVE vehicle.
-2. Host enters title, description, city, address, price, and policy.
-3. UI calls POST /api/v1/host/listings.
-4. Backend creates listing in DRAFT.
-5. Host clicks Submit.
-6. UI calls POST /api/v1/host/listings/{id}/submit.
-7. Backend changes status DRAFT -> PENDING_APPROVAL.
+If active related bookings exist, show that the vehicle cannot be archived yet.
+```
+
+## Flow 10: Host Creates And Submits Listing
+
+```text
+1. Host opens /host/listings/new.
+2. UI loads host vehicles.
+3. Host selects an ACTIVE vehicle.
+4. Host enters listing content, location, price, policy, and booking options.
+5. UI calls POST /api/v1/host/listings.
+6. Backend returns listing in DRAFT.
+7. Host clicks Submit.
+8. UI calls POST /api/v1/host/listings/{id}/submit.
+9. Backend returns listing in PENDING_APPROVAL.
 ```
 
 Submit preconditions:
 
+- listing status is `DRAFT`
+- vehicle status is `ACTIVE`
+
+## Flow 11: Host Manages Listings
+
 ```text
-listing.status = DRAFT
-vehicle.status = ACTIVE
-photos recommended but not required for P0/P1
+1. Host opens /host/listings.
+2. UI calls GET /api/v1/host/listings.
+3. Host filters by status.
+4. Host opens /host/listings/:id.
+5. UI calls GET /api/v1/host/listings/{id}.
+6. Host edits, archives, reactivates, or submits based on current status.
 ```
 
----
+Status behavior:
 
-## 11. Flow 9 — Admin Approves Listing
+| Status | Common actions |
+|---|---|
+| `DRAFT` | edit, submit, archive |
+| `PENDING_APPROVAL` | view, archive |
+| `ACTIVE` | view, archive |
+| `SUSPENDED` | view, reactivate if backend permits |
+| `ARCHIVED` | view only |
 
-Route: `/admin/listings`
-
-Steps:
+## Flow 12: Host Manages Availability
 
 ```text
-1. Admin opens pending listings.
+1. Host opens /host/listings/:id/availability.
+2. UI calls GET /api/v1/host/listings/{id}/availability?from=&to=.
+3. UI renders calendar or date list with FREE/HOLD/BOOKED/BLOCKED.
+4. Host selects dates.
+5. Host clicks Block or Unblock.
+6. UI calls the matching block/unblock endpoint with { dates: [...] }.
+7. UI refreshes availability.
+```
+
+Client-side restrictions:
+
+- block only `FREE`
+- unblock only `BLOCKED`
+- `HOLD` and `BOOKED` are read-only
+
+## Flow 13: Admin Reviews Listings
+
+```text
+1. Admin opens /admin/listings.
 2. UI calls GET /api/v1/admin/listings?status=PENDING_APPROVAL.
-3. Admin opens listing detail.
-4. Admin clicks Approve.
-5. UI calls POST /api/v1/admin/listings/{id}/approve.
-6. Backend sets listing ACTIVE and generates 365 availability rows.
-7. UI shows approved status.
+3. Admin opens /admin/listings/:id.
+4. UI calls GET /api/v1/admin/listings/{id}.
+5. Admin approves, rejects with reason, suspends with reason, or reactivates.
+6. UI calls the matching admin listing endpoint.
+7. UI refreshes list/detail.
 ```
 
-Reject:
+Approve result:
 
 ```text
-1. Admin clicks Reject.
-2. UI asks for reason.
-3. UI calls POST /api/v1/admin/listings/{id}/reject.
-4. Backend returns listing to DRAFT.
+Listing becomes ACTIVE and backend generates availability rows.
 ```
 
----
-
-## 12. Flow 10 — Host Manages Availability
-
-Route: `/host/listings/:id/availability`
-
-Steps:
+Reject result:
 
 ```text
-1. Host opens listing availability.
-2. UI calls GET /api/v1/host/listings/{id}/availability.
-3. UI renders calendar with FREE/HOLD/BOOKED/BLOCKED.
-4. Host selects FREE date range.
-5. Host clicks Block.
-6. UI calls POST /api/v1/host/listings/{id}/availability/block.
+Listing returns to DRAFT.
 ```
 
-Restrictions:
+## Flow 14: Admin Lists Users
 
 ```text
-Cannot block HOLD dates.
-Cannot block BOOKED dates.
-Can unblock only BLOCKED dates.
+1. Admin opens /admin/users.
+2. UI calls GET /api/v1/admin/users.
+3. Admin filters by status or role.
+4. UI renders paginated user summaries.
 ```
 
----
+This is read-only in current backend.
 
-## 13. Flow 11 — Host Approves Booking
-
-P1 only. Route: `/host/bookings`
-
-Steps:
+## Flow 15: Token Expiry Recovery
 
 ```text
-1. Host opens booking requests.
-2. UI calls GET /api/v1/host/bookings?status=PENDING_HOST_APPROVAL.
-3. Host opens booking detail.
-4. UI shows allowed customer info only.
-5. Host clicks Approve or Reject.
-6. UI generates Idempotency-Key.
-7. UI calls approve/reject endpoint.
+1. API call returns 401 AUTH_TOKEN_EXPIRED.
+2. UI calls POST /api/v1/auth/refresh with refreshToken.
+3. If refresh succeeds, UI stores new tokens and retries original request once.
+4. If refresh fails, UI clears auth state and redirects to /login.
 ```
 
-Host can see customer full name, driver verification status, booking dates, listing/vehicle summary, price snapshot. Host cannot see license number, license document, customer address, phone, or payment details.
-
----
-
-## 14. Flow 12 — Driver Verification
-
-Customer route: `/me/driver-verification`
-
-Steps:
+## Flow 16: Idempotency Recovery
 
 ```text
-1. Customer opens verification page.
-2. UI shows current status.
-3. Customer enters license number and expiry date.
-4. Customer attaches document if file flow is available.
-5. UI calls POST /api/v1/users/me/driver-license.
-6. Backend returns PENDING.
+1. User submits create booking or cancel booking.
+2. UI generates one UUID-v4 Idempotency-Key for that user action.
+3. Network fails or user retries the same action.
+4. UI retries with the same key and same body.
+5. If user changes form/body, UI starts a new action with a new key.
 ```
 
-Duplicate active submission shows `ALREADY_SUBMITTED`.
+Error behavior:
 
-Admin route: `/admin/driver-verifications`
+- `REQUEST_ALREADY_PROCESSING`: show processing and avoid rapid retries.
+- `IDEMPOTENCY_KEY_CONFLICT`: do not retry with same key.
 
-Steps:
+## Future Flows Waiting For Backend
 
-```text
-1. Admin filters PENDING requests.
-2. Admin opens detail.
-3. Admin approves or rejects with reason.
-4. Backend updates customer driver verification status.
-```
+These flows are documented in SRS but should stay disabled or hidden until endpoints are implemented:
 
-Expiry behavior:
+- customer payment authorization
+- payment capture/void/refund
+- host booking approval/rejection
+- customer driver license submission
+- admin driver verification
+- listing photo/file upload
+- notifications
+- audit logs
+- revenue and host earnings reports
+- trip check-in/check-out
+- reviews and disputes
 
-```text
-Daily backend job may change status to EXPIRED.
-Customer cannot create new bookings until re-verified.
-Existing bookings remain valid.
-```
+## P0 UI Acceptance Criteria
 
----
-
-## 15. Flow 13 — Vehicle Archive
-
-Route: `/host/vehicles/:id`
-
-Steps:
-
-```text
-1. Host opens vehicle detail.
-2. Host clicks Archive.
-3. UI shows warning that archive is soft delete.
-4. UI calls DELETE /api/v1/host/vehicles/{id}.
-5. Backend checks related listings/bookings.
-6. If allowed, backend archives all non-ARCHIVED listings first.
-7. Backend archives vehicle.
-```
-
-Reject conditions:
-
-```text
-Any HELD booking exists.
-Any CONFIRMED booking exists.
-Any IN_PROGRESS booking exists.
-Archive preconditions fail.
-```
-
----
-
-## 16. Flow 14 — Notifications
-
-Route: `/me/notifications`
-
-Steps:
-
-```text
-1. User opens notifications page.
-2. UI calls GET /api/v1/notifications/me.
-3. UI renders notifications by createdAt.
-```
-
-Common notification types:
-
-```text
-BOOKING_CONFIRMED
-BOOKING_CANCELLED
-BOOKING_EXPIRED
-PAYMENT_AUTHORIZED
-PAYMENT_VOID_RETRY_REQUIRED
-DRIVER_VERIFICATION_APPROVED
-DRIVER_VERIFICATION_REJECTED
-DRIVER_VERIFICATION_EXPIRED
-```
-
----
-
-## 17. Flow 15 — Error Recovery
-
-### Token Expired
-
-```text
-1. API returns 401 AUTH_TOKEN_EXPIRED.
-2. UI calls refresh token endpoint.
-3. If refresh succeeds, retry original request.
-4. If refresh fails, logout and redirect to login.
-```
-
-### Request Already Processing
-
-```text
-1. API returns 409 REQUEST_ALREADY_PROCESSING.
-2. UI disables submit button.
-3. UI shows "Your request is being processed."
-4. UI may retry status fetch after delay.
-```
-
-### Idempotency Conflict
-
-```text
-1. API returns 409 IDEMPOTENCY_KEY_CONFLICT.
-2. UI must not retry with same key.
-3. UI should generate a new key only if user intentionally starts a new action.
-```
-
-### Listing Not Available
-
-```text
-1. API returns 409 LISTING_NOT_AVAILABLE.
-2. UI refreshes availability calendar.
-3. UI suggests choosing other dates.
-```
-
----
-
-## 18. Recommended Routes
-
-```text
-/
-/login
-/register
-/listings
-/listings/:id
-/listings/:id/book
-/bookings/:id
-/bookings/:id/payment
-/me/profile
-/me/bookings
-/me/driver-verification
-/me/notifications
-
-/host
-/host/vehicles
-/host/vehicles/new
-/host/vehicles/:id
-/host/listings
-/host/listings/new
-/host/listings/:id
-/host/listings/:id/availability
-/host/bookings
-
-/admin
-/admin/listings
-/admin/listings/:id
-/admin/users
-/admin/driver-verifications
-/admin/audit-logs
-```
-
----
-
-## 19. UI Acceptance Criteria
-
-### P0
-
-```text
-Guest can search listings.
-Customer can register/login.
-Host can create vehicle.
-Host can create and submit listing.
-Admin can approve listing.
-Customer can create HELD booking.
-HELD booking shows countdown.
-API errors render correctly.
-Role-based navigation works.
-```
-
-### P1
-
-```text
-Customer can authorize payment.
-Customer can cancel booking.
-Host can view full availability.
-Driver verification flow works.
-Notifications page works.
-Vehicle archive rules show useful errors.
-```
-
-### P2
-
-```text
-Photos/files flow works.
-Trip check-in/out works.
-Reviews/disputes/reports work.
-```
+- Guest can search listings and open listing details.
+- User can register, login, logout, and recover access token through refresh.
+- User can view and update profile.
+- Host can create/update/archive vehicles.
+- Host can create/update/submit/archive/reactivate listings.
+- Host can block/unblock listing availability dates.
+- Admin can approve/reject/suspend/reactivate listings.
+- Admin can list users.
+- Customer can create a HELD booking with idempotency.
+- Customer can see hold countdown.
+- Customer can view bookings and booking detail.
+- Customer can patch booking locations.
+- Customer can cancel HELD booking with idempotency.
+- API validation, authorization, not-found, conflict, and processing states render clearly.

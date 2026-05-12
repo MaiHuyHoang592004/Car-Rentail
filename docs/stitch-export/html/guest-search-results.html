@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RentFlow - Search Results</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style data-purpose="custom-utilities">
+    /* Add any custom styles here if needed, sticking mainly to Tailwind */
+    body {
+      background-color: #f8f9fa;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    }
+  </style>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col">
+<!-- BEGIN: MainHeader -->
+<header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between items-center h-16">
+<!-- Logo -->
+<div class="flex-shrink-0 flex items-center">
+<a class="text-2xl font-bold tracking-tight" href="#">RentFlow</a>
+</div>
+<!-- Search Bar -->
+<div class="flex-1 flex justify-center px-2 lg:ml-6 lg:justify-start">
+<div class="max-w-lg w-full lg:max-w-xs">
+<label class="sr-only" for="search">Search</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<i class="fas fa-search text-gray-400"></i>
+</div>
+<input class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-black focus:border-black sm:text-sm" id="search" name="search" placeholder="Search cities, airports..." type="search"/>
+</div>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="hidden md:flex space-x-8">
+<a class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium" href="#">Home</a>
+<a class="text-gray-900 border-b-2 border-black px-3 py-2 text-sm font-medium" href="#">Search</a>
+<a class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium" href="#">My Bookings</a>
+<a class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium" href="#">Host Dashboard</a>
+<a class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium" href="#">Admin</a>
+</nav>
+<!-- Right Side Icons & Login -->
+<div class="flex items-center ml-auto md:ml-6 space-x-4">
+<button class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black" type="button">
+<span class="sr-only">View notifications</span>
+<i class="far fa-bell text-xl"></i>
+</button>
+<button class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black" type="button">
+<span class="sr-only">User profile</span>
+<i class="far fa-user-circle text-xl"></i>
+</button>
+<a class="bg-black text-white hover:bg-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors" href="#">Login</a>
+</div>
+</div>
+</div>
+</header>
+<!-- END: MainHeader -->
+<!-- BEGIN: MainContent -->
+<main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8 w-full">
+<!-- BEGIN: Sidebar Filters -->
+<aside class="w-full md:w-64 flex-shrink-0">
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
+<div class="flex items-center space-x-2 mb-6">
+<i class="fas fa-sliders-h text-gray-600"></i>
+<h2 class="text-lg font-semibold text-gray-900">Filters</h2>
+</div>
+<div class="space-y-6">
+<!-- Location Filter -->
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1" for="location">Location</label>
+<div class="relative rounded-md shadow-sm">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<i class="fas fa-map-marker-alt text-gray-400"></i>
+</div>
+<input class="focus:ring-black focus:border-black block w-full pl-10 sm:text-sm border-gray-300 rounded-md bg-gray-50 py-2" id="location" name="location" type="text" value="Los Angeles, CA"/>
+</div>
+</div>
+<!-- Dates Filter -->
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1" for="dates">Dates</label>
+<div class="relative rounded-md shadow-sm">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<i class="far fa-calendar text-gray-400"></i>
+</div>
+<input class="focus:ring-black focus:border-black block w-full pl-10 sm:text-sm border-gray-300 rounded-md bg-gray-50 py-2" id="dates" name="dates" type="text" value="Oct 15 - Oct 20"/>
+</div>
+</div>
+<!-- Vehicle Type Filter -->
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1" for="vehicle_type">Vehicle Type</label>
+<select class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-black focus:border-black sm:text-sm rounded-md bg-gray-50" id="vehicle_type" name="vehicle_type">
+<option selected="">All Types</option>
+<option>Sedan</option>
+<option>SUV</option>
+<option>Sports</option>
+</select>
+</div>
+<!-- Price Range Filter -->
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1">Price Range</label>
+<div class="flex items-center space-x-2">
+<div class="relative flex-1">
+<input class="focus:ring-black focus:border-black block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50 py-2 px-3" id="min_price" name="min_price" placeholder="Min" type="number"/>
+</div>
+<span class="text-gray-500">-</span>
+<div class="relative flex-1">
+<input class="focus:ring-black focus:border-black block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50 py-2 px-3" id="max_price" name="max_price" placeholder="Max" type="number"/>
+</div>
+</div>
+</div>
+<!-- Apply Button -->
+<div class="pt-2">
+<button class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors" type="button">
+              Apply Filters
+            </button>
+</div>
+</div>
+</div>
+</aside>
+<!-- END: Sidebar Filters -->
+<!-- BEGIN: Search Results Area -->
+<div class="flex-1 min-w-0">
+<!-- Results Header -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+<h1 class="text-2xl md:text-3xl font-bold text-gray-900">Available Vehicles in Los Angeles</h1>
+<span class="text-sm text-gray-500 mt-2 sm:mt-0">Showing 24 results</span>
+</div>
+<!-- Results Grid -->
+<div class="space-y-6">
+<!-- Featured Card Layout (Full Width) -->
+<article class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row group cursor-pointer transition-shadow hover:shadow-md">
+<!-- Image Section -->
+<div class="relative w-full md:w-1/2 lg:w-3/5 h-64 md:h-auto overflow-hidden">
+<img alt="2023 Tesla Model S Plaid" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1rS-nl3MkUQf1oBKQ1fe9V2tlMtpgaFIitnMvvr3q9EC7P0YpCbOCvsFYVhwRBxKafGKZyzpBiXYueYYj2CtGqKKdKOTneBrAkeVjVO_f74zAl7OstLeq4CKcSZQwekWjHfI3jlaiZ-Ts7aP9lrrT5HbIWFY3DYE8noeyz9bxc4AkLCLB2sqs6FP_P6uWmihIDfzr0KWsxM4VEwOKczBuoNHfbd2cMeqVe7RlWu4rt6tBOVWIohr9cSPIv99DUkHEk-g_G9SGO6f6"/>
+<div class="absolute top-4 left-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#8b6b4e] text-white">
+                PREMIUM SELECTION
+              </span>
+</div>
+<button class="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full text-gray-600 hover:text-red-500 transition-colors">
+<i class="far fa-heart"></i>
+</button>
+</div>
+<!-- Content Section -->
+<div class="p-6 flex flex-col justify-between w-full md:w-1/2 lg:w-2/5">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="text-xl font-bold text-gray-900 mb-1">2023 Tesla Model S Plaid</h3>
+<div class="text-right">
+<span class="text-2xl font-bold text-gray-900">$185</span><span class="text-sm text-gray-500">/day</span>
+</div>
+</div>
+<p class="text-sm text-gray-500 flex items-center mb-4">
+<i class="fas fa-map-marker-alt mr-1"></i> Downtown LA (2.4 mi)
+              </p>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
+<i class="fas fa-charging-station mr-1 text-gray-500"></i> Electric
+                </span>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
+<i class="fas fa-tachometer-alt mr-1 text-gray-500"></i> 1.99s 0-60
+                </span>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
+<i class="fas fa-user-friends mr-1 text-gray-500"></i> 5 Seats
+                </span>
+</div>
+<div class="flex items-center text-sm text-gray-600 mb-6">
+<i class="fas fa-star text-black mr-1"></i> 4.9 <span class="text-gray-400 ml-1">(128 trips)</span>
+</div>
+</div>
+<div class="mt-auto border-t border-gray-100 pt-4 flex items-center justify-between">
+<div class="flex items-center">
+<div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">JD</div>
+<span class="ml-2 text-sm text-gray-600">Superhost</span>
+</div>
+<button class="bg-black text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800 transition-colors">
+                View Details
+              </button>
+</div>
+</div>
+</article>
+<!-- Grid for smaller cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Card 2 -->
+<article class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col group cursor-pointer transition-shadow hover:shadow-md">
+<div class="relative h-48 overflow-hidden">
+<img alt="2022 BMW X5" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcC852fc4diZ7XVpApjBjCLJdLWL1lshdsf6VlpzvJL0I472ELjHAP18o9UKb2HcQW--gSwrR6Kb3ej6B5h6Tvadxun_4t9ylBGcne_C6iaf6UykjNN3R2hHsClvPy9TffeY_SGH2QZtxdVQXrN44cNs8K1AQSlgZBBRXqY2Tv1oFXr2mWvgiuAb0SOS2yJQheG1bIfdAyClfo8z_YDL8hKKqHMuU_IjUJEY2JJyDmiMeg0ny3OitIiijCdHCpbFJPfBBatYau5khZ"/>
+<button class="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm rounded-full text-gray-600 hover:text-red-500 transition-colors">
+<i class="far fa-heart"></i>
+</button>
+</div>
+<div class="p-5 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-1">
+<h3 class="text-lg font-bold text-gray-900">2022 BMW X5</h3>
+<span class="text-lg font-bold text-gray-900">$110</span>
+</div>
+<p class="text-sm text-gray-500 flex items-center mb-2">
+<i class="fas fa-map-marker-alt mr-1"></i> Santa Monica (4.1 mi)
+              </p>
+<div class="flex items-center text-sm text-gray-600 mb-4">
+<i class="fas fa-star text-black mr-1"></i> 4.8 <span class="text-gray-400 ml-1">(84 trips)</span>
+</div>
+<div class="mt-auto border-t border-gray-100 pt-3 flex items-center justify-between">
+<span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">SUV</span>
+<span class="text-sm font-medium text-gray-900 group-hover:underline">View Details</span>
+</div>
+</div>
+</article>
+<!-- Card 3 -->
+<article class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col group cursor-pointer transition-shadow hover:shadow-md">
+<div class="relative h-48 overflow-hidden">
+<img alt="2024 Mercedes-Benz E-Class" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuABc4sdfW-IkLWoeNArsK0A_AfB8E_gycA6m6puh-GQByF0ZIwcQvus54gDTZSekHHEWdd7fQ4WmVP108YpnUP69bLChcizp4LL9fB_KH-An4sWIYGH8f8au_xnp0q9wxxQ62Dx9u4LP_6o2F4Ad_B1iBcxw1Ndp-6mtfNBA1j2Wy4LZGTf5oyC5lxGYEkTNqJ06WupQxFvdHasYYIcYhJUV1pbFCbZNe5YMu-WjTOXXjiTRucJR12oTAmvB0FpfKazOxeUaPnP6D47"/>
+<button class="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm rounded-full text-gray-600 hover:text-red-500 transition-colors">
+<i class="far fa-heart"></i>
+</button>
+</div>
+<div class="p-5 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-1">
+<h3 class="text-lg font-bold text-gray-900">2024 Mercedes-Benz E-Class</h3>
+<span class="text-lg font-bold text-gray-900">$145</span>
+</div>
+<p class="text-sm text-gray-500 flex items-center mb-2">
+<i class="fas fa-map-marker-alt mr-1"></i> LAX Airport (8.0 mi)
+              </p>
+<div class="flex items-center text-sm text-gray-600 mb-4">
+<i class="fas fa-star text-black mr-1"></i> 5.0 <span class="text-gray-400 ml-1">(22 trips)</span>
+</div>
+<div class="mt-auto border-t border-gray-100 pt-3 flex items-center justify-between">
+<span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">Sedan</span>
+<span class="text-sm font-medium text-gray-900 group-hover:underline">View Details</span>
+</div>
+</div>
+</article>
+<!-- Card 4 -->
+<article class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col group cursor-pointer transition-shadow hover:shadow-md">
+<div class="relative h-48 overflow-hidden">
+<img alt="2021 Porsche 911" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCL6roHemotYH5z-HAsOzYD3qLu1Wif16ASjIpj3ru1Qa_l_WU8L99oxidQT-P9A7b0I8uFubMy0xD_3vxQA40xvZOkG8wM5GJlkCbjjSyy1dWGt53aBrLW0T9I2_tWL4dSljW-HdeGnjC7M7iOwraXaKLJFdLs9mPQLSH7-8pZEeuLNdfrGcW4RaZHz1qBgO_hEAdYBRwqqDbUYdnKgaZXojrAxtn-wEwHxx-2kNJrDso8WvLOu_yAr3iLZEQO1qq86HLo4nkSZzMW"/>
+<button class="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm rounded-full text-gray-600 hover:text-red-500 transition-colors">
+<i class="far fa-heart"></i>
+</button>
+</div>
+<div class="p-5 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-1">
+<h3 class="text-lg font-bold text-gray-900">2021 Porsche 911</h3>
+<span class="text-lg font-bold text-gray-900">$250</span>
+</div>
+<p class="text-sm text-gray-500 flex items-center mb-2">
+<i class="fas fa-map-marker-alt mr-1"></i> Beverly Hills (1.2 mi)
+              </p>
+<div class="flex items-center text-sm text-gray-600 mb-4">
+<i class="fas fa-star text-black mr-1"></i> 4.9 <span class="text-gray-400 ml-1">(56 trips)</span>
+</div>
+<div class="mt-auto border-t border-gray-100 pt-3 flex items-center justify-between">
+<span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">Sports</span>
+<span class="text-sm font-medium text-gray-900 group-hover:underline">View Details</span>
+</div>
+</div>
+</article>
+</div>
+<!-- Pagination -->
+<div class="flex items-center justify-center pt-8 pb-4">
+<nav aria-label="Pagination" class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+<a class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" href="#">
+<span class="sr-only">Previous</span>
+<i class="fas fa-chevron-left"></i>
+</a>
+<a aria-current="page" class="z-10 bg-black border-black text-white relative inline-flex items-center px-4 py-2 border text-sm font-medium" href="#">
+              1
+            </a>
+<a class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium" href="#">
+              2
+            </a>
+<a class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium" href="#">
+              3
+            </a>
+<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+              ...
+            </span>
+<a class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" href="#">
+<span class="sr-only">Next</span>
+<i class="fas fa-chevron-right"></i>
+</a>
+</nav>
+</div>
+</div>
+</div>
+<!-- END: Search Results Area -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: Footer -->
+<footer class="bg-gray-100 mt-auto border-t border-gray-200">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row justify-between items-center">
+<div class="mb-4 md:mb-0">
+<span class="text-xl font-bold tracking-tight">RentFlow</span>
+<p class="text-sm text-gray-500 mt-1">© 2024 RentFlow. Professional Grade Fleet Management.</p>
+</div>
+<nav class="flex flex-wrap gap-4 text-sm text-gray-500">
+<a class="hover:text-gray-900 underline" href="#">Terms of Service</a>
+<a class="hover:text-gray-900 underline" href="#">Privacy Policy</a>
+<a class="hover:text-gray-900 underline" href="#">Help Center</a>
+<a class="hover:text-gray-900 underline" href="#">Become a Host</a>
+<a class="hover:text-gray-900 underline" href="#">Contact Support</a>
+</nav>
+</div>
+</footer>
+<!-- END: Footer -->
+</body></html>

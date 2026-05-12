@@ -227,6 +227,9 @@
                                 <include>**/*IntegrationTests*.java</include>
                             </includes>
                             <groups>integration</groups>
+                            <systemPropertyVariables>
+                                <api.version>1.44</api.version>
+                            </systemPropertyVariables>
                         </configuration>
                     </execution>
                 </executions>

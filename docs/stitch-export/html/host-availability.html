@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RentFlow - Availability Calendar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style data-purpose="custom-fonts">
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              black: '#111827',
+              gray: '#F9FAFB',
+              darkerGray: '#F3F4F6',
+              border: '#E5E7EB',
+              red: {
+                bg: '#FEF2F2',
+                border: '#FCA5A5',
+                text: '#B91C1C'
+              },
+              yellow: {
+                bg: '#FEF08A',
+                border: '#FBBF24',
+                text: '#92400E'
+              },
+              blue: {
+                bg: '#DBEAFE',
+                text: '#1D4ED8'
+              }
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-brand-gray text-brand-black antialiased min-h-screen flex flex-col">
+<!-- BEGIN: MainHeader -->
+<header class="bg-white border-b border-brand-border h-16 flex items-center px-6 justify-between shrink-0 sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<div class="text-xl font-bold tracking-tight">RentFlow</div>
+<nav class="hidden md:flex items-center space-x-6 text-sm font-medium text-gray-600">
+<a class="hover:text-gray-900" href="#">Home</a>
+<a class="hover:text-gray-900" href="#">Search</a>
+<a class="hover:text-gray-900" href="#">My Bookings</a>
+<a class="text-brand-black border-b-2 border-brand-black py-5" href="#">Host Dashboard</a>
+<a class="hover:text-gray-900" href="#">Admin</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-gray-100 rounded-full text-gray-600">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="p-2 hover:bg-gray-100 rounded-full text-gray-600">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<a class="text-sm font-medium hover:text-gray-600" href="#">Login</a>
+</div>
+</header>
+<!-- END: MainHeader -->
+<div class="flex flex-1 overflow-hidden">
+<!-- BEGIN: Sidebar -->
+<aside class="w-64 bg-white border-r border-brand-border hidden lg:flex flex-col shrink-0">
+<div class="p-6 pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Listings</div>
+<nav class="flex-1 px-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50" href="#">
+<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          All Vehicles
+        </a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-white bg-brand-black rounded-md" href="#">
+<svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          Availability
+        </a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50" href="#">
+<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          Pricing
+        </a>
+</nav>
+<div class="p-4 border-t border-brand-border">
+<div class="flex items-center gap-3">
+<img alt="Alex Mercer" class="w-10 h-10 rounded-full bg-gray-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCutFp8U3blySOtSAcw6VUXLID154kuivCVclPanxgfQsQNbVMmk3Y6-8WewcyDpRNBCb1W8XBktWC4bC_fxqFp0T82fNnBgUFw6mK8f7601pNTcAP9ERPSQJMSdr9_TDok2rXwX5VE4oqIrrfAHYK7eJ57KZvQJrA11QqcpEgRUDfSyZlACtrIC3pdaZNl0wd3ioPYdOhvkbsnDh7wmLl-VRBoO-bA6wCCGBEH2Cwt0Z2nD8hH77wt2wp-LB3CgshaxIjUPDIsB1wC"/>
+<div>
+<div class="text-sm font-semibold">Alex Mercer</div>
+<div class="text-xs text-gray-500">Premium Host</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- END: Sidebar -->
+<!-- BEGIN: Main Content -->
+<main class="flex-1 overflow-y-auto p-6 md:p-8">
+<div class="max-w-6xl mx-auto space-y-6">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<a class="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 mb-2" href="#">
+<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+              Back to Vehicle Details
+            </a>
+<h1 class="text-3xl font-bold text-gray-900">Availability Calendar</h1>
+<p class="text-gray-600 mt-1">Manage dates for 2023 Tesla Model S Plaid (VIN: ...8492)</p>
+</div>
+<div class="flex items-center gap-3 bg-white border border-brand-border rounded-full px-4 py-2 shadow-sm">
+<img alt="Tesla Model S" class="w-8 h-8 rounded-full bg-gray-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRyY0fI1A77lOy1SbXIbm1USCtl_mUTJjxQq0OT33X_SujqZmO9mj4d81oWOIKapsdVqLnTO-09Y_fJawNjq4EkMFlf_1WN8PqLI54ORqY1RAirbp6pEk2HeOhF-r5lFL69ox-gK7aSNfP9sfiHwn-5xgU6o4_PZYb4RJMd78rsbiayFBB6RaonsyCPergWDoARFfHxX3ZdELX_IzNXRW2haeHeTM4ZPqX0Pjy4z-QwpncSOJmPuHZBml_lDxLne9Qo5elxon7Z_1N"/>
+<span class="text-sm font-medium">Tesla Model S</span>
+</div>
+</div>
+<!-- Alert -->
+<div class="bg-brand-red-bg border border-brand-red-border rounded-lg p-4 flex gap-3 relative">
+<svg class="w-5 h-5 text-brand-red-text shrink-0 mt-0.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<div>
+<h3 class="text-sm font-medium text-brand-red-text">Conflict Detected</h3>
+<p class="text-sm text-brand-red-text mt-1">Cannot block dates from Oct 15 - Oct 18. A booking is already HELD for these dates. Please wait for the booking to clear or contact support.</p>
+</div>
+<button class="absolute top-4 right-4 text-brand-red-text hover:text-red-900">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+<div class="flex flex-col xl:flex-row gap-6">
+<!-- Calendar Container -->
+<div class="flex-1 bg-white border border-brand-border rounded-xl shadow-sm overflow-hidden flex flex-col">
+<!-- Calendar Header -->
+<div class="px-6 py-4 border-b border-brand-border flex items-center justify-between">
+<h2 class="text-xl font-semibold text-gray-900">October 2024</h2>
+<div class="flex items-center gap-2">
+<button class="p-2 border border-brand-border rounded-md hover:bg-gray-50">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="px-4 py-2 border border-brand-border rounded-md text-sm font-medium hover:bg-gray-50">Today</button>
+<button class="p-2 border border-brand-border rounded-md hover:bg-gray-50">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+</div>
+<!-- Calendar Grid -->
+<div class="flex-1 flex flex-col">
+<!-- Days Header -->
+<div class="grid grid-cols-7 border-b border-brand-border text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+<div class="py-3 border-r border-brand-border">Sun</div>
+<div class="py-3 border-r border-brand-border">Mon</div>
+<div class="py-3 border-r border-brand-border">Tue</div>
+<div class="py-3 border-r border-brand-border">Wed</div>
+<div class="py-3 border-r border-brand-border">Thu</div>
+<div class="py-3 border-r border-brand-border">Fri</div>
+<div class="py-3">Sat</div>
+</div>
+<!-- Weeks Grid -->
+<div class="grid grid-cols-7 flex-1 min-h-[500px]">
+<!-- Row 1 -->
+<div class="bg-gray-100 border-b border-r border-brand-border p-2 min-h-[100px] relative">
+<span class="text-sm text-gray-500 font-medium">29</span>
+</div>
+<div class="bg-gray-100 border-b border-r border-brand-border p-2 min-h-[100px] relative">
+<span class="text-sm text-gray-500 font-medium">30</span>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between">
+<span class="text-sm font-medium">1</span>
+<span class="text-xs text-gray-500 text-right mt-auto block">$120</span>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between">
+<span class="text-sm font-medium">2</span>
+<span class="text-xs text-gray-500 text-right mt-auto block">$120</span>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between">
+<span class="text-sm font-medium">3</span>
+<span class="text-xs text-gray-500 text-right mt-auto block">$120</span>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative border-l-4 border-l-blue-500 bg-brand-blue-bg/30">
+<span class="text-sm font-medium text-blue-800">4</span>
+<div class="mt-1 bg-brand-blue-bg text-brand-blue-text text-[10px] font-semibold px-2 py-0.5 rounded inline-block uppercase">Booked ...</div>
+</div>
+<div class="border-b border-brand-border p-2 min-h-[100px] relative bg-brand-blue-bg/30 border-r-4 border-r-blue-500">
+<span class="text-sm font-medium text-blue-800">5</span>
+<div class="mt-1 bg-brand-blue-bg text-brand-blue-text text-[10px] font-semibold px-2 py-0.5 rounded inline-block uppercase">Booked ...</div>
+</div>
+<!-- Row 2 -->
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between">
+<span class="text-sm font-medium">6</span>
+<span class="text-xs text-gray-500 text-right mt-auto block">$120</span>
+</div>
+<div class="bg-gray-100 border-b border-r border-brand-border p-2 min-h-[100px] relative border-l-4 border-l-gray-400">
+<span class="text-sm font-medium text-gray-700">7</span>
+<div class="mt-1 flex items-center text-xs text-gray-600 gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Blocked</div>
+</div>
+<div class="bg-gray-100 border-b border-r border-brand-border p-2 min-h-[100px] relative">
+<span class="text-sm font-medium text-gray-700">8</span>
+<div class="mt-1 flex items-center text-xs text-gray-600 gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Blocked</div>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between">
+<span class="text-sm font-medium">9</span>
+<span class="text-xs text-gray-500 text-right mt-auto block">$120</span>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between border-2 border-brand-black shadow-[inset_0_0_0_1px_#111827]">
+<div class="flex justify-between items-start">
+<span class="text-sm font-medium">10</span>
+<svg class="w-4 h-4 text-brand-black" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<span class="text-xs text-gray-500 text-right mt-auto block">$120</span>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between border-y-2 border-brand-black shadow-[inset_0_0_0_1px_#111827]">
+<div class="flex justify-between items-start">
+<span class="text-sm font-medium">11</span>
+<svg class="w-4 h-4 text-brand-black" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<span class="text-xs text-gray-500 text-right mt-auto block">$150</span>
+</div>
+<div class="border-b border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between border-2 border-brand-black shadow-[inset_0_0_0_1px_#111827]">
+<div class="flex justify-between items-start">
+<span class="text-sm font-medium">12</span>
+<svg class="w-4 h-4 text-brand-black" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<span class="text-xs text-gray-500 text-right mt-auto block">$150</span>
+</div>
+<!-- Row 3 -->
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between">
+<span class="text-sm font-medium">13</span>
+<span class="text-xs text-gray-500 text-right mt-auto block">$120</span>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between">
+<span class="text-sm font-medium">14</span>
+<span class="text-xs text-gray-500 text-right mt-auto block">$120</span>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative bg-brand-yellow-bg/50 border-l-4 border-l-yellow-500 border-2 border-red-500 shadow-[inset_0_0_0_1px_#EF4444]">
+<span class="text-sm font-medium text-yellow-900">15</span>
+<div class="mt-1 bg-brand-yellow-bg text-brand-yellow-text text-[10px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 uppercase w-max"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Hold (14:21)</div>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative bg-brand-yellow-bg/50 border-y-2 border-red-500 shadow-[inset_0_0_0_1px_#EF4444]">
+<span class="text-sm font-medium text-yellow-900">16</span>
+<div class="mt-1 bg-brand-yellow-bg text-brand-yellow-text text-[10px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 uppercase w-max"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Hold</div>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative bg-brand-yellow-bg/50 border-y-2 border-red-500 shadow-[inset_0_0_0_1px_#EF4444]">
+<span class="text-sm font-medium text-yellow-900">17</span>
+<div class="mt-1 bg-brand-yellow-bg text-brand-yellow-text text-[10px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 uppercase w-max"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Hold</div>
+</div>
+<div class="border-b border-r border-brand-border p-2 min-h-[100px] relative bg-brand-yellow-bg/50 border-r-4 border-r-yellow-500 border-2 border-red-500 shadow-[inset_0_0_0_1px_#EF4444]">
+<span class="text-sm font-medium text-yellow-900">18</span>
+<div class="mt-1 bg-brand-yellow-bg text-brand-yellow-text text-[10px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 uppercase w-max"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Hold</div>
+</div>
+<div class="border-b border-brand-border p-2 min-h-[100px] relative flex flex-col justify-between">
+<span class="text-sm font-medium">19</span>
+<span class="text-xs text-gray-500 text-right mt-auto block">$150</span>
+</div>
+<!-- Empty Rows to fill grid -->
+<div class="col-span-7 bg-gray-200 min-h-[100px] flex-1"></div>
+</div>
+</div>
+<!-- Calendar Footer -->
+<div class="bg-gray-100 border-t border-brand-border px-4 py-2 flex items-center justify-between text-xs text-gray-500">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-gray-400"></span>
+                Syncing external calendars...
+              </div>
+<div>Last updated: 2 mins ago</div>
+</div>
+</div>
+<!-- Sidebar Panels -->
+<div class="w-full xl:w-80 space-y-6 shrink-0">
+<!-- Manage Selection Card -->
+<div class="bg-white border border-brand-border rounded-xl shadow-sm p-5">
+<h3 class="text-lg font-semibold flex items-center gap-2 mb-4">
+<svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                Manage Selection
+              </h3>
+<div class="mb-4">
+<label class="block text-xs text-gray-500 font-medium mb-1">Selected Dates</label>
+<div class="bg-gray-50 border border-brand-border rounded-lg p-3 flex items-center justify-between text-sm">
+<span class="font-medium text-gray-900">Oct 10, 2024</span>
+<svg class="w-4 h-4 text-gray-400 mx-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="font-medium text-gray-900">Oct 12, 2024</span>
+</div>
+<p class="text-xs text-gray-500 mt-2">3 days selected (Currently FREE)</p>
+</div>
+<button class="w-full bg-brand-black text-white font-medium rounded-lg py-2.5 px-4 mb-3 flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                Block Selected Dates
+              </button>
+<button class="w-full bg-gray-50 text-gray-400 font-medium rounded-lg py-2.5 px-4 border border-brand-border flex items-center justify-center gap-2 cursor-not-allowed">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                Unblock Selected Dates
+              </button>
+<div class="mt-4 bg-gray-50 rounded-lg p-3 flex gap-2 border border-brand-border">
+<svg class="w-4 h-4 text-gray-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<p class="text-xs text-gray-600 leading-relaxed">You can only block dates that are currently FREE. HOLD or BOOKED dates cannot be modified manually.</p>
+</div>
+</div>
+<!-- Legend Card -->
+<div class="bg-white border border-brand-border rounded-xl shadow-sm p-5">
+<h3 class="text-sm font-semibold uppercase tracking-wide text-gray-900 mb-4">Status Legend</h3>
+<ul class="space-y-4">
+<li class="flex items-center justify-between text-sm">
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 rounded border border-gray-300 bg-white"></div>
+<span class="text-gray-900">Free</span>
+</div>
+<span class="text-gray-500 text-xs">Available for booking</span>
+</li>
+<li class="flex items-center justify-between text-sm">
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 rounded border border-yellow-400 bg-brand-yellow-bg"></div>
+<span class="text-gray-900">Hold</span>
+</div>
+<span class="text-gray-500 text-xs">Pending checkout</span>
+</li>
+<li class="flex items-center justify-between text-sm">
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 rounded border border-blue-400 bg-brand-blue-bg"></div>
+<span class="text-gray-900">Booked</span>
+</div>
+<span class="text-gray-500 text-xs">Confirmed trip</span>
+</li>
+<li class="flex items-center justify-between text-sm">
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 rounded border border-gray-400 bg-gray-100 flex items-center justify-center">
+<svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<span class="text-gray-900">Blocked</span>
+</div>
+<span class="text-gray-500 text-xs">Host unavailable</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- END: Main Content -->
+</div>
+<!-- BEGIN: Footer -->
+<footer class="bg-brand-darkerGray border-t border-brand-border py-8 px-6 mt-auto shrink-0">
+<div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+<div>
+<div class="text-lg font-bold text-gray-900 mb-1">RentFlow</div>
+<div class="text-sm text-gray-500">© 2024 RentFlow. Professional Grade Fleet Management.</div>
+</div>
+<div class="flex flex-wrap gap-4 md:gap-6 text-sm text-gray-600">
+<a class="hover:underline hover:text-gray-900" href="#">Terms of Service</a>
+<a class="hover:underline hover:text-gray-900" href="#">Privacy Policy</a>
+<a class="hover:underline hover:text-gray-900" href="#">Help Center</a>
+<a class="hover:underline hover:text-gray-900" href="#">Become a Host</a>
+<a class="hover:underline hover:text-gray-900" href="#">Contact Support</a>
+</div>
+</div>
+</footer>
+<!-- END: Footer -->
+</body></html>

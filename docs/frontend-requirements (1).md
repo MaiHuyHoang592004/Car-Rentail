@@ -1,218 +1,206 @@
-# Frontend Requirements — RentFlow
+# RentFlow Frontend Requirements
 
-**Version:** 1.1  
-**Synced with:** RentFlow SRS v5.1  
-**Frontend target:** React / Next.js / Vue-compatible  
-**Backend style:** REST API-first, JSON response, JWT authentication
+Version: 2026-05-11  
+Source: current backend code plus `docs/srs.md`, phase docs, and API contracts.  
+Important: this file defines frontend requirements only. It does not authorize generating frontend code in this backend repo.
 
----
+## Product Scope
 
-## 1. Purpose
+RentFlow is a car rental booking frontend that consumes a Spring Boot REST API. The first frontend build should support the backend features already implemented:
 
-The frontend must consume the RentFlow REST API and must not rely on backend-rendered pages.
+- Guest listing search and listing detail.
+- Register, login, refresh token, logout.
+- Current user profile view/update.
+- Host vehicle management.
+- Host listing management and submission.
+- Host availability calendar with block/unblock.
+- Admin listing approval workflow.
+- Admin user list.
+- Customer booking hold creation.
+- My bookings, booking detail, location patch, and HELD booking cancel.
 
-The UI should support the P0 backend demo first:
+Payment, driver verification endpoints, notifications, files/photos, trip lifecycle, reviews, disputes, reports, and payouts are planned but not currently implemented in backend.
 
-```text
-Guest searches listings.
-Customer creates HELD booking.
-Booking hold countdown is shown.
-Host can create/submit listing.
-Admin can approve listing.
-```
-
-P1/P2 screens are added after P0 backend is stable.
-
----
-
-## 2. Scope by Phase
-
-### P0 — Required Frontend Scope
-
-| Area | Required UI |
-|---|---|
-| Auth | Register, login, logout |
-| User | View/update own profile |
-| Public listing | Search listings, view listing detail |
-| Host | Create vehicle, create listing, submit listing |
-| Admin | Approve/reject listing |
-| Availability | Public listing availability; host full availability |
-| Booking | Create booking hold |
-| Booking expiry | Show hold expiration timer |
-| Error handling | Standard API error response support |
-
-### P1 — Business Complete UI
-
-| Area | Required UI |
-|---|---|
-| Payment | Authorize payment |
-| Cancellation | Cancel booking with reason |
-| Driver verification | Submit license metadata/document |
-| Notification | Notification list |
-| Timeline | Booking timeline if backend exposes it |
-| Host approval | Host approve/reject booking if `instantBook=false` |
-| File metadata | Listing photo metadata and document metadata when API is available |
-
-### P2 — Advanced UI
-
-| Area | Required UI |
-|---|---|
-| MinIO full flow | Signed upload/download URLs |
-| Trip lifecycle | Check-in/check-out |
-| Reviews | Review completed trip |
-| Disputes | Open/resolve dispute |
-| Reports | Admin/host dashboards |
-| Payouts | Host earnings/payout view |
-
----
-
-## 3. Personas and Permissions
+## Personas
 
 ### Guest
 
-Can search active listings, view listing details, register, and login. Cannot create booking or view host internal availability.
+Can search active listings, view listing details, inspect public availability, register, and login.
 
 ### Customer
 
-Can manage profile, search listings, create bookings, authorize payment, cancel eligible bookings, view own bookings, submit driver verification, and view notifications.
-
-Customer cannot access another customer's booking, book own hosted listing, or create new booking when driver verification is required and status is not `APPROVED`.
+Can manage own profile, create booking holds, view own bookings, patch booking pickup/return locations, and cancel HELD bookings.
 
 ### Host
 
-Can manage own vehicles/listings, submit listings for approval, view own listing full availability, block/unblock dates, and handle host bookings in P1.
-
-Host cannot view customer license number/document, customer payment details, customer phone/address in pending approval, or manage another host's resources.
+Can manage own vehicles, listings, listing lifecycle, and listing availability.
 
 ### Admin
 
-Can approve/reject listings, view users, approve/reject driver verification, view audit logs, and view reports in P2.
+Can list users and approve/reject/suspend/reactivate listings.
 
----
+A user may have multiple roles.
 
-## 4. Global Frontend Requirements
+## Global Frontend Requirements
 
-### App Shell
+- Use REST JSON; no backend-rendered pages are expected.
+- Use role-aware routing and navigation.
+- Persist auth state: access token, refresh token, token expiry metadata, current user, and roles.
+- Attach `Authorization: Bearer <accessToken>` to protected requests.
+- Attempt refresh on `401 AUTH_TOKEN_EXPIRED`; logout if refresh fails.
+- Generate UUID-v4 `Idempotency-Key` for `POST /bookings` and `POST /bookings/{id}/cancel`.
+- Reuse an idempotency key only when retrying the exact same request body.
+- Show loading, empty, optimistic disabled-submit, validation, and error states for every API interaction.
+- Render backend `details[]` field errors when `VALIDATION_ERROR` is returned.
+- Keep `correlationId` visible in technical details or support copy.
+- Dates must be handled as local calendar dates, not instants.
+- Booking range validation must enforce `pickupDate < returnDate`, min 1 day, max 30 days, and no past pickup date.
+- Frontend must not expose host/admin links to users without the relevant role.
 
-The app should include:
-
-- Header/navigation
-- Auth state indicator
-- Role-aware navigation
-- Responsive layout
-- Toast/notification system
-- Loading states
-- Empty states
-- Error boundary
-- API error display component
-
-### Auth State
-
-Frontend stores:
-
-- Access token
-- Refresh token
-- Current user summary
-- Roles
-- Token expiry metadata if provided
-
-Rules:
+## Recommended Route Map
 
 ```text
-Attach Authorization: Bearer <accessToken> to protected API calls.
-Refresh token on 401 AUTH_TOKEN_EXPIRED.
-Logout on refresh failure.
-Hide role-restricted navigation when user lacks role.
+/
+/login
+/register
+/listings
+/listings/:id
+/listings/:id/book
+/me/profile
+/me/bookings
+/bookings/:id
+
+/host
+/host/vehicles
+/host/vehicles/new
+/host/vehicles/:id
+/host/listings
+/host/listings/new
+/host/listings/:id
+/host/listings/:id/availability
+
+/admin
+/admin/listings
+/admin/listings/:id
+/admin/users
 ```
 
-### Error Handling
-
-Frontend must understand:
-
-```json
-{
-  "code": "LISTING_NOT_AVAILABLE",
-  "message": "Listing is not available for the selected date range.",
-  "details": [
-    {
-      "field": "pickupDate",
-      "message": "pickupDate must be before returnDate"
-    }
-  ],
-  "correlationId": "req-20260509-0001"
-}
-```
-
-Display `message`, render `details[]` as field errors, and keep `correlationId` for debug/support.
-
-### Date Handling
-
-Rules:
+Planned routes for later backend phases:
 
 ```text
-pickupDate < returnDate
-minimum rental = 1 day
-maximum rental = 30 days
-booking period = [pickupDate, returnDate)
-returnDate is exclusive
+/bookings/:id/payment
+/me/driver-verification
+/me/notifications
+/host/bookings
+/admin/driver-verifications
+/admin/audit-logs
+/admin/reports
 ```
 
-Example:
+## App Shell
 
-```text
-pickupDate = 2026-06-01
-returnDate = 2026-06-03
-Occupied dates: 2026-06-01 and 2026-06-02
-```
+The frontend should include:
 
-### Idempotency Handling
+- Header with primary navigation.
+- Auth menu with login/register or current user/logout.
+- Role-switch/role-aware menu when a user has multiple roles.
+- Toast or alert system.
+- API error component.
+- Confirmation modal component.
+- Pagination component that works with both custom `PageResponse<T>` and Spring `Page<T>`.
+- Empty states for search, lists, and unavailable resources.
 
-Generate UUID-v4 `Idempotency-Key` before:
+## Auth Requirements
 
-- Create booking
-- Authorize payment
-- Cancel booking
-- Capture payment
-- Void payment
-- Refund payment
-- Host approve booking
-- Host reject booking
+### Register
 
-Reuse the same key only for retrying the same exact request body.
+Fields:
 
----
+| Field | Rule |
+|---|---|
+| email | required, valid email |
+| password | required, min 8 chars |
+| fullName | required |
+| roles | optional; default expected backend behavior is customer when omitted |
 
-## 5. Page Requirements
+On success, store returned token response if present and redirect to intended page or `/listings`.
 
-### Listing Search Page
+### Login
+
+Fields: email and password.  
+On success, store tokens and current user.  
+On `AUTH_INVALID_CREDENTIALS`, show a non-field login error.
+
+### Logout
+
+Call backend logout with refresh token, clear local auth state, and redirect to `/login` or public listings.
+
+## Profile Requirements
+
+Route: `/me/profile`
+
+Show and edit:
+
+- full name
+- phone
+- date of birth
+- address line
+- email and roles as read-only
+- driver verification status as read-only until backend driver verification endpoints exist
+
+## Public Listing Requirements
+
+### Listing Search
 
 Route: `/listings`
 
 Filters:
 
-| Filter | Type |
+| Filter | Component |
 |---|---|
-| city | text |
-| category | multi-select |
-| pickupDate | date |
-| returnDate | date |
-| minPrice | number |
-| maxPrice | number |
-| seats | number |
+| city | text input |
+| categories | multi-select |
+| pickupDate | date input |
+| returnDate | date input |
+| minPrice/maxPrice | number inputs |
+| seats | number input |
 | transmission | select |
 | fuelType | select |
+| page/size | pagination |
 
-Listing card shows title, city, category, price, currency, seats, transmission, fuel type, cover photo if available, and rating average if available. `ratingAverage` is P2 and may be null/omitted.
+Listing card displays:
 
-### Listing Detail Page
+- title
+- city
+- category
+- base price per day and currency
+- seats
+- transmission
+- fuel type
+- cover photo placeholder because current backend returns `coverPhotoUrl: null`
+- rating hidden or placeholder because current backend returns `ratingAverage: null`
+
+### Listing Detail
 
 Route: `/listings/:id`
 
-Shows listing info, vehicle summary, description, city/address summary, price, cancellation policy, availability calendar, extras if available, and Book CTA.
+Display:
 
-Guest clicking Book redirects to login/register. Customer proceeds to booking form.
+- title, description, city, address
+- price and currency
+- daily km limit
+- instant book flag
+- cancellation policy
+- vehicle summary
+- extras
+- public availability
+- booking CTA
 
-### Create Booking Page
+Guest booking CTA should redirect to login with intended URL preserved. Customer booking CTA opens booking page.
+
+## Booking Requirements
+
+### Create Booking Hold
 
 Route: `/listings/:id/book`
 
@@ -220,170 +208,235 @@ Fields:
 
 | Field | Required |
 |---|---|
-| pickupDate | Yes |
-| returnDate | Yes |
-| pickupLocation | Optional/P0 |
-| returnLocation | Optional/P0 |
-| extras | Optional |
+| pickupDate | yes |
+| returnDate | yes |
+| pickupLocation | optional |
+| returnLocation | optional |
+| extras | optional |
 
-Before submit: validate date range, max 30 days, user logged in, and driver verification gate if enabled.
+Before submit:
 
-On success, booking status is `HELD`; show countdown using `holdExpiresAt`.
+- Validate date range.
+- Check customer is authenticated.
+- Generate UUID-v4 `Idempotency-Key`.
+- Disable submit while the request is in flight.
 
-### My Bookings Page
+Success:
+
+- Backend returns `status: HELD`.
+- Show `holdExpiresAt` countdown.
+- Show booking summary and current limitation: payment confirmation is not available until payment backend is implemented.
+
+### My Bookings
 
 Route: `/me/bookings`
 
-Filters: All, HELD, PENDING_HOST_APPROVAL, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, REJECTED, EXPIRED.
+Filters:
 
-Status actions:
+```text
+ALL, HELD, PENDING_HOST_APPROVAL, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, REJECTED, EXPIRED
+```
 
-| Status | Customer action |
-|---|---|
-| HELD | Continue payment, cancel |
-| PENDING_HOST_APPROVAL | View status, cancel |
-| CONFIRMED | View detail, cancel |
-| IN_PROGRESS | View detail |
-| COMPLETED | Review, P2 |
-| CANCELLED/REJECTED/EXPIRED | View detail |
+For current backend, user should mostly see `HELD`, `CANCELLED`, or `EXPIRED`.
+
+### Booking Detail
+
+Route: `/bookings/:id`
+
+Display:
+
+- status
+- listing title
+- pickup/return dates
+- pickup/return locations
+- total amount and currency
+- hold expiration
+- price snapshot
+- policy snapshot
+
+Actions:
+
+- Patch pickup/return locations for statuses `HELD`, `PENDING_HOST_APPROVAL`, `CONFIRMED`.
+- Cancel only when backend allows it. Current backend allows only `HELD`.
 
 ### Cancel Booking Modal
 
-Allowed for HELD, PENDING_HOST_APPROVAL, CONFIRMED. Not allowed for IN_PROGRESS or COMPLETED.
+Field: reason, optional, max 500 characters.  
+Frontend should strip or block HTML-like input before submit.  
+Submit requires UUID-v4 `Idempotency-Key`.
 
-Reason must be max 500 chars and stripped/rejected for HTML/script content.
+## Host Requirements
 
-### Host Vehicles Page
+### Vehicles
 
-Route: `/host/vehicles`
+Route group: `/host/vehicles`
 
-Capabilities: list, create, edit, archive. Vehicle statuses: DRAFT, ACTIVE, MAINTENANCE, SUSPENDED, ARCHIVED.
+Capabilities:
 
-Default: new vehicles are ACTIVE unless host explicitly saves DRAFT.
+- list by status
+- create
+- view detail
+- update
+- archive
 
-Archive is soft delete; backend rejects if active bookings exist.
+Create fields:
 
-### Host Listings Page
+- category
+- make
+- model
+- year
+- plate number
+- VIN optional
+- transmission
+- fuel type
+- seats
+- status optional, backend default is `ACTIVE`
 
-Route: `/host/listings`
+Archive is soft delete. If backend returns `VEHICLE_ARCHIVE_NOT_ALLOWED`, explain that related active bookings/listings block archive.
 
-Capabilities: create, edit, submit, archive, reactivate.
+### Listings
 
-Submit preconditions:
+Route group: `/host/listings`
 
-```text
-listing.status = DRAFT
-vehicle.status = ACTIVE
-photos recommended but not required for P0/P1
-```
+Capabilities:
 
-### Host Availability Page
+- list by status
+- create
+- view detail
+- update
+- submit
+- archive
+- reactivate
+
+Create fields:
+
+- vehicle
+- title
+- description
+- city
+- address
+- latitude/longitude optional
+- base price per day
+- currency, default suggested `VND`
+- daily km limit
+- instant book
+- cancellation policy
+
+Submit requirements:
+
+- listing must be `DRAFT`
+- vehicle should be `ACTIVE`
+- backend changes status to `PENDING_APPROVAL`
+
+### Availability
 
 Route: `/host/listings/:id/availability`
 
-Host sees FREE, HOLD, BOOKED, BLOCKED. Host can block FREE dates and unblock BLOCKED dates. Host cannot block HOLD/BOOKED dates.
+Display calendar/list statuses:
 
-### Admin Listing Approval Page
+```text
+FREE, HOLD, BOOKED, BLOCKED
+```
 
-Route: `/admin/listings`
+Actions:
 
-Actions: approve, reject with reason, suspend with reason, reactivate.
+- block selected dates
+- unblock selected dates
 
-Approval side effect: listing becomes ACTIVE and backend generates 365 availability rows.
+Frontend should prevent obvious invalid operations:
 
-### Driver Verification Page
+- cannot block `HOLD` or `BOOKED`
+- cannot unblock non-`BLOCKED`
 
-Customer route: `/me/driver-verification`. Admin route: `/admin/driver-verifications`.
+Backend request uses explicit `dates: string[]`, not `{ from, to }`.
 
-Customer can view current status, submit license number, expiry date, and documentFileId if file flow exists. Admin can approve/reject with reason.
+## Admin Requirements
 
-### Notifications Page
+### Listing Approval
 
-Route: `/me/notifications`
+Route group: `/admin/listings`
 
-Shows type, title, message, created time, read status, and delivery status.
+Capabilities:
 
----
+- list by status, hostId, city, page, size
+- view detail
+- approve
+- reject with reason
+- suspend with reason
+- reactivate
 
-## 6. Conflict Handling
+Approval side effect: backend sets listing to `ACTIVE` and generates availability rows.
+
+### Users
+
+Route: `/admin/users`
+
+Filters:
+
+- status
+- role
+- page
+- size
+
+Display:
+
+- email
+- roles
+- full name
+- account status
+- driver verification status
+- createdAt
+- lastLoginAt
+
+## Error Handling Requirements
 
 | Backend code | UI behavior |
 |---|---|
-| LISTING_NOT_AVAILABLE | Show unavailable message and refresh calendar |
-| BOOKING_OVERLAP_CUSTOMER | Show existing booking warning |
-| BOOKING_INVALID_STATUS | Refresh resource and show current status |
-| IDEMPOTENCY_KEY_CONFLICT | Do not retry with same key |
-| REQUEST_ALREADY_PROCESSING | Show processing state |
-| VEHICLE_ARCHIVE_NOT_ALLOWED | Show active booking/listing constraint |
-| PAYMENT_VOID_RETRY_REQUIRED | Mark cancellation done and show payment-release warning |
+| `AUTH_INVALID_CREDENTIALS` | Show login error |
+| `AUTH_TOKEN_EXPIRED` | Refresh token, retry once, then logout |
+| `ACCESS_DENIED` | Show forbidden or hide unavailable actions |
+| `USER_EMAIL_EXISTS` | Show account exists and link to login |
+| `LISTING_NOT_FOUND` | Show not found/unavailable listing |
+| `LISTING_NOT_AVAILABLE` | Refresh availability and ask user to select other dates |
+| `BOOKING_OVERLAP_CUSTOMER` | Show link to my bookings |
+| `BOOKING_INVALID_STATUS` | Refresh booking and show current state |
+| `IDEMPOTENCY_KEY_REQUIRED` | Treat as frontend bug |
+| `IDEMPOTENCY_KEY_CONFLICT` | Do not retry with same key |
+| `REQUEST_ALREADY_PROCESSING` | Keep action disabled and show processing state |
+| `VEHICLE_ARCHIVE_NOT_ALLOWED` | Explain archive preconditions |
+| `VALIDATION_ERROR` | Render field-level messages |
+| `TOO_MANY_REQUESTS` | Back off and show retry timing if available |
+| `INTERNAL_ERROR` | Generic retry/support message |
 
----
+## API Client Requirements
 
-## 7. Recommended Frontend Architecture
+The API layer should provide:
 
-```text
-src/
-├── app or pages
-├── components
-├── features
-│   ├── auth
-│   ├── listings
-│   ├── bookings
-│   ├── vehicles
-│   ├── host
-│   ├── admin
-│   ├── notifications
-│   └── profile
-├── lib
-│   ├── api
-│   ├── auth
-│   ├── errors
-│   ├── idempotency
-│   └── date
-└── types
-```
+- typed DTOs matching `docs/api-contracts.md`
+- auth token attachment
+- refresh-token retry handling
+- normalized error object
+- correlation ID support
+- idempotency key helper
+- date serialization as `YYYY-MM-DD`
+- pagination adapter for `PageResponse<T>` and Spring `Page<T>`
 
-API client responsibilities:
+## Non-Goals For First Frontend Build
 
-- Attach access token
-- Attach correlation ID
-- Handle refresh token
-- Normalize error response
-- Generate idempotency keys for mutation actions
-- Provide typed DTOs
+- Do not implement payment UI until backend payment endpoints exist.
+- Do not implement driver license upload/verification until endpoints exist.
+- Do not implement file/photo upload until file APIs exist.
+- Do not implement realtime chat, GPS tracking, mobile app, or analytics-heavy dashboards.
+- Do not generate backend code or alter backend behavior from frontend work.
 
----
+## Acceptance Criteria
 
-## 8. Non-Goals
-
-P0/P1 frontend should not implement realtime chat, GPS tracking, complex maps, microfrontends, full payment gateway UI, mobile app, or advanced analytics dashboard.
-
----
-
-## 9. Acceptance Criteria
-
-### P0
-
-- Guest can search listings.
-- Customer can register/login.
-- Host can create vehicle/listing and submit listing.
-- Admin can approve listing.
-- Customer can create HELD booking.
-- HELD booking shows countdown.
-- API errors display user-friendly messages.
-- Role-based navigation works.
-
-### P1
-
-- Customer can authorize payment.
-- Customer can cancel booking.
-- Driver verification UI exists.
-- Notifications UI exists.
-- Host full availability calendar exists.
-- Admin driver verification screen exists.
-
-### P2
-
-- File upload/photo UI exists.
-- Check-in/check-out flow exists.
-- Review/dispute/report screens exist.
+- Guest can search and view listing details.
+- User can register, login, refresh implicitly, logout.
+- Authenticated user can view/update profile.
+- Host can create vehicle and listing, submit listing, manage availability.
+- Admin can approve/reject/suspend/reactivate listing and list users.
+- Customer can create HELD booking and see hold countdown.
+- Customer can list, view, patch location, and cancel eligible HELD booking.
+- API errors show clear user messages and field errors.
+- Navigation and protected routes respect roles.

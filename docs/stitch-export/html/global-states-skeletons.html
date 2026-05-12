@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RentFlow - Empty &amp; Loading States Showcase</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&amp;family=Inter:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e7e7f3",
+                        "on-tertiary-container": "#ffd4c5",
+                        "on-surface-variant": "#434654",
+                        "on-surface": "#191b23",
+                        "inverse-on-surface": "#f0f0fb",
+                        "surface-variant": "#e2e1ed",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed-dim": "#b5c4ff",
+                        "inverse-surface": "#2e3039",
+                        "tertiary-fixed-dim": "#ffb59a",
+                        "surface-container": "#ededf8",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "primary": "#003fb1",
+                        "surface-bright": "#faf8ff",
+                        "surface-tint": "#1353d8",
+                        "on-background": "#191b23",
+                        "on-primary-fixed": "#00174d",
+                        "inverse-primary": "#b5c4ff",
+                        "secondary": "#9d4300",
+                        "primary-fixed": "#dbe1ff",
+                        "surface-container-low": "#f3f3fe",
+                        "secondary-fixed-dim": "#ffb690",
+                        "surface": "#faf8ff",
+                        "outline": "#737686",
+                        "background": "#faf8ff",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#ad3b00",
+                        "on-secondary-fixed": "#341100",
+                        "on-primary-container": "#d4dcff",
+                        "on-secondary-container": "#5c2400",
+                        "on-primary-fixed-variant": "#003dab",
+                        "tertiary-fixed": "#ffdbcf",
+                        "on-tertiary-fixed": "#380d00",
+                        "error": "#ba1a1a",
+                        "surface-container-highest": "#e2e1ed",
+                        "secondary-fixed": "#ffdbca",
+                        "primary-container": "#1a56db",
+                        "secondary-container": "#fd761a",
+                        "outline-variant": "#c3c5d7",
+                        "on-secondary": "#ffffff",
+                        "tertiary": "#852b00",
+                        "surface-dim": "#d9d9e4",
+                        "on-secondary-fixed-variant": "#783200",
+                        "on-tertiary-fixed-variant": "#802a00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack_lg": "32px",
+                        "stack_md": "16px",
+                        "margin_mobile": "16px",
+                        "gutter": "24px",
+                        "container_max_width": "1280px",
+                        "base": "4px",
+                        "stack_sm": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "caption": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "display": ["Manrope"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "caption": ["12px", { "lineHeight": "1.4", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "display": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .shimmer {
+            background: linear-gradient(90deg, #f0f0fb 0%, #ffffff 50%, #f0f0fb 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<nav class="bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline shadow-sm dark:shadow-none flex justify-between items-center w-full px-margin_mobile md:px-stack_lg h-16 sticky top-0 z-50">
+<div class="flex items-center gap-gutter">
+<div class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed-dim">RentFlow</div>
+<div class="hidden md:flex gap-stack_md">
+<a class="font-body-md text-body-md text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors duration-200 active:opacity-80 transition-opacity" href="#">Marketplace</a>
+<a class="font-body-md text-body-md text-primary dark:text-primary-fixed-dim border-b-2 border-primary dark:border-primary-fixed-dim pb-1 active:opacity-80 transition-opacity" href="#">Explore</a>
+<a class="font-body-md text-body-md text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors duration-200 active:opacity-80 transition-opacity" href="#">Help</a>
+</div>
+</div>
+<!-- Search Bar (on_left logic implemented by ordering) -->
+<div class="hidden md:flex flex-1 max-w-md mx-gutter">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant">search</span>
+<input class="w-full bg-surface-container rounded-full py-2 pl-10 pr-4 border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary-container outline-none transition-all font-body-md text-body-md text-on-surface" placeholder="Search..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-stack_md">
+<button class="hidden md:block px-4 py-2 rounded-lg font-label-md text-label-md text-primary hover:bg-surface-variant transition-colors">Switch to Host</button>
+<button class="hidden md:block px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md text-label-md shadow hover:bg-primary-container hover:text-on-primary-container transition-colors">Rent a Car</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden border border-outline-variant">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A professional headshot of a smiling man with short brown hair, wearing a dark blue button-down shirt. The background is slightly blurred, showing a modern, well-lit office environment. The lighting is soft and flattering, creating a warm and approachable mood suitable for a corporate profile avatar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpqyoqsp_c-tGT9H3NPqmKs_XSQyYGWfXBB2-TawP3zQsEtqYHbNPgLYtfzKd7cJQCemDTG_uBRqiucIrZmFBBnclzH1kRstHPfZRR3dzoFqx0PLFpe3IBZ2UsRd_klvuJWGQTqemEPN4ERqVAKEcwmYif2llC-taHTNEj1-jm-DTC6ILit3mUQbfMXKwvKDY7Gjyb7VBrM8X6keJy5YH6YP8zjt932LdO8vNqGF5S9ydVqLTIcJz6DcVC0fUxOHMNkQZfEE5vZVJp"/>
+</div>
+</div>
+</nav>
+<div class="flex flex-1">
+<!-- Main Content -->
+<main class="flex-1 w-full max-w-container_max_width mx-auto px-margin_mobile md:px-stack_lg py-stack_lg flex flex-col gap-stack_lg">
+<header class="mb-stack_md">
+<h1 class="font-headline-lg text-headline-lg text-on-background">Empty &amp; Loading States</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-base">Reference implementation for non-ideal states across the RentFlow platform.</p>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-stack_lg">
+<!-- Empty State: Listing Search -->
+<section class="flex flex-col gap-stack_md">
+<h2 class="font-headline-md text-headline-md text-on-surface border-b border-surface-variant pb-base">Listing Search Empty</h2>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack_lg flex flex-col items-center justify-center text-center min-h-[400px] shadow-sm">
+<div class="w-24 h-24 bg-surface-container rounded-full flex items-center justify-center mb-stack_md">
+<span class="material-symbols-outlined text-4xl text-outline" style="font-variation-settings: 'FILL' 0;">search_off</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-base">No vehicles found</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-sm mb-stack_md">We couldn't find any cars matching your current filters in this location. Try adjusting your dates or removing some filters.</p>
+<div class="flex gap-stack_sm">
+<button class="px-4 py-2 border border-outline-variant text-on-surface rounded-lg font-label-md text-label-md hover:bg-surface-variant transition-colors">Clear Filters</button>
+<button class="px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md text-label-md shadow hover:bg-primary-container hover:text-on-primary-container transition-colors">Explore All</button>
+</div>
+</div>
+</section>
+<!-- Empty State: Host Vehicles -->
+<section class="flex flex-col gap-stack_md">
+<h2 class="font-headline-md text-headline-md text-on-surface border-b border-surface-variant pb-base">Host Fleet Empty</h2>
+<div class="bg-surface-container-lowest border border-outline-variant border-dashed rounded-xl p-stack_lg flex flex-col items-center justify-center text-center min-h-[400px]">
+<div class="w-24 h-24 bg-primary-fixed rounded-full flex items-center justify-center mb-stack_md">
+<span class="material-symbols-outlined text-4xl text-primary" style="font-variation-settings: 'FILL' 1;">directions_car</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-base">Your fleet is empty</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-sm mb-stack_md">Start earning by listing your first vehicle. The process takes less than 10 minutes to complete.</p>
+<button class="px-6 py-3 bg-secondary text-on-secondary rounded-lg font-label-md text-label-md shadow hover:bg-secondary-container hover:text-on-secondary-container transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">add</span> Add New Vehicle
+                        </button>
+</div>
+</section>
+<!-- Loading State: Skeleton Cards -->
+<section class="flex flex-col gap-stack_md col-span-1 lg:col-span-2">
+<h2 class="font-headline-md text-headline-md text-on-surface border-b border-surface-variant pb-base">Skeleton Listing Cards</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- Skeleton Card 1 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl overflow-hidden shadow-sm flex flex-col">
+<div class="w-full aspect-[4/3] shimmer"></div>
+<div class="p-stack_md flex flex-col gap-stack_sm flex-1">
+<div class="w-20 h-4 shimmer rounded-full"></div>
+<div class="w-3/4 h-6 shimmer rounded"></div>
+<div class="w-1/2 h-4 shimmer rounded mt-auto"></div>
+<div class="flex justify-between items-center mt-stack_sm pt-stack_sm border-t border-surface-variant">
+<div class="w-16 h-6 shimmer rounded"></div>
+<div class="w-8 h-8 shimmer rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Skeleton Card 2 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl overflow-hidden shadow-sm flex flex-col hidden md:flex">
+<div class="w-full aspect-[4/3] shimmer"></div>
+<div class="p-stack_md flex flex-col gap-stack_sm flex-1">
+<div class="w-24 h-4 shimmer rounded-full"></div>
+<div class="w-4/5 h-6 shimmer rounded"></div>
+<div class="w-2/3 h-4 shimmer rounded mt-auto"></div>
+<div class="flex justify-between items-center mt-stack_sm pt-stack_sm border-t border-surface-variant">
+<div class="w-20 h-6 shimmer rounded"></div>
+<div class="w-8 h-8 shimmer rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Skeleton Card 3 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl overflow-hidden shadow-sm flex flex-col hidden lg:flex">
+<div class="w-full aspect-[4/3] shimmer"></div>
+<div class="p-stack_md flex flex-col gap-stack_sm flex-1">
+<div class="w-16 h-4 shimmer rounded-full"></div>
+<div class="w-full h-6 shimmer rounded"></div>
+<div class="w-1/2 h-4 shimmer rounded mt-auto"></div>
+<div class="flex justify-between items-center mt-stack_sm pt-stack_sm border-t border-surface-variant">
+<div class="w-24 h-6 shimmer rounded"></div>
+<div class="w-8 h-8 shimmer rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Skeleton Card 4 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl overflow-hidden shadow-sm flex flex-col hidden lg:flex">
+<div class="w-full aspect-[4/3] shimmer"></div>
+<div class="p-stack_md flex flex-col gap-stack_sm flex-1">
+<div class="w-20 h-4 shimmer rounded-full"></div>
+<div class="w-3/4 h-6 shimmer rounded"></div>
+<div class="w-3/5 h-4 shimmer rounded mt-auto"></div>
+<div class="flex justify-between items-center mt-stack_sm pt-stack_sm border-t border-surface-variant">
+<div class="w-16 h-6 shimmer rounded"></div>
+<div class="w-8 h-8 shimmer rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Loading State: Skeleton Table -->
+<section class="flex flex-col gap-stack_md col-span-1 lg:col-span-2">
+<h2 class="font-headline-md text-headline-md text-on-surface border-b border-surface-variant pb-base">Skeleton Table Rows</h2>
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl overflow-hidden shadow-sm">
+<!-- Table Header Skeleton -->
+<div class="flex items-center px-stack_md py-3 bg-surface-container-low border-b border-surface-variant gap-gutter">
+<div class="w-8 h-4 shimmer rounded"></div>
+<div class="flex-1 h-4 shimmer rounded"></div>
+<div class="w-24 h-4 shimmer rounded hidden md:block"></div>
+<div class="w-32 h-4 shimmer rounded hidden md:block"></div>
+<div class="w-16 h-4 shimmer rounded"></div>
+</div>
+<!-- Table Rows -->
+<div class="flex items-center px-stack_md py-4 border-b border-surface-variant gap-gutter">
+<div class="w-8 h-8 shimmer rounded-full"></div>
+<div class="flex-1 flex flex-col gap-2">
+<div class="w-1/2 h-5 shimmer rounded"></div>
+<div class="w-1/4 h-3 shimmer rounded"></div>
+</div>
+<div class="w-24 h-6 shimmer rounded-full hidden md:block"></div>
+<div class="w-32 h-4 shimmer rounded hidden md:block"></div>
+<div class="w-16 h-6 shimmer rounded"></div>
+</div>
+<div class="flex items-center px-stack_md py-4 border-b border-surface-variant gap-gutter">
+<div class="w-8 h-8 shimmer rounded-full"></div>
+<div class="flex-1 flex flex-col gap-2">
+<div class="w-2/3 h-5 shimmer rounded"></div>
+<div class="w-1/3 h-3 shimmer rounded"></div>
+</div>
+<div class="w-24 h-6 shimmer rounded-full hidden md:block"></div>
+<div class="w-32 h-4 shimmer rounded hidden md:block"></div>
+<div class="w-16 h-6 shimmer rounded"></div>
+</div>
+<div class="flex items-center px-stack_md py-4 gap-gutter">
+<div class="w-8 h-8 shimmer rounded-full"></div>
+<div class="flex-1 flex flex-col gap-2">
+<div class="w-1/2 h-5 shimmer rounded"></div>
+<div class="w-1/4 h-3 shimmer rounded"></div>
+</div>
+<div class="w-24 h-6 shimmer rounded-full hidden md:block"></div>
+<div class="w-32 h-4 shimmer rounded hidden md:block"></div>
+<div class="w-16 h-6 shimmer rounded"></div>
+</div>
+</div>
+</section>
+<!-- Button Loading States -->
+<section class="flex flex-col gap-stack_md">
+<h2 class="font-headline-md text-headline-md text-on-surface border-b border-surface-variant pb-base">Button Loading States</h2>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack_lg flex flex-col gap-stack_md shadow-sm">
+<div class="flex flex-wrap gap-stack_md items-center">
+<button class="px-6 py-3 bg-primary text-on-primary rounded-lg font-label-md text-label-md shadow flex items-center justify-center gap-2 opacity-80 cursor-wait min-w-[140px]">
+<span class="material-symbols-outlined animate-spin text-sm">progress_activity</span> Processing
+                            </button>
+<span class="font-caption text-caption text-on-surface-variant">Primary Loading</span>
+</div>
+<div class="flex flex-wrap gap-stack_md items-center">
+<button class="px-6 py-3 border border-outline-variant text-on-surface rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 opacity-80 cursor-wait min-w-[140px] bg-surface-variant">
+<span class="material-symbols-outlined animate-spin text-sm">progress_activity</span> Updating
+                            </button>
+<span class="font-caption text-caption text-on-surface-variant">Secondary Loading</span>
+</div>
+<div class="flex flex-wrap gap-stack_md items-center">
+<button class="px-6 py-3 bg-secondary text-on-secondary rounded-lg font-label-md text-label-md shadow flex items-center justify-center gap-2 opacity-80 cursor-wait min-w-[140px]">
+<div class="flex gap-1">
+<div class="w-1.5 h-1.5 bg-on-secondary rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+<div class="w-1.5 h-1.5 bg-on-secondary rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+<div class="w-1.5 h-1.5 bg-on-secondary rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+</div>
+</button>
+<span class="font-caption text-caption text-on-surface-variant">Action Loading (Dots)</span>
+</div>
+</div>
+</section>
+</div>
+</main>
+</div>
+</body></html>

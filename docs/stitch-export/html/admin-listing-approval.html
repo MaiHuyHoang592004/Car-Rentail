@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RentFlow - Listing Approvals</title>
+<!-- Tailwind CSS via CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<!-- Tailwind Configuration -->
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            gray: {
+              50: '#F9FAFB',
+              100: '#F3F4F6',
+              200: '#E5E7EB',
+              300: '#D1D5DB',
+              400: '#9CA3AF',
+              500: '#6B7280',
+              600: '#4B5563',
+              700: '#374151',
+              800: '#1F2937',
+              900: '#111827',
+            },
+            primary: '#000000',
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Styles -->
+<style data-purpose="custom-styles">
+    body {
+      background-color: #F9FAFB; /* gray-50 */
+    }
+    /* Hide scrollbar for cleaner look if needed */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="font-sans text-gray-900 antialiased min-h-screen flex flex-col">
+<!-- BEGIN: NavigationBar -->
+<header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+<div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16 items-center">
+<!-- Logo and Main Nav -->
+<div class="flex items-center space-x-8">
+<div class="flex-shrink-0 flex items-center">
+<span class="font-bold text-2xl tracking-tight text-black">RentFlow</span>
+</div>
+<nav class="hidden md:flex space-x-6">
+<a class="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors" href="#">Home</a>
+<a class="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors" href="#">Search</a>
+<a class="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors" href="#">My Bookings</a>
+<a class="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors" href="#">Host Dashboard</a>
+<a class="text-black font-semibold text-sm border-b-2 border-black pb-1" href="#">Admin</a>
+</nav>
+</div>
+<!-- Right Side Icons & Login -->
+<div class="flex items-center space-x-5">
+<button aria-label="Notifications" class="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black rounded-full p-1 transition-colors" type="button">
+<i class="h-5 w-5" data-lucide="bell"></i>
+</button>
+<button aria-label="User Profile" class="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black rounded-full p-1 transition-colors" type="button">
+<i class="h-5 w-5" data-lucide="user"></i>
+</button>
+<a class="bg-black text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors" href="#">
+            Login
+          </a>
+</div>
+</div>
+</div>
+</header>
+<!-- END: NavigationBar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-grow max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+<!-- BEGIN: PageHeader -->
+<div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+<div>
+<h1 class="text-4xl font-bold text-gray-900 tracking-tight mb-2">Listing Approvals</h1>
+<p class="text-lg text-gray-600">Review and approve new vehicle listings to ensure platform quality.</p>
+</div>
+<div>
+<!-- Filter Dropdown Button -->
+<button class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors" type="button">
+<i class="h-4 w-4 mr-2 text-gray-500" data-lucide="filter"></i>
+          PENDING_APPROVAL
+        </button>
+</div>
+</div>
+<!-- END: PageHeader -->
+<!-- BEGIN: SummaryCards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<!-- Card 1: Pending Review -->
+<div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Pending Review</h3>
+<i class="h-5 w-5 text-gray-500" data-lucide="clipboard-list"></i>
+</div>
+<div>
+<p class="text-4xl font-bold text-gray-900 mb-1">24</p>
+<p class="text-sm text-gray-600">+3 since yesterday</p>
+</div>
+</div>
+<!-- Card 2: Average Wait Time -->
+<div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Average Wait Time</h3>
+<i class="h-5 w-5 text-gray-500" data-lucide="clock"></i>
+</div>
+<div>
+<p class="text-4xl font-bold text-gray-900 mb-1">14h</p>
+<p class="text-sm text-gray-600">Target: &lt; 24h</p>
+</div>
+</div>
+<!-- Card 3: Approval Rate -->
+<div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Approval Rate (30d)</h3>
+<i class="h-5 w-5 text-gray-500" data-lucide="check-circle-2"></i>
+</div>
+<div>
+<p class="text-4xl font-bold text-gray-900 mb-1">82%</p>
+<p class="text-sm text-red-600">Down 2% vs last month</p>
+</div>
+</div>
+</div>
+<!-- END: SummaryCards -->
+<!-- BEGIN: DataListContainer -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+<!-- List Toolbar (Search & Sort) -->
+<div class="p-4 border-b border-gray-200 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4">
+<div class="relative w-full sm:w-96">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<i class="h-4 w-4 text-gray-400" data-lucide="search"></i>
+</div>
+<input class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-black focus:border-black sm:text-sm transition-colors" placeholder="Search by host, vehicle, or ID..." type="text"/>
+</div>
+<div>
+<button class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors" type="button">
+<i class="h-4 w-4 mr-2 text-gray-500" data-lucide="arrow-down-up"></i>
+            Sort
+          </button>
+</div>
+</div>
+<!-- List Content -->
+<div class="overflow-x-auto">
+<table class="min-w-full divide-y divide-gray-200">
+<thead class="bg-white">
+<tr>
+<th class="px-6 py-4 text-left text-sm font-semibold text-gray-900 tracking-wider" scope="col">Vehicle Details</th>
+<th class="px-6 py-4 text-left text-sm font-semibold text-gray-900 tracking-wider" scope="col">Host Info</th>
+<th class="px-6 py-4 text-left text-sm font-semibold text-gray-900 tracking-wider" scope="col">Submitted</th>
+<th class="px-6 py-4 text-left text-sm font-semibold text-gray-900 tracking-wider" scope="col">Status</th>
+<th class="px-6 py-4 text-right text-sm font-semibold text-gray-900 tracking-wider" scope="col">Action</th>
+</tr>
+</thead>
+<tbody class="bg-white divide-y divide-gray-200">
+<!-- Row 1 -->
+<tr class="hover:bg-gray-50 transition-colors">
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="flex items-center">
+<div class="flex-shrink-0 h-16 w-24 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+<img alt="2023 Tesla Model Y thumbnail" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLFpjnGulyoMxzJCqExUnmXPE-JYx6D0bXoai9Dp-3Zq466dujhPswfQpO47JJNJ9PvmUPlOc-xlzExHV4sEdAT4ZplKIDWsPb4kbjZDwbp6MUbBuVoXH98215oD89n-CmA77w9EHnD4F-BulbqHYh5lDOAQwHAoS6ow-rUYuL5xxRw7GrEBVjOX-iYiYQu3OJCaJnzuCTGeAyZ_X8tn7NF8ah_Kzan-7kwWLojwjrwGAcuB8zwitCbPJ75K85vhtcg6_jg7_TFXQ5"/>
+</div>
+<div class="ml-4">
+<div class="text-sm font-semibold text-gray-900">2023 Tesla Model Y</div>
+<div class="text-sm text-gray-500 mt-1">VIN: 5YJG...9A21 • San Francisco, CA</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="text-sm font-medium text-gray-900">Sarah Jenkins</div>
+<div class="text-xs text-gray-500 mt-1">New Host (0 Listings)</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                2 hours ago
+              </td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+<span class="h-1.5 w-1.5 rounded-full bg-gray-400 mr-1.5"></span>
+                  Pending
+                </span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<button class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors" type="button">
+                  Review
+                </button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-gray-50 transition-colors">
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="flex items-center">
+<div class="flex-shrink-0 h-16 w-24 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+<img alt="2022 BMW 5 Series thumbnail" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAT1mzcHrTg0DBso0YeoB07gufKc1kunCV68gnPcMQZSAfJqQ6ZplX5KXVLSzJ1imlPQi2h9ZPSmLgK4pE9bUP5i2ZLAEC9aYbsrtGHud-o2A_3AK8HKBKgj40_3boiV7EhobgwQcYlA11KiC0-vWqbwZJtSNd42_LPwWQlpSOiK-QeE2BcyalDTaOrTiY-2jYjYt5YbR3P0VlH5yP4tRbRcmyqqwtZEE-jtjCFz4rDeCq5oj5NqRFQQRoXEIOhvK5kb6MaA4JXqytq"/>
+</div>
+<div class="ml-4">
+<div class="text-sm font-semibold text-gray-900">2022 BMW 5 Series</div>
+<div class="text-sm text-gray-500 mt-1">VIN: WBAJ...3K89 • Chicago, IL</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="text-sm font-medium text-gray-900">Michael Chen</div>
+<div class="text-xs text-gray-500 mt-1">Super Host (12 Listings)</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                5 hours ago
+              </td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+<span class="h-1.5 w-1.5 rounded-full bg-gray-400 mr-1.5"></span>
+                  Pending
+                </span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<button class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors" type="button">
+                  Review
+                </button>
+</td>
+</tr>
+<!-- Row 3 (No Image/Flagged) -->
+<tr class="hover:bg-gray-50 transition-colors">
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="flex items-center">
+<div class="flex-shrink-0 h-16 w-24 rounded-md overflow-hidden bg-gray-50 flex items-center justify-center border border-gray-200">
+<i class="h-6 w-6 text-gray-400" data-lucide="image-off"></i>
+</div>
+<div class="ml-4">
+<div class="text-sm font-semibold text-gray-900">2018 Ford Transit Cargo</div>
+<div class="text-sm text-gray-500 mt-1">VIN: 1FTN...8M22 • Austin, TX</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="text-sm font-medium text-gray-900">Logistics Pro LLC</div>
+<div class="text-xs text-red-600 mt-1 flex items-center">
+<i class="h-3 w-3 mr-1" data-lucide="triangle-alert"></i>
+                  Flagged: Missing Docs
+                </div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                1 day ago
+              </td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+<span class="h-1.5 w-1.5 rounded-full bg-gray-400 mr-1.5"></span>
+                  Pending
+                </span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<button class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors" type="button">
+                  Review
+                </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between sm:px-6">
+<div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+<div>
+<p class="text-sm text-gray-700">
+              Showing <span class="font-medium">1</span> to <span class="font-medium">3</span> of <span class="font-medium">24</span> entries
+            </p>
+</div>
+<div>
+<nav aria-label="Pagination" class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+<a class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" href="#">
+<span class="sr-only">Previous</span>
+<span>Prev</span>
+</a>
+<a aria-current="page" class="z-10 bg-black text-white relative inline-flex items-center px-4 py-2 border border-black text-sm font-medium" href="#">
+                1
+              </a>
+<a class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium" href="#">
+                2
+              </a>
+<a class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium" href="#">
+                3
+              </a>
+<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                ...
+              </span>
+<a class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" href="#">
+<span class="sr-only">Next</span>
+<span>Next</span>
+</a>
+</nav>
+</div>
+</div>
+</div>
+</div>
+<!-- END: DataListContainer -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: Footer -->
+<footer class="bg-gray-100 border-t border-gray-200 mt-auto">
+<div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+<div class="flex-shrink-0">
+<span class="font-bold text-xl tracking-tight text-black">RentFlow</span>
+</div>
+<nav class="flex flex-wrap justify-center space-x-6 text-sm text-gray-600">
+<a class="hover:text-gray-900 hover:underline" href="#">Terms of Service</a>
+<a class="hover:text-gray-900 hover:underline" href="#">Privacy Policy</a>
+<a class="hover:text-gray-900 hover:underline" href="#">Help Center</a>
+<a class="hover:text-gray-900 hover:underline" href="#">Become a Host</a>
+<a class="hover:text-gray-900 hover:underline" href="#">Contact Support</a>
+</nav>
+<p class="text-sm text-gray-500 text-center md:text-right">
+        © 2024 RentFlow. Professional Grade Fleet Management.
+      </p>
+</div>
+</footer>
+<!-- END: Footer -->
+<!-- Initialize Lucide Icons -->
+<script data-purpose="icon-initialization">
+    lucide.createIcons();
+  </script>
+</body></html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RentFlow - Book Your Car</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&amp;family=Inter:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e7e7f3",
+                        "on-tertiary-container": "#ffd4c5",
+                        "on-surface-variant": "#434654",
+                        "on-surface": "#191b23",
+                        "inverse-on-surface": "#f0f0fb",
+                        "surface-variant": "#e2e1ed",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed-dim": "#b5c4ff",
+                        "inverse-surface": "#2e3039",
+                        "tertiary-fixed-dim": "#ffb59a",
+                        "surface-container": "#ededf8",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "primary": "#003fb1",
+                        "surface-bright": "#faf8ff",
+                        "surface-tint": "#1353d8",
+                        "on-background": "#191b23",
+                        "on-primary-fixed": "#00174d",
+                        "inverse-primary": "#b5c4ff",
+                        "secondary": "#9d4300",
+                        "primary-fixed": "#dbe1ff",
+                        "surface-container-low": "#f3f3fe",
+                        "secondary-fixed-dim": "#ffb690",
+                        "surface": "#faf8ff",
+                        "outline": "#737686",
+                        "background": "#faf8ff",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#ad3b00",
+                        "on-secondary-fixed": "#341100",
+                        "on-primary-container": "#d4dcff",
+                        "on-secondary-container": "#5c2400",
+                        "on-primary-fixed-variant": "#003dab",
+                        "tertiary-fixed": "#ffdbcf",
+                        "on-tertiary-fixed": "#380d00",
+                        "error": "#ba1a1a",
+                        "surface-container-highest": "#e2e1ed",
+                        "secondary-fixed": "#ffdbca",
+                        "primary-container": "#1a56db",
+                        "secondary-container": "#fd761a",
+                        "outline-variant": "#c3c5d7",
+                        "on-secondary": "#ffffff",
+                        "tertiary": "#852b00",
+                        "surface-dim": "#d9d9e4",
+                        "on-secondary-fixed-variant": "#783200",
+                        "on-tertiary-fixed-variant": "#802a00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack_lg": "32px",
+                        "stack_md": "16px",
+                        "margin_mobile": "16px",
+                        "gutter": "24px",
+                        "container_max_width": "1280px",
+                        "base": "4px",
+                        "stack_sm": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "caption": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "display": ["Manrope"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "caption": ["12px", { "lineHeight": "1.4", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "display": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            background: transparent;
+            bottom: 0;
+            color: transparent;
+            cursor: pointer;
+            height: auto;
+            left: 0;
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: auto;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased selection:bg-primary-container selection:text-on-primary-container min-h-screen flex flex-col">
+<!-- TopNavBar (Nav suppressed as this is a linear transactional checkout flow) -->
+<header class="bg-surface dark:bg-inverse-surface shadow-sm dark:shadow-none flex justify-center items-center w-full px-margin_mobile md:px-stack_lg h-16 sticky top-0 z-50">
+<a class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed-dim" href="#">RentFlow</a>
+</header>
+<main class="flex-grow w-full max-w-[container_max_width] mx-auto px-margin_mobile md:px-gutter py-stack_lg flex flex-col lg:flex-row gap-stack_lg">
+<!-- Left Column: Booking Form -->
+<div class="flex-1 flex flex-col gap-stack_lg">
+<section class="flex items-center justify-between">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Book Your Car</h1>
+<a class="flex items-center gap-stack_sm text-primary hover:text-primary-fixed-dim transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+                    Back to Listing
+                </a>
+</section>
+<!-- Dates Section -->
+<section class="bg-surface-container-lowest rounded-xl p-stack_md border border-outline-variant shadow-sm flex flex-col gap-stack_md">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-stack_sm">
+<span class="material-symbols-outlined text-primary" data-icon="calendar_month">calendar_month</span>
+                    Rental Period
+                </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack_md relative">
+<div class="relative">
+<label class="block font-label-md text-label-md text-on-surface-variant mb-base" for="pickup-date">Pickup Date</label>
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded-lg py-3 px-4 text-on-surface font-body-md focus:border-primary focus:ring-2 focus:ring-primary-container outline-none transition-all relative z-10 bg-transparent" id="pickup-date" type="date" value="2023-11-10"/>
+<span class="material-symbols-outlined absolute right-4 top-3 text-outline pointer-events-none z-0" data-icon="event">event</span>
+</div>
+</div>
+<div class="relative">
+<label class="block font-label-md text-label-md text-on-surface-variant mb-base" for="return-date">Return Date</label>
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded-lg py-3 px-4 text-on-surface font-body-md focus:border-primary focus:ring-2 focus:ring-primary-container outline-none transition-all relative z-10 bg-transparent" id="return-date" type="date" value="2023-11-14"/>
+<span class="material-symbols-outlined absolute right-4 top-3 text-outline pointer-events-none z-0" data-icon="event">event</span>
+</div>
+</div>
+</div>
+<p class="font-caption text-caption text-on-surface-variant mt-1 flex items-start gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="info">info</span>
+                    Return date is exclusive. Rental duration must be 1–30 days.
+                </p>
+</section>
+<!-- Location Section -->
+<section class="bg-surface-container-lowest rounded-xl p-stack_md border border-outline-variant shadow-sm flex flex-col gap-stack_md">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-stack_sm">
+<span class="material-symbols-outlined text-primary" data-icon="location_on">location_on</span>
+                    Locations
+                </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack_md">
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-base" for="pickup-location">Preferred pickup location</label>
+<select class="w-full bg-surface border border-outline-variant rounded-lg py-3 px-4 text-on-surface font-body-md focus:border-primary focus:ring-2 focus:ring-primary-container outline-none transition-all appearance-none cursor-pointer" id="pickup-location">
+<option>SFO International Airport</option>
+<option>Downtown SF Station</option>
+<option>Oakland Airport</option>
+</select>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-base" for="return-location">Preferred return location</label>
+<select class="w-full bg-surface border border-outline-variant rounded-lg py-3 px-4 text-on-surface font-body-md focus:border-primary focus:ring-2 focus:ring-primary-container outline-none transition-all appearance-none cursor-pointer" id="return-location">
+<option>SFO International Airport</option>
+<option>Downtown SF Station</option>
+<option>Oakland Airport</option>
+</select>
+</div>
+</div>
+<p class="font-caption text-caption text-on-surface-variant mt-1 flex items-start gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="error">error</span>
+                    Delivery fees are not calculated in this version.
+                </p>
+</section>
+<!-- Extras Section -->
+<section class="bg-surface-container-lowest rounded-xl p-stack_md border border-outline-variant shadow-sm flex flex-col gap-stack_md">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-stack_sm">
+<span class="material-symbols-outlined text-primary" data-icon="add_circle">add_circle</span>
+                    Optional Extras
+                </h2>
+<div class="flex flex-col gap-stack_sm">
+<label class="flex items-center justify-between p-4 border border-outline-variant rounded-lg hover:border-primary cursor-pointer transition-colors bg-surface-bright">
+<div class="flex items-center gap-stack_md">
+<input checked="" class="w-5 h-5 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<div>
+<span class="block font-label-md text-label-md text-on-surface">Premium Insurance</span>
+<span class="block font-caption text-caption text-on-surface-variant">$0 deductible coverage</span>
+</div>
+</div>
+<span class="font-body-md text-body-md text-on-surface font-semibold">+$25/day</span>
+</label>
+<label class="flex items-center justify-between p-4 border border-outline-variant rounded-lg hover:border-primary cursor-pointer transition-colors bg-surface">
+<div class="flex items-center gap-stack_md">
+<input class="w-5 h-5 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<div>
+<span class="block font-label-md text-label-md text-on-surface">GPS Navigation</span>
+<span class="block font-caption text-caption text-on-surface-variant">Built-in routing system</span>
+</div>
+</div>
+<span class="font-body-md text-body-md text-on-surface font-semibold">+$10/day</span>
+</label>
+<label class="flex items-center justify-between p-4 border border-outline-variant rounded-lg hover:border-primary cursor-pointer transition-colors bg-surface">
+<div class="flex items-center gap-stack_md">
+<input class="w-5 h-5 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<div>
+<span class="block font-label-md text-label-md text-on-surface">Child Seat</span>
+<span class="block font-caption text-caption text-on-surface-variant">Standard toddler safety seat</span>
+</div>
+</div>
+<span class="font-body-md text-body-md text-on-surface font-semibold">+$15/day</span>
+</label>
+</div>
+</section>
+</div>
+<!-- Right Column: Summary & Payment (Sticky) -->
+<div class="w-full lg:w-[400px]">
+<div class="sticky top-[88px] flex flex-col gap-stack_md">
+<!-- Listing Summary Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden flex flex-col">
+<div class="h-48 w-full bg-surface-variant relative">
+<img alt="Sleek black luxury sedan parked in a modern minimalist garage setting with soft lighting" class="w-full h-full object-cover" data-alt="A sleek, modern black luxury sedan parked inside a brightly lit, minimalist architectural garage. The setting features pristine white walls and smooth concrete floors, bathed in soft, high-key white light that reflects off the car's polished surface. The aesthetic is premium, corporate, and clean, perfectly aligning with a professional car rental marketplace interface. The mood is calm and trustworthy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHrSgU_dGjBZxZ7fHpsxVzXbR6yz_c-5EGI_Myjr0UtufcOtOH5KJ0wIAsjFmWsR_wR82BplWUAM9lj2ExifrZrYlVZcddKHvDxWgj8sLWeyWYWTyCXC4lFuqXkwHfEDgrjP57GPygEbXFPo1W44xvRE6PSzhL9MaENz8rgC1WRSDzSxW1-7DSpzMwFpGXvwWLm92CV1zebwIBvd7lxZI4aBM4qNqt_HFXOrD6wd0YMMgx1IZ8bqTGOuldks5J8AhRgqhs8KbeHnqs"/>
+<div class="absolute top-4 right-4 bg-surface-container-lowest/90 backdrop-blur-sm px-3 py-1 rounded-full border border-outline-variant shadow-sm">
+<span class="font-label-md text-label-md text-on-surface flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary-container fill" data-icon="star">star</span>
+                                4.9 (120)
+                            </span>
+</div>
+</div>
+<div class="p-stack_md flex flex-col gap-stack_sm">
+<div>
+<span class="font-label-md text-label-md text-primary tracking-widest uppercase">Luxury Sedan</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mt-1">2023 Tesla Model S</h3>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant font-caption text-caption mt-2">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]" data-icon="electric_car">electric_car</span> Electric</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]" data-icon="settings">settings</span> Auto</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]" data-icon="group">group</span> 5 Seats</span>
+</div>
+</div>
+</div>
+<!-- Price Summary Card -->
+<div class="bg-surface-container-lowest rounded-xl p-stack_md border border-outline-variant shadow-sm flex flex-col gap-stack_md">
+<h3 class="font-headline-md text-headline-md text-on-surface">Price Details</h3>
+<div class="flex flex-col gap-3 font-body-md text-body-md text-on-surface-variant">
+<div class="flex justify-between items-center">
+<span>$150 x 4 days</span>
+<span class="text-on-surface">$600.00</span>
+</div>
+<div class="flex justify-between items-center">
+<span>Premium Insurance ($25/day)</span>
+<span class="text-on-surface">$100.00</span>
+</div>
+<div class="flex justify-between items-center">
+<span>Cleaning Fee</span>
+<span class="text-on-surface">$35.00</span>
+</div>
+<hr class="border-outline-variant my-2"/>
+<div class="flex justify-between items-center font-headline-md text-headline-md text-on-surface">
+<span>Total</span>
+<span>$735.00</span>
+</div>
+</div>
+<button class="w-full bg-primary hover:bg-primary-fixed-dim text-on-primary font-label-md text-label-md py-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 mt-4">
+                        Hold this car
+                    </button>
+<p class="text-center font-caption text-caption text-on-surface-variant flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="lock">lock</span>
+                        Secure payment processing
+                    </p>
+</div>
+</div>
+</div>
+</main>
+</body></html>

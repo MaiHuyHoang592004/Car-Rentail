@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RentFlow Admin - Suspend Listing</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "on-error": "#ffffff",
+                    "surface-container-high": "#e7e7f3",
+                    "on-tertiary-container": "#ffd4c5",
+                    "on-surface-variant": "#434654",
+                    "on-surface": "#191b23",
+                    "inverse-on-surface": "#f0f0fb",
+                    "surface-variant": "#e2e1ed",
+                    "on-tertiary": "#ffffff",
+                    "primary-fixed-dim": "#b5c4ff",
+                    "inverse-surface": "#2e3039",
+                    "tertiary-fixed-dim": "#ffb59a",
+                    "surface-container": "#ededf8",
+                    "surface-container-lowest": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "primary": "#003fb1",
+                    "surface-bright": "#faf8ff",
+                    "surface-tint": "#1353d8",
+                    "on-background": "#191b23",
+                    "on-primary-fixed": "#00174d",
+                    "inverse-primary": "#b5c4ff",
+                    "secondary": "#9d4300",
+                    "primary-fixed": "#dbe1ff",
+                    "surface-container-low": "#f3f3fe",
+                    "secondary-fixed-dim": "#ffb690",
+                    "surface": "#faf8ff",
+                    "outline": "#737686",
+                    "background": "#faf8ff",
+                    "on-primary": "#ffffff",
+                    "tertiary-container": "#ad3b00",
+                    "on-secondary-fixed": "#341100",
+                    "on-primary-container": "#d4dcff",
+                    "on-secondary-container": "#5c2400",
+                    "on-primary-fixed-variant": "#003dab",
+                    "tertiary-fixed": "#ffdbcf",
+                    "on-tertiary-fixed": "#380d00",
+                    "error": "#ba1a1a",
+                    "surface-container-highest": "#e2e1ed",
+                    "secondary-fixed": "#ffdbca",
+                    "primary-container": "#1a56db",
+                    "secondary-container": "#fd761a",
+                    "outline-variant": "#c3c5d7",
+                    "on-secondary": "#ffffff",
+                    "tertiary": "#852b00",
+                    "surface-dim": "#d9d9e4",
+                    "on-secondary-fixed-variant": "#783200",
+                    "on-tertiary-fixed-variant": "#802a00"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack_lg": "32px",
+                    "stack_md": "16px",
+                    "margin_mobile": "16px",
+                    "gutter": "24px",
+                    "container_max_width": "1280px",
+                    "base": "4px",
+                    "stack_sm": "8px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Manrope"],
+                    "headline-lg": ["Manrope"],
+                    "caption": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "display": ["Manrope"],
+                    "label-md": ["Inter"],
+                    "headline-lg-mobile": ["Manrope"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "caption": ["12px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "display": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}]
+            }
+          }
+        }
+      }
+    </script>
+</head>
+<body class="bg-background min-h-screen text-on-surface antialiased overflow-hidden">
+<!-- Background Shell (Blurred out for Modal focus) -->
+<div aria-hidden="true" class="flex h-screen w-full select-none">
+<!-- SideNavBar JSON Component -->
+<nav class="h-screen w-64 fixed left-0 top-0 bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline shadow-md flex flex-col p-4 space-y-2 z-0 hidden md:flex">
+<!-- Header -->
+<div class="mb-stack_lg px-2 flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary-container">domain</span>
+</div>
+<div>
+<h1 class="font-display text-headline-md font-bold text-primary">RentFlow Business</h1>
+<p class="font-caption text-caption text-on-surface-variant">Vehicle Owner Portal</p>
+</div>
+</div>
+<!-- Primary Navigation -->
+<div class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high rounded-lg hover:bg-surface-variant transition-all active:scale-98 duration-150" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+                    Dashboard
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high rounded-lg hover:bg-surface-variant transition-all active:scale-98 duration-150" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+                    My Bookings
+                </a>
+<!-- Active Item matching /admin/listings intent -->
+<a class="flex items-center gap-3 px-3 py-2 font-body-md text-body-md bg-primary-container text-on-primary-container rounded-lg font-bold hover:bg-surface-variant transition-all active:scale-98 duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">directions_car</span>
+                    Vehicle Fleet
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high rounded-lg hover:bg-surface-variant transition-all active:scale-98 duration-150" href="#">
+<span class="material-symbols-outlined">payments</span>
+                    Financials
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high rounded-lg hover:bg-surface-variant transition-all active:scale-98 duration-150" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+</div>
+<!-- CTA -->
+<button class="w-full py-3 mb-4 bg-primary text-on-primary font-label-md text-label-md rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined">add</span>
+                Add Vehicle
+            </button>
+<!-- Footer Navigation -->
+<div class="mt-auto border-t border-outline-variant pt-4 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high rounded-lg hover:bg-surface-variant transition-all active:scale-98 duration-150" href="#">
+<span class="material-symbols-outlined">help</span>
+                    Help Center
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high rounded-lg hover:bg-surface-variant transition-all active:scale-98 duration-150" href="#">
+<span class="material-symbols-outlined">logout</span>
+                    Logout
+                </a>
+</div>
+</nav>
+<!-- Simulated Main Content Canvas -->
+<main class="ml-0 md:ml-64 flex-1 bg-surface p-8 h-full">
+<!-- Content blurred by overlay -->
+</main>
+</div>
+<!-- MODAL OVERLAY (Level 3 Depth) -->
+<!-- Deep, diffused shadows with a semi-transparent backdrop blur (12px) to keep the user focused -->
+<div aria-labelledby="modal-title" aria-modal="true" class="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/20 backdrop-blur-[12px] p-4 sm:p-6" role="dialog">
+<!-- Modal Container -->
+<div class="bg-surface-container-lowest w-full max-w-lg rounded-xl shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),_0px_10px_10px_-5px_rgba(0,0,0,0.04)] flex flex-col border border-outline-variant/30 overflow-hidden transform transition-all">
+<!-- Modal Header -->
+<div class="flex items-center justify-between px-gutter py-stack_md border-b border-outline-variant/40 bg-surface">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2" id="modal-title">
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">warning</span>
+                    Suspend listing?
+                </h2>
+<button aria-label="Close modal" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-full p-1 transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Modal Body -->
+<div class="p-gutter flex flex-col gap-stack_lg bg-surface">
+<!-- Listing Summary Card -->
+<div class="flex items-start gap-4 p-4 bg-surface-container border border-outline-variant/50 rounded-lg">
+<div class="w-20 h-16 rounded overflow-hidden shrink-0 bg-surface-variant">
+<img alt="Vehicle thumbnail" class="w-full h-full object-cover" data-alt="A sleek, modern silver Tesla Model 3 parked on a clean, well-lit urban street during daytime. The image reflects a premium, corporate modern aesthetic typical of a high-end car rental platform. The lighting is bright and even, highlighting the car's aerodynamic curves against a subtly blurred city background, emphasizing trust and professional utility." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjO5QHjb9QuZQlqbhvNkG_YdnNuuj1YC8bHnKu7-F1l5YsrgFvYOYCXcJDOyPfiE3lO9XsqbbB5utulAmO9ZXNuA7FOPHyEJPPcd6EHfoOonYnlD_WKuVGxa_k0yNnr4hsgwCOdpQaHidzzVcHKBOD4pm0kmIiYkzOUwj7PTxDEzDyl5it5Y3CYAXgY9f9R6k4-Mynw1s7v-eEiL8sPgnzVM_Pg0qtbzrpKC_PiqsdGLtPXhUDASMFDaQ3MvlW5pa2toWI6YJ4EDJx"/>
+</div>
+<div class="flex flex-col">
+<h3 class="font-label-md text-label-md text-on-surface line-clamp-1">2023 Tesla Model 3 Long Range</h3>
+<p class="font-caption text-caption text-on-surface-variant mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">person</span>
+                            Host: Sarah Jenkins
+                        </p>
+<p class="font-caption text-caption text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">location_on</span>
+                            Seattle, WA • Electric Sedan
+                        </p>
+</div>
+</div>
+<!-- Form Area -->
+<div class="flex flex-col gap-stack_sm">
+<label class="font-label-md text-label-md text-on-surface flex items-center gap-1" for="suspend-reason">
+                        Reason for suspension
+                        <span aria-hidden="true" class="text-error">*</span>
+</label>
+<textarea class="w-full bg-surface-container-lowest border border-outline focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg p-3 font-body-md text-body-md text-on-surface resize-none transition-shadow" id="suspend-reason" placeholder="Provide details for suspending this vehicle..." rows="4"></textarea>
+<p class="font-caption text-caption text-on-surface-variant flex items-start gap-2 mt-1">
+<span class="material-symbols-outlined text-[16px] shrink-0 mt-0.5">info</span>
+<span>Suspended listings are hidden from public search until reactivated. This action will not cancel existing confirmed bookings.</span>
+</p>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="px-gutter py-stack_md border-t border-outline-variant/40 bg-surface-container-low flex justify-end items-center gap-3">
+<button class="px-5 py-2.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-lg transition-colors focus:ring-2 focus:ring-outline-variant outline-none">
+                    Cancel
+                </button>
+<button class="px-5 py-2.5 font-label-md text-label-md bg-error text-on-error hover:bg-on-error-container rounded-lg shadow-sm hover:shadow transition-all focus:ring-2 focus:ring-error focus:ring-offset-2 focus:ring-offset-surface outline-none flex items-center gap-2">
+                    Suspend listing
+                </button>
+</div>
+</div>
+</div>
+</body></html>

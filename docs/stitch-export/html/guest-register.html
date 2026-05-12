@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RentFlow - Create Account</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style data-purpose="custom-utilities">/* Adding a custom utility for the background blur effect if needed, though Tailwind has backdrop-blur */
+.bg-image-section {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuBClgn9keARHfLLWipSwwXMrJ44iG7OP519pjkY0zDyeoZrUXbm5VpDFtUHsXQ0M-I1h4alV__PC9uub3sLLtpve_0GWanW9lQj0M5DXlouOLKOdyEXy69TxtuOIFQE1Ge8pOOSP04y_puvY9sgIsYmSedJa8Mqsw4Rc9DVqGAW8NItNBu-dp1pqzlAqLPRsR9a1Jpr3t8kLbUuPII_Tfixz6ZzuJfShC-YMzbUkerCDSl-cBwtO4NO-7F07CUSX87bY96SxLBv2f7j);
+    background-size: cover;
+    background-position: center
+    }</style>
+</head>
+<body class="bg-white min-h-screen font-sans text-gray-900 antialiased flex flex-col md:flex-row">
+<!-- BEGIN: Left Image Section -->
+<section class="hidden md:flex md:w-[45%] lg:w-[55%] relative flex-col justify-end p-12 bg-gray-900 text-white overflow-hidden" data-purpose="hero-image-section">
+<!-- Using a high-quality premium car image -->
+<img alt="Premium Car in Showroom" class="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-overlay" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcRH6mm5izcVqTKKbO8Wx7RkCATU_2pOnl1WYgdQ5RhXvkNtsNE3X2OZs-10Y0G5PaDf5pbugyAjIXIEOkzszZwvk-wDOXlrVTr82AFo9sYehPR0FPrmi3YsatJJ6X3ICGWTe7Ai3uOf4Cb-2dD2QAxw2qP4ovVKvsg1coi1t3EKnUjO4BnvrO_jwLroS7PPjBa7_4DtNUhRCx4mvxus6TiNqhIIGDqP33529lgSnzm17K3uyKNU5m_gQnQKEdNjoQEhXY2iaJmg_5"/>
+<div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"></div>
+<div class="relative z-10 max-w-lg mb-8">
+<h1 class="text-5xl font-bold tracking-tight mb-4">RentFlow</h1>
+<p class="text-xl text-gray-200 font-light">Professional Grade Fleet Management and Premium Rentals.</p>
+</div>
+</section>
+<!-- END: Left Image Section -->
+<!-- BEGIN: Right Form Section -->
+<main class="w-full md:w-[55%] lg:w-[45%] flex items-center justify-center p-8 sm:p-12 lg:p-24" data-purpose="registration-form-section">
+<div class="w-full max-w-md">
+<!-- BEGIN: Header -->
+<header class="mb-10" data-purpose="form-header">
+<h2 class="text-3xl font-bold mb-3 text-gray-900">Create an account</h2>
+<p class="text-gray-600 text-base">Join the premier platform for mobility professionals.</p>
+</header>
+<!-- END: Header -->
+<!-- BEGIN: Form -->
+<form action="#" class="space-y-6" data-purpose="registration-form" method="POST">
+<!-- Role Selection -->
+<fieldset data-purpose="role-selection">
+<legend class="block text-sm font-medium text-gray-700 mb-3">I want to use RentFlow as a...</legend>
+<div class="grid grid-cols-2 gap-4">
+<!-- Customer Option -->
+<label class="relative border rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 border-gray-300 bg-white" data-purpose="role-customer">
+<input class="sr-only" name="role" type="radio" value="customer"/>
+<svg class="h-6 w-6 text-gray-500 mb-2" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="text-sm font-medium text-gray-900">Customer</span>
+</label>
+<!-- Host Option (Selected) -->
+<label class="relative border-2 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer bg-gray-50 border-gray-900" data-purpose="role-host">
+<input checked="" class="sr-only" name="role" type="radio" value="host"/>
+<svg class="h-6 w-6 text-gray-900 mb-2" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="text-sm font-medium text-gray-900">Host</span>
+</label>
+</div>
+</fieldset>
+<!-- Full Name -->
+<div data-purpose="input-group-name">
+<label class="block text-sm font-medium text-gray-700 mb-1" for="fullName">Full Name</label>
+<input class="block w-full border-gray-300 rounded-md shadow-sm py-2.5 px-3 focus:ring-black focus:border-black sm:text-sm text-gray-900" id="fullName" name="fullName" placeholder="Jane Doe" type="text"/>
+</div>
+<!-- Email Address (Error State) -->
+<div data-purpose="input-group-email">
+<label class="block text-sm font-medium text-gray-700 mb-1" for="email">Email Address</label>
+<div class="relative rounded-md shadow-sm">
+<input aria-describedby="email-error" aria-invalid="true" class="block w-full rounded-md shadow-sm py-2.5 px-3 sm:text-sm text-gray-900 border-red-500 text-red-900 placeholder-red-300 focus:outline-none focus:ring-red-500 focus:border-red-500 pr-10" id="email" name="email" type="email" value="alex.fleet@example.com"/>
+<div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+<svg aria-hidden="true" class="h-5 w-5 text-red-500" fill="currentColor" viewbox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" fill-rule="evenodd"></path>
+</svg>
+</div>
+</div>
+<p class="mt-2 text-xs text-red-600" id="email-error">This email is already registered. Please log in.</p>
+</div>
+<!-- Password -->
+<div data-purpose="input-group-password">
+<label class="block text-sm font-medium text-gray-700 mb-1" for="password">Password</label>
+<input class="block w-full border-gray-300 rounded-md shadow-sm py-2.5 px-3 focus:ring-black focus:border-black sm:text-sm text-gray-900" id="password" name="password" placeholder="••••••••" type="password"/>
+</div>
+<!-- Terms and Privacy -->
+<div class="flex items-center" data-purpose="terms-checkbox">
+<input class="h-4 w-4 text-black focus:ring-black border-gray-300 rounded cursor-pointer" id="terms" name="terms" type="checkbox"/>
+<label class="ml-2 block text-sm text-gray-700" for="terms">
+            I agree to the <a class="font-medium text-gray-900 hover:underline" href="#">Terms of Service</a> and <a class="font-medium text-gray-900 hover:underline" href="#">Privacy Policy</a>.
+          </label>
+</div>
+<!-- Submit Button -->
+<div class="pt-2">
+<button class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors" type="submit">
+            Create Account
+          </button>
+</div>
+</form>
+<!-- END: Form -->
+<!-- BEGIN: Footer Links -->
+<div class="mt-8 text-center" data-purpose="login-link">
+<p class="text-sm text-gray-600">
+          Already have an account? 
+          <a class="font-medium text-gray-900 hover:underline" href="#">Log in</a>
+</p>
+</div>
+<!-- END: Footer Links -->
+</div>
+</main>
+<!-- END: Right Form Section -->
+</body></html>

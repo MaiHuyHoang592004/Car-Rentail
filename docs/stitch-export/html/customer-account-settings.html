@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RentFlow - Profile Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style data-purpose="custom-fonts">
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+<style data-purpose="custom-utilities">
+    /* Custom utility classes if needed */
+  </style>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#000000',
+            secondary: '#F3F4F6',
+            accent: '#EF4444',
+            surface: '#FFFFFF',
+            border: '#E5E7EB',
+            textMain: '#111827',
+            textMuted: '#6B7280',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#F8F9FA] text-textMain min-h-screen flex flex-col">
+<!-- BEGIN: MainHeader -->
+<header class="bg-white border-b border-gray-200 sticky top-0 z-50 py-4 px-6 sm:px-8">
+<div class="max-w-7xl mx-auto flex items-center justify-between">
+<!-- Brand Logo -->
+<div class="flex items-center gap-2">
+<a class="text-2xl font-bold tracking-tight" href="#">RentFlow</a>
+</div>
+<!-- Navigation Links -->
+<nav class="hidden md:flex items-center space-x-6 text-sm font-medium">
+<a class="text-gray-600 hover:text-black" href="#">Home</a>
+<a class="text-gray-600 hover:text-black" href="#">Search</a>
+<a class="text-gray-600 hover:text-black" href="#">My Bookings</a>
+<a class="text-gray-600 hover:text-black" href="#">Host Dashboard</a>
+<a class="text-gray-600 hover:text-black" href="#">Admin</a>
+</nav>
+<!-- User Actions -->
+<div class="flex items-center space-x-4">
+<button class="text-gray-500 hover:text-gray-700">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<button class="text-gray-500 hover:text-gray-700 border-b-2 border-black pb-1">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<a class="bg-black text-white px-5 py-2 text-sm font-medium rounded hover:bg-gray-800 transition-colors" href="#">Login</a>
+</div>
+</div>
+</header>
+<!-- END: MainHeader -->
+<!-- BEGIN: Main Content Area -->
+<main class="flex-grow max-w-7xl mx-auto w-full px-6 sm:px-8 py-10 flex flex-col md:flex-row gap-10">
+<!-- BEGIN: Left Sidebar -->
+<aside class="w-full md:w-64 flex-shrink-0">
+<!-- Page Title -->
+<div class="mb-8">
+<h1 class="text-3xl font-bold text-gray-900 mb-2">Profile Settings</h1>
+<p class="text-gray-500 text-sm">Manage your personal information and verification status.</p>
+</div>
+<!-- Navigation Menu -->
+<nav class="space-y-1">
+<a class="flex items-center px-4 py-3 bg-gray-100 text-gray-900 rounded font-medium text-sm" href="#">
+<svg class="w-5 h-5 mr-3 text-gray-700" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+          Personal Info
+        </a>
+<a class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded font-medium text-sm transition-colors" href="#">
+<svg class="w-5 h-5 mr-3 text-gray-500" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+          Security
+        </a>
+<a class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded font-medium text-sm transition-colors" href="#">
+<svg class="w-5 h-5 mr-3 text-gray-500" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+          Payment Methods
+        </a>
+</nav>
+</aside>
+<!-- END: Left Sidebar -->
+<!-- BEGIN: Main Content Column -->
+<div class="flex-grow space-y-6">
+<!-- Driver Verification Alert Banner -->
+<section class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div class="flex items-start gap-4">
+<div class="bg-red-100 text-red-600 p-2 rounded-full flex-shrink-0 mt-1 sm:mt-0">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h2 class="text-lg font-semibold text-gray-900">Driver Verification</h2>
+<p class="text-sm text-gray-500 mt-1">Status: <span class="text-red-600 font-medium">NOT_SUBMITTED</span></p>
+</div>
+</div>
+<button class="bg-black text-white px-5 py-2 text-sm font-medium rounded hover:bg-gray-800 transition-colors whitespace-nowrap self-start sm:self-auto">
+          Verify Now
+        </button>
+</section>
+<!-- Personal Information Form -->
+<section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+<div class="p-6 border-b border-gray-200">
+<h2 class="text-xl font-semibold text-gray-900">Personal Information</h2>
+</div>
+<form class="p-6 space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Full Name Field -->
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1" for="fullName">Full Name</label>
+<input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-black focus:border-black sm:text-sm px-3 py-2 border" id="fullName" name="fullName" type="text" value="John Doe"/>
+</div>
+<!-- Email Field (Read-only styled) -->
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1 flex items-center" for="email">
+                Email
+                <svg class="w-3 h-3 ml-1 text-gray-400" fill="currentColor" viewbox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" fill-rule="evenodd"></path>
+</svg>
+</label>
+<input class="mt-1 block w-full bg-gray-50 border-gray-300 rounded-md shadow-sm focus:ring-black focus:border-black sm:text-sm px-3 py-2 border text-gray-500 cursor-not-allowed" id="email" name="email" readonly="" type="email" value="john.doe@example.com"/>
+</div>
+<!-- Phone Number Field -->
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1" for="phoneNumber">Phone Number</label>
+<input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-black focus:border-black sm:text-sm px-3 py-2 border" id="phoneNumber" name="phoneNumber" type="tel" value="+1 (555) 123-4567"/>
+</div>
+<!-- Date of Birth Field -->
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1" for="dob">Date of Birth</label>
+<div class="relative">
+<input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-black focus:border-black sm:text-sm px-3 py-2 border pr-10 appearance-none" id="dob" name="dob" type="date" value="1985-06-15"/>
+<!-- Using appearance-none and standard input[type=date] usually gives a calendar icon in modern browsers, 
+                     but styling might vary. In a real tailwind-forms setup, the native calendar picker is retained. -->
+</div>
+</div>
+</div>
+<!-- Address Line Field -->
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-1" for="address">Address Line</label>
+<input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-black focus:border-black sm:text-sm px-3 py-2 border" id="address" name="address" type="text" value="123 Corporate Blvd, Suite 400"/>
+</div>
+<!-- Form Actions -->
+<div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-100">
+<button class="bg-white border border-gray-300 text-gray-700 px-5 py-2 text-sm font-medium rounded hover:bg-gray-50 transition-colors" type="button">
+              Cancel
+            </button>
+<button class="bg-black text-white px-5 py-2 text-sm font-medium rounded hover:bg-gray-800 transition-colors shadow-sm" type="submit">
+              Save Changes
+            </button>
+</div>
+</form>
+</section>
+</div>
+<!-- END: Main Content Column -->
+</main>
+<!-- END: Main Content Area -->
+<!-- BEGIN: Footer -->
+<footer class="bg-gray-200 border-t border-gray-300 py-8 px-6 sm:px-8 mt-auto">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex items-center gap-4 text-sm text-gray-600">
+<span class="font-bold text-black text-base">RentFlow</span>
+<span class="hidden md:inline">|</span>
+<span>© 2024 RentFlow. Professional Grade Fleet Management.</span>
+</div>
+<nav class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-600">
+<a class="hover:underline" href="#">Terms of Service</a>
+<a class="hover:underline" href="#">Privacy Policy</a>
+<a class="hover:underline" href="#">Help Center</a>
+<a class="hover:underline" href="#">Become a Host</a>
+<a class="hover:underline" href="#">Contact Support</a>
+</nav>
+</div>
+</footer>
+<!-- END: Footer -->
+</body></html>
