@@ -11,6 +11,8 @@ import com.rentflow.booking.service.CreateBookingRequest;
 import com.rentflow.booking.service.PatchBookingLocationRequest;
 import com.rentflow.common.exception.IdempotencyException;
 import com.rentflow.common.exception.ValidationException;
+import com.rentflow.common.ratelimit.RateLimitService;
+import com.rentflow.common.security.SecurityContext;
 import com.rentflow.common.web.PageResponse;
 import com.rentflow.common.web.PageableValidation;
 import lombok.RequiredArgsConstructor;
@@ -41,12 +43,15 @@ public class BookingController {
             "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$");
 
     private final BookingService bookingService;
+    private final SecurityContext securityContext;
+    private final RateLimitService rateLimitService;
 
     @PostMapping
     public ResponseEntity<BookingResponse> createBooking(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody CreateBookingRequest request) {
         validateIdempotencyKey(idempotencyKey);
+        rateLimitService.consumeBookingCreate(securityContext.currentUserId());
         BookingResponse response = bookingService.createBooking(idempotencyKey, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

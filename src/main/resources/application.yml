@@ -32,6 +32,11 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
+  data:
+    redis:
+      repositories:
+        enabled: false
+
 jwt:
   secret: ${JWT_SECRET:}
   access-token-expiry: PT15M
@@ -45,6 +50,14 @@ rentflow:
       enabled: ${EXPIRE_HELD_BOOKINGS_ENABLED:true}
       batch-size: ${EXPIRE_HELD_BOOKINGS_BATCH_SIZE:100}
       fixed-delay-ms: ${EXPIRE_HELD_BOOKINGS_FIXED_DELAY_MS:60000}
+  rate-limit:
+    enabled: ${RENTFLOW_RATE_LIMIT_ENABLED:true}
+    login:
+      limit: ${RENTFLOW_LOGIN_RATE_LIMIT:5}
+      window: ${RENTFLOW_LOGIN_RATE_WINDOW:PT5M}
+    booking:
+      create-limit: ${RENTFLOW_BOOKING_CREATE_RATE_LIMIT:10}
+      create-window: ${RENTFLOW_BOOKING_CREATE_RATE_WINDOW:PT1M}
 
 server:
   error:

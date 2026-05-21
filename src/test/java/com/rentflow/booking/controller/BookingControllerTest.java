@@ -14,6 +14,9 @@ import com.rentflow.booking.service.PatchBookingLocationRequest;
 import com.rentflow.booking.service.RequestedExtra;
 import com.rentflow.common.exception.CorrelationIdHelper;
 import com.rentflow.common.exception.GlobalExceptionHandler;
+import com.rentflow.common.exception.RateLimitExceededException;
+import com.rentflow.common.ratelimit.RateLimitService;
+import com.rentflow.common.security.SecurityContext;
 import com.rentflow.common.web.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,7 +39,9 @@ import static org.mockito.ArgumentCaptor.forClass;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -50,16 +56,20 @@ class BookingControllerTest {
     private static final String VALID_IDEMPOTENCY_KEY = "8b71f8d2-9e1d-4f7a-bbe6-334c3816df91";
 
     private BookingService bookingService;
+    private SecurityContext securityContext;
+    private RateLimitService rateLimitService;
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
         bookingService = mock(BookingService.class);
+        securityContext = mock(SecurityContext.class);
+        rateLimitService = mock(RateLimitService.class);
         objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mockMvc = MockMvcBuilders.standaloneSetup(new BookingController(bookingService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new BookingController(bookingService, securityContext, rateLimitService))
                 .setControllerAdvice(new GlobalExceptionHandler(new CorrelationIdHelper()))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
@@ -86,6 +96,7 @@ class BookingControllerTest {
 
     @Test
     void createBookingValidHeaderDelegatesAndReturnsCreated() throws Exception {
+        when(securityContext.currentUserId()).thenReturn(UUID.fromString("44444444-4444-4444-8444-444444444444"));
         when(bookingService.createBooking(eq(VALID_IDEMPOTENCY_KEY), any(CreateBookingRequest.class)))
                 .thenReturn(response());
 
@@ -98,6 +109,23 @@ class BookingControllerTest {
                 .andExpect(jsonPath("$.status").value("HELD"));
 
         verify(bookingService).createBooking(eq(VALID_IDEMPOTENCY_KEY), any(CreateBookingRequest.class));
+        verify(rateLimitService).consumeBookingCreate(UUID.fromString("44444444-4444-4444-8444-444444444444"));
+    }
+
+    @Test
+    void createBookingRateLimitedReturns429() throws Exception {
+        UUID customerId = UUID.fromString("44444444-4444-4444-8444-444444444444");
+        when(securityContext.currentUserId()).thenReturn(customerId);
+        doThrow(new RateLimitExceededException(Duration.ofSeconds(42)))
+                .when(rateLimitService).consumeBookingCreate(customerId);
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .header("Idempotency-Key", VALID_IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request())))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "42"))
+                .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"));
     }
 
     @Test

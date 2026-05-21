@@ -2,6 +2,9 @@ package com.rentflow.auth.controller;
 
 import com.rentflow.auth.dto.*;
 import com.rentflow.auth.service.AuthService;
+import com.rentflow.common.exception.AuthenticationException;
+import com.rentflow.common.ratelimit.RateLimitService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final RateLimitService rateLimitService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
@@ -24,9 +28,19 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        var response = authService.login(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<TokenResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest servletRequest) {
+        String clientIp = clientIp(servletRequest);
+        rateLimitService.checkLoginAllowed(request.email(), clientIp);
+        try {
+            var response = authService.login(request);
+            rateLimitService.clearLoginFailures(request.email(), clientIp);
+            return ResponseEntity.ok(response);
+        } catch (AuthenticationException ex) {
+            rateLimitService.recordLoginFailure(request.email(), clientIp);
+            throw ex;
+        }
     }
 
     @PostMapping("/refresh")
@@ -39,5 +53,13 @@ public class AuthController {
     public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
         return ResponseEntity.noContent().build();
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

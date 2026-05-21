@@ -4,6 +4,7 @@ import com.rentflow.common.web.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -128,6 +129,17 @@ public class GlobalExceptionHandler {
         String cid = correlationIdHelper.getCorrelationId();
         log.error("Payment error [{}]: {} - {}", cid, ex.getCode(), ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(
+            RateLimitExceededException ex, HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        long retryAfterSeconds = Math.max(1, ex.getRetryAfter().toSeconds());
+        log.warn("Rate limit exceeded [{}]: retry after {}s", cid, retryAfterSeconds);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds))
                 .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
     }
 
