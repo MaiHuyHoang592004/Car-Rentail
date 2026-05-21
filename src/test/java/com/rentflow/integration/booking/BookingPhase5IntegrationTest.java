@@ -14,7 +14,9 @@ import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingExtraRepository;
 import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.common.idempotency.entity.IdempotencyStatus;
 import com.rentflow.common.idempotency.repository.IdempotencyKeyRepository;
+import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.security.JwtTokenProvider;
 import com.rentflow.integration.BaseIntegrationTest;
 import com.rentflow.listing.entity.CancellationPolicy;
@@ -203,6 +205,30 @@ class BookingPhase5IntegrationTest extends BaseIntegrationTest {
         postCreate(hostCustomerToken, uuidV4(), createBody(selfListing.getId(), PICKUP_DATE, RETURN_DATE))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void failedCreateMarksIdempotencyKeyFailedEvenWhenBookingTransactionRollsBack() throws Exception {
+        AuthUser hostCustomer = saveUser("host-customer", Role.CUSTOMER, Role.HOST);
+        String hostCustomerToken = token(hostCustomer, Role.CUSTOMER, Role.HOST);
+        Listing selfListing = saveListing(hostCustomer, "Self hosted car");
+        saveAvailability(selfListing.getId(), PICKUP_DATE, RETURN_DATE, AvailabilityStatus.FREE);
+        String key = uuidV4();
+
+        postCreate(hostCustomerToken, key, createBody(selfListing.getId(), PICKUP_DATE, RETURN_DATE))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        assertThat(bookingRepository.findAll())
+                .filteredOn(booking -> booking.getCustomerId().equals(hostCustomer.getId()))
+                .filteredOn(booking -> booking.getListingId().equals(selfListing.getId()))
+                .isEmpty();
+        assertThat(idempotencyKeyRepository.findAll())
+                .filteredOn(row -> row.getUserId().equals(hostCustomer.getId()))
+                .filteredOn(row -> row.getScope() == IdempotencyScope.CREATE_BOOKING)
+                .filteredOn(row -> row.getKey().equals(key.toLowerCase()))
+                .singleElement()
+                .satisfies(row -> assertThat(row.getStatus()).isEqualTo(IdempotencyStatus.FAILED));
     }
 
     @Test

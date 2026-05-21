@@ -7,6 +7,7 @@ import com.rentflow.common.idempotency.repository.IdempotencyKeyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -31,7 +32,7 @@ public class IdempotencyService {
         return canonicalJsonHasher.hash(request);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public IdempotencyResolution resolve(
             UUID userId,
             IdempotencyScope scope,

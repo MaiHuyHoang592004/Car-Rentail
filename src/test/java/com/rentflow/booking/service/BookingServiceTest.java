@@ -19,6 +19,7 @@ import com.rentflow.common.exception.DriverLicenseNotApprovedException;
 import com.rentflow.common.exception.ListingNotFoundException;
 import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.idempotency.service.IdempotencyResolution;
+import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.idempotency.service.IdempotencyService;
 import com.rentflow.common.security.SecurityContext;
@@ -80,6 +81,7 @@ class BookingServiceTest {
     @Mock private AvailabilityCalendarRepository availabilityRepository;
     @Mock private UserProfileRepository userProfileRepository;
     @Mock private IdempotencyService idempotencyService;
+    @Mock private IdempotencyFailureMarker idempotencyFailureMarker;
     @Mock private SecurityContext securityContext;
 
     private BookingService bookingService;
@@ -97,6 +99,7 @@ class BookingServiceTest {
                 availabilityRepository,
                 userProfileRepository,
                 idempotencyService,
+                idempotencyFailureMarker,
                 new BookingPriceCalculator(),
                 securityContext,
                 objectMapper,
@@ -172,16 +175,18 @@ class BookingServiceTest {
         });
         verify(availabilityRepository).saveAll(rows);
         verify(idempotencyService).complete(eq(IDEMPOTENCY_ID), eq(201), any());
+        verify(idempotencyFailureMarker, never()).markFailed(any());
     }
 
     @Test
-    void nonCustomerThrowsAccessDenied() {
+    void createBookingBusinessFailureMarksIdempotencyFailed() {
         mockProceed();
         doThrow(new AccessDeniedException()).when(securityContext).requireRole(Role.CUSTOMER);
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request()))
                 .isInstanceOf(AccessDeniedException.class);
         verify(listingRepository, never()).findByIdAndStatusWithVehicleAndExtras(any(), any());
+        verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_ID);
     }
 
     @Test
@@ -193,6 +198,7 @@ class BookingServiceTest {
                 availabilityRepository,
                 userProfileRepository,
                 idempotencyService,
+                idempotencyFailureMarker,
                 new BookingPriceCalculator(),
                 securityContext,
                 objectMapper,
@@ -584,6 +590,7 @@ class BookingServiceTest {
                 new CancelBookingRequest("Change of plan")))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasFieldOrPropertyWithValue("code", "BOOKING_INVALID_STATUS");
+        verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_ID);
     }
 
     @Test

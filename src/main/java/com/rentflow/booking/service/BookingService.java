@@ -19,6 +19,7 @@ import com.rentflow.common.exception.DriverLicenseNotApprovedException;
 import com.rentflow.common.exception.ListingNotFoundException;
 import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.idempotency.service.IdempotencyResolution;
+import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.idempotency.service.IdempotencyService;
 import com.rentflow.common.security.SecurityContext;
@@ -63,6 +64,7 @@ public class BookingService {
     private final AvailabilityCalendarRepository availabilityCalendarRepository;
     private final UserProfileRepository userProfileRepository;
     private final IdempotencyService idempotencyService;
+    private final IdempotencyFailureMarker idempotencyFailureMarker;
     private final BookingPriceCalculator bookingPriceCalculator;
     private final SecurityContext securityContext;
     private final ObjectMapper objectMapper;
@@ -77,6 +79,7 @@ public class BookingService {
             AvailabilityCalendarRepository availabilityCalendarRepository,
             UserProfileRepository userProfileRepository,
             IdempotencyService idempotencyService,
+            IdempotencyFailureMarker idempotencyFailureMarker,
             BookingPriceCalculator bookingPriceCalculator,
             SecurityContext securityContext,
             ObjectMapper objectMapper,
@@ -89,6 +92,7 @@ public class BookingService {
         this.availabilityCalendarRepository = availabilityCalendarRepository;
         this.userProfileRepository = userProfileRepository;
         this.idempotencyService = idempotencyService;
+        this.idempotencyFailureMarker = idempotencyFailureMarker;
         this.bookingPriceCalculator = bookingPriceCalculator;
         this.securityContext = securityContext;
         this.objectMapper = objectMapper;
@@ -117,7 +121,7 @@ public class BookingService {
             idempotencyService.complete(idempotencyKeyId, 201, serialize(response));
             return response;
         } catch (RuntimeException e) {
-            // TODO: Consider a REQUIRES_NEW failure marker in a later idempotency hardening step.
+            idempotencyFailureMarker.markFailed(idempotencyKeyId);
             throw e;
         }
     }
@@ -226,7 +230,7 @@ public class BookingService {
             idempotencyService.complete(idempotencyKeyId, 200, serialize(response));
             return response;
         } catch (RuntimeException e) {
-            // TODO: Consider a REQUIRES_NEW failure marker in a later idempotency hardening step.
+            idempotencyFailureMarker.markFailed(idempotencyKeyId);
             throw e;
         }
     }
