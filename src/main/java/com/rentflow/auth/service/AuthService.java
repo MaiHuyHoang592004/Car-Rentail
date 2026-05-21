@@ -30,6 +30,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final String DUMMY_PASSWORD_HASH =
+            "$2a$12$lK6tMiUUcbddgmGqvuIrNO7KjBgKplGHbP1wLjTvj2GTl2zQLTlI.";
+
     private final AuthUserRepository authUserRepository;
     private final UserRoleRepository userRoleRepository;
     private final UserProfileRepository userProfileRepository;
@@ -73,8 +76,11 @@ public class AuthService {
 
     @Transactional
     public TokenResponse login(LoginRequest request) {
-        AuthUser user = authUserRepository.findByEmail(request.email())
-                .orElseThrow(AuthenticationException::invalidCredentials);
+        AuthUser user = authUserRepository.findByEmail(request.email()).orElse(null);
+        if (user == null) {
+            passwordEncoder.matches(request.password(), DUMMY_PASSWORD_HASH);
+            throw AuthenticationException.invalidCredentials();
+        }
 
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw AuthenticationException.invalidCredentials();
