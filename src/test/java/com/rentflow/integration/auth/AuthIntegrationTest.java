@@ -280,6 +280,16 @@ class AuthIntegrationTest {
                                 }
                                 """.formatted(oldRefreshToken)))
                 .andExpect(status().isUnauthorized());
+
+        // Reusing a rotated token is treated as theft and revokes the active replacement too.
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "%s"
+                                }
+                                """.formatted(newRefreshToken)))
+                .andExpect(status().isUnauthorized());
     }
 
     // ─── Logout ───────────────────────────────────────────────────────────────

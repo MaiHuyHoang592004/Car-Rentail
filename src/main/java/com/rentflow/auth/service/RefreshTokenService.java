@@ -47,6 +47,28 @@ public class RefreshTokenService {
     }
 
     @Transactional
+    public RefreshToken findUsableTokenOrRevokeFamilyOnReuse(String rawToken) {
+        String hash = sha256(rawToken);
+        Instant now = Instant.now();
+        RefreshToken token = refreshTokenRepository.findByTokenHash(hash).orElse(null);
+        if (token == null) {
+            return null;
+        }
+        if (token.getRevokedAt() != null) {
+            if (token.getReplacedByTokenId() != null) {
+                int revoked = refreshTokenRepository.revokeAllByUserId(token.getUser().getId(), now);
+                log.warn("Refresh token reuse detected for user {}. Revoked {} active refresh tokens.",
+                        token.getUser().getId(), revoked);
+            }
+            return null;
+        }
+        if (!token.getExpiresAt().isAfter(now)) {
+            return null;
+        }
+        return token;
+    }
+
+    @Transactional
     public CreatedRefreshToken rotateRefreshToken(RefreshToken oldToken) {
         Instant now = Instant.now();
 

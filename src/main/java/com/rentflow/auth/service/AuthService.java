@@ -106,7 +106,7 @@ public class AuthService {
 
     @Transactional
     public TokenOnlyResponse refresh(RefreshRequest request) {
-        RefreshToken oldToken = refreshTokenService.findActiveByToken(request.refreshToken());
+        RefreshToken oldToken = refreshTokenService.findUsableTokenOrRevokeFamilyOnReuse(request.refreshToken());
         if (oldToken == null) {
             throw AuthenticationException.invalidCredentials();
         }
