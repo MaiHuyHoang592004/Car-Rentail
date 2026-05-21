@@ -38,6 +38,8 @@ jwt:
   refresh-token-expiry: P7D
 
 rentflow:
+  cors:
+    allowed-origins: ${RENTFLOW_CORS_ALLOWED_ORIGINS:http://localhost:3000}
   scheduler:
     expire-held-bookings:
       enabled: ${EXPIRE_HELD_BOOKINGS_ENABLED:true}

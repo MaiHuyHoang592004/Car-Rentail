@@ -29,10 +29,21 @@ public class JwtTokenProvider {
     private final Duration refreshTokenExpiry;
 
     public JwtTokenProvider(
-            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.secret:}") String secret,
             @Value("${jwt.access-token-expiry:PT15M}") Duration accessTokenExpiry,
             @Value("${jwt.refresh-token-expiry:P7D}") Duration refreshTokenExpiry) {
-        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT_SECRET is not configured. Set the JWT_SECRET environment variable "
+                            + "(or jwt.secret property) to a value of at least 64 bytes for HS512.");
+        }
+        byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (secretBytes.length < 64) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must be at least 64 bytes (512 bits) for HS512. Got "
+                            + secretBytes.length + " bytes.");
+        }
+        this.secretKey = Keys.hmacShaKeyFor(secretBytes);
         this.accessTokenExpiry = accessTokenExpiry;
         this.refreshTokenExpiry = refreshTokenExpiry;
     }

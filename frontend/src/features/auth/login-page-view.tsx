@@ -1,30 +1,37 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 import { AppShell } from "@/components/rentflow/app-shell";
+import { ErrorBanner } from "@/components/rentflow/error-banner";
 import { AuthCard } from "@/features/auth/auth-card";
 import { AuthFormLayout } from "@/features/auth/auth-form-layout";
-import type { AuthFormErrors, AuthFormState, GuestIntentRedirect } from "@/features/auth/types";
-import { AUTH_DEMO_ERRORS } from "@/mocks/auth";
+import { useAuth, type AuthUser } from "@/features/auth/auth-context";
+import type { GuestIntentRedirect } from "@/features/auth/types";
+import { ApiError } from "@/lib/api-error";
 
-function validateLoginForm(form: AuthFormState): AuthFormErrors {
-  const errors: AuthFormErrors = {};
+const loginSchema = z.object({
+  email: z.string().min(1, "Vui lòng nhập email.").email("Email không hợp lệ."),
+  password: z.string().min(1, "Vui lòng nhập mật khẩu."),
+});
 
-  if (!form.email.trim()) {
-    errors.email = "Email is required.";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    errors.email = "Enter a valid email address.";
+type LoginForm = z.infer<typeof loginSchema>;
+
+const SAFE_NEXT_PREFIX = /^\/(?!\/)/;
+
+function resolveRedirect(nextPath: string, user: AuthUser): string {
+  if (nextPath && SAFE_NEXT_PREFIX.test(nextPath)) {
+    return nextPath;
   }
-
-  if (!form.password) {
-    errors.password = "Password is required.";
-  } else if (form.password.length < 8) {
-    errors.password = "Password must be at least 8 characters.";
-  }
-
-  return errors;
+  if (user.roles.includes("ADMIN")) return "/admin";
+  if (user.roles.includes("HOST")) return "/host/dashboard";
+  return "/listings";
 }
 
 type LoginPageViewProps = {
@@ -32,64 +39,67 @@ type LoginPageViewProps = {
 };
 
 export function LoginPageView({ redirectIntent }: LoginPageViewProps) {
+  const router = useRouter();
+  const { login } = useAuth();
+  const [submitError, setSubmitError] = useState<ApiError | null>(null);
 
-  const [form, setForm] = useState<AuthFormState>({
-    email: "",
-    password: "",
-    fullName: "",
-    roles: ["CUSTOMER"],
+  const form = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
   });
-  const [errors, setErrors] = useState<AuthFormErrors>({});
-  const [errorCode, setErrorCode] = useState<string>("");
-  const [successMessage, setSuccessMessage] = useState<string>("");
 
-  function updateField(field: Exclude<keyof AuthFormState, "roles">, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined }));
-    setErrorCode("");
-    setSuccessMessage("");
+  async function onSubmit(values: LoginForm) {
+    setSubmitError(null);
+    try {
+      const user = await login(values);
+      toast.success("Đăng nhập thành công");
+      const target = resolveRedirect(redirectIntent.nextPath, user);
+      router.replace(target);
+      router.refresh();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 400 && err.details.length > 0) {
+          err.details.forEach((detail) => {
+            if (detail.field === "email" || detail.field === "password") {
+              form.setError(detail.field as keyof LoginForm, { message: detail.message });
+            }
+          });
+          if (err.details.every((d) => d.field === "email" || d.field === "password")) {
+            return;
+          }
+        }
+        setSubmitError(err);
+      } else {
+        setSubmitError(new ApiError(0, { code: "UNKNOWN_ERROR", message: "Lỗi không xác định." }));
+      }
+    }
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const nextErrors = validateLoginForm(form);
-    setErrors(nextErrors);
-    setErrorCode("");
-    setSuccessMessage("");
-
-    if (Object.keys(nextErrors).length > 0) {
-      return;
-    }
-
-    if (form.email.toLowerCase() === AUTH_DEMO_ERRORS.invalidCredentialsEmail) {
-      setErrorCode("AUTH_INVALID_CREDENTIALS");
-      return;
-    }
-
-    setSuccessMessage(`Static login success. Redirect target: ${redirectIntent.nextPath}`);
-  }
+  const errors = form.formState.errors;
+  const isSubmitting = form.formState.isSubmitting;
 
   return (
     <AppShell activePath="/login">
       <div className="py-6">
         <AuthCard
-          title="Login to RentFlow"
-          description="Sign in to continue booking, hosting, or admin operations."
+          title="Đăng nhập RentFlow"
+          description="Tiếp tục để đặt xe, quản lý đăng tin hoặc vận hành hệ thống."
         >
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <AuthFormLayout
               errorBanner={
-                errorCode ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                    {errorCode}: Invalid email or password.
-                  </div>
+                submitError ? (
+                  <ErrorBanner
+                    error={mapLoginError(submitError)}
+                    title="Không thể đăng nhập"
+                  />
                 ) : null
               }
               footer={
                 <p>
-                  No account yet?{" "}
+                  Chưa có tài khoản?{" "}
                   <Link href="/register" className="font-semibold text-primary hover:underline">
-                    Create account
+                    Tạo tài khoản
                   </Link>
                 </p>
               }
@@ -98,42 +108,57 @@ export function LoginPageView({ redirectIntent }: LoginPageViewProps) {
                 <label className="mb-1 block text-sm font-semibold text-foreground">Email</label>
                 <input
                   type="email"
-                  value={form.email}
-                  onChange={(event) => updateField("email", event.target.value)}
+                  autoComplete="email"
+                  {...form.register("email")}
                   className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                 />
-                {errors.email ? <p className="mt-1 text-xs text-red-700">{errors.email}</p> : null}
+                {errors.email ? (
+                  <p className="mt-1 text-xs text-red-700">{errors.email.message}</p>
+                ) : null}
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Password</label>
+                <label className="mb-1 block text-sm font-semibold text-foreground">Mật khẩu</label>
                 <input
                   type="password"
-                  value={form.password}
-                  onChange={(event) => updateField("password", event.target.value)}
+                  autoComplete="current-password"
+                  {...form.register("password")}
                   className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                 />
                 {errors.password ? (
-                  <p className="mt-1 text-xs text-red-700">{errors.password}</p>
+                  <p className="mt-1 text-xs text-red-700">{errors.password.message}</p>
                 ) : null}
               </div>
 
               <button
                 type="submit"
-                className="h-10 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                disabled={isSubmitting}
+                className="h-10 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                Login
+                {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
               </button>
-
-              {successMessage ? (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                  {successMessage}
-                </div>
-              ) : null}
             </AuthFormLayout>
           </form>
         </AuthCard>
       </div>
     </AppShell>
   );
+}
+
+function mapLoginError(error: ApiError): ApiError {
+  if (error.status === 401 || error.code === "AUTH_INVALID_CREDENTIALS") {
+    return new ApiError(error.status, {
+      code: error.code,
+      message: "Email hoặc mật khẩu không đúng.",
+      correlationId: error.correlationId,
+    });
+  }
+  if (error.status === 423 || error.code === "USER_SUSPENDED") {
+    return new ApiError(error.status, {
+      code: error.code,
+      message: "Tài khoản đã bị khóa. Liên hệ quản trị viên để hỗ trợ.",
+      correlationId: error.correlationId,
+    });
+  }
+  return error;
 }

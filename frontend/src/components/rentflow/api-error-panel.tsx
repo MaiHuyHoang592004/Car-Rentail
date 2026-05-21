@@ -1,12 +1,19 @@
 import { AlertCircle } from "lucide-react";
 
+import { ApiError } from "@/lib/api-error";
+
 type ApiErrorPanelProps = {
-  code: string;
-  message: string;
+  error?: ApiError | { code: string; message: string; correlationId?: string };
+  code?: string;
+  message?: string;
   correlationId?: string;
 };
 
-export function ApiErrorPanel({ code, message, correlationId }: ApiErrorPanelProps) {
+export function ApiErrorPanel(props: ApiErrorPanelProps) {
+  const code = props.error?.code ?? props.code ?? "ERROR";
+  const message = props.error?.message ?? props.message ?? "Đã có lỗi xảy ra.";
+  const correlationId = props.error?.correlationId ?? props.correlationId;
+
   return (
     <section className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-900">
       <div className="flex items-start gap-3">

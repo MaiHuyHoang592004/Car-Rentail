@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 
+import { AppProviders } from "@/components/rentflow/providers";
+
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
@@ -13,8 +15,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "RentFlow Frontend",
-  description: "Phase 5 frontend shell for RentFlow",
+  title: "RentFlow",
+  description: "Nền tảng cho thuê xe ngang hàng RentFlow",
 };
 
 export default function RootLayout({
@@ -24,10 +26,12 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="vi"
       className={`${inter.variable} ${manrope.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AppProviders>{children}</AppProviders>
+      </body>
     </html>
   );
 }

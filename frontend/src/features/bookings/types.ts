@@ -34,7 +34,7 @@ export type BookingSummaryViewModel = {
   pickupDate: string;
   returnDate: string;
   totalAmount: number;
-  currency: "VND";
+  currency: string;
   holdExpiresAt?: string;
 };
 
@@ -44,27 +44,33 @@ export type BookingPriceExtraViewModel = {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  currency: "VND";
+  currency: string;
+};
+
+export type BookingPriceSnapshot = {
+  rentalDays: number;
+  basePricePerDay: number;
+  baseAmount: number;
+  extraAmount: number;
+  totalAmount: number;
+  currency: string;
+  extras: BookingPriceExtraViewModel[];
+};
+
+export type BookingPolicySnapshot = {
+  cancellationPolicy: "FLEXIBLE" | "MODERATE" | "STRICT";
+  instantBook: boolean;
+  dailyKmLimit: number;
 };
 
 export type BookingDetailViewModel = BookingSummaryViewModel & {
+  customerId?: string;
+  hostId?: string;
   pickupLocation: string;
   returnLocation: string;
   cancellationReason?: string;
-  priceSnapshot: {
-    rentalDays: number;
-    basePricePerDay: number;
-    baseAmount: number;
-    extraAmount: number;
-    totalAmount: number;
-    currency: "VND";
-    extras: BookingPriceExtraViewModel[];
-  };
-  policySnapshot: {
-    cancellationPolicy: "FLEXIBLE" | "MODERATE" | "STRICT";
-    instantBook: boolean;
-    dailyKmLimit: number;
-  };
+  priceSnapshot: BookingPriceSnapshot;
+  policySnapshot: BookingPolicySnapshot;
 };
 
 export type BookingLocationPatchFormState = {

@@ -1,123 +1,138 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 import { AppShell } from "@/components/rentflow/app-shell";
+import { ErrorBanner } from "@/components/rentflow/error-banner";
 import { AuthCard } from "@/features/auth/auth-card";
 import { AuthFormLayout } from "@/features/auth/auth-form-layout";
-import type { AuthFormErrors, AuthFormState, AuthRoleOption } from "@/features/auth/types";
-import { AUTH_DEMO_ERRORS, AUTH_ROLE_OPTIONS } from "@/mocks/auth";
+import { useAuth } from "@/features/auth/auth-context";
+import { ApiError } from "@/lib/api-error";
 
-function validateRegisterForm(form: AuthFormState): AuthFormErrors {
-  const errors: AuthFormErrors = {};
+const registerSchema = z.object({
+  fullName: z.string().trim().min(1, "Vui lòng nhập họ tên."),
+  email: z.string().min(1, "Vui lòng nhập email.").email("Email không hợp lệ."),
+  password: z
+    .string()
+    .min(8, "Mật khẩu cần ít nhất 8 ký tự."),
+  roles: z
+    .array(z.enum(["CUSTOMER", "HOST"]))
+    .min(1, "Chọn ít nhất một vai trò."),
+});
 
-  if (!form.fullName.trim()) {
-    errors.fullName = "Full name is required.";
-  }
+type RegisterForm = z.infer<typeof registerSchema>;
 
-  if (!form.email.trim()) {
-    errors.email = "Email is required.";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    errors.email = "Enter a valid email address.";
-  }
-
-  if (!form.password) {
-    errors.password = "Password is required.";
-  } else if (form.password.length < 8) {
-    errors.password = "Password must be at least 8 characters.";
-  }
-
-  if (form.roles.length === 0) {
-    errors.roles = "Choose at least one role.";
-  }
-
-  return errors;
-}
+const ROLE_OPTIONS: { value: "CUSTOMER" | "HOST"; label: string; hint?: string }[] = [
+  { value: "CUSTOMER", label: "Khách thuê" },
+  {
+    value: "HOST",
+    label: "Chủ xe (Host)",
+    hint: "Tài khoản Host cần xác minh giấy phép kinh doanh trước khi đăng tin.",
+  },
+];
 
 export function RegisterPageView() {
-  const [form, setForm] = useState<AuthFormState>({
-    email: "",
-    password: "",
-    fullName: "",
-    roles: ["CUSTOMER"],
+  const router = useRouter();
+  const { register: registerUser } = useAuth();
+  const [submitError, setSubmitError] = useState<ApiError | null>(null);
+
+  const form = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      password: "",
+      roles: ["CUSTOMER"],
+    },
   });
-  const [errors, setErrors] = useState<AuthFormErrors>({});
-  const [errorCode, setErrorCode] = useState<string>("");
-  const [successMessage, setSuccessMessage] = useState<string>("");
 
-  function updateField(field: Exclude<keyof AuthFormState, "roles">, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined }));
-    setErrorCode("");
-    setSuccessMessage("");
+  const selectedRoles = form.watch("roles");
+
+  function toggleRole(role: "CUSTOMER" | "HOST") {
+    const next = selectedRoles.includes(role)
+      ? selectedRoles.filter((r) => r !== role)
+      : [...selectedRoles, role];
+    form.setValue("roles", next, { shouldValidate: true });
   }
 
-  function toggleRole(role: AuthRoleOption) {
-    setForm((prev) => {
-      const hasRole = prev.roles.includes(role);
-      const roles = hasRole ? prev.roles.filter((item) => item !== role) : [...prev.roles, role];
-      return { ...prev, roles };
-    });
-    setErrors((prev) => ({ ...prev, roles: undefined }));
-    setErrorCode("");
-    setSuccessMessage("");
-  }
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const nextErrors = validateRegisterForm(form);
-    setErrors(nextErrors);
-    setErrorCode("");
-    setSuccessMessage("");
-
-    if (Object.keys(nextErrors).length > 0) {
-      return;
+  async function onSubmit(values: RegisterForm) {
+    setSubmitError(null);
+    try {
+      await registerUser(values);
+      toast.success("Tạo tài khoản thành công");
+      router.replace("/me/profile?onboarding=1");
+      router.refresh();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.code === "USER_EMAIL_EXISTS" || err.fieldError("email")) {
+          form.setError("email", {
+            message: err.fieldError("email") ?? "Email đã được sử dụng.",
+          });
+          return;
+        }
+        if (err.status === 400 && err.details.length > 0) {
+          err.details.forEach((d) => {
+            if (d.field === "email" || d.field === "password" || d.field === "fullName") {
+              form.setError(d.field as keyof RegisterForm, { message: d.message });
+            }
+          });
+          if (
+            err.details.every((d) =>
+              ["email", "password", "fullName"].includes(d.field),
+            )
+          ) {
+            return;
+          }
+        }
+        setSubmitError(err);
+      } else {
+        setSubmitError(new ApiError(0, { code: "UNKNOWN_ERROR", message: "Lỗi không xác định." }));
+      }
     }
-
-    if (form.email.toLowerCase() === AUTH_DEMO_ERRORS.duplicateEmail) {
-      setErrorCode("USER_EMAIL_EXISTS");
-      return;
-    }
-
-    setSuccessMessage(`Static registration success for ${form.roles.join(", ")} role(s).`);
   }
+
+  const errors = form.formState.errors;
+  const isSubmitting = form.formState.isSubmitting;
 
   return (
     <AppShell activePath="/register">
       <div className="py-6">
         <AuthCard
-          title="Create RentFlow Account"
-          description="Register as customer or host for the static Phase 5 experience."
+          title="Tạo tài khoản RentFlow"
+          description="Đăng ký để thuê xe hoặc trở thành Host của hệ thống."
         >
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <AuthFormLayout
               errorBanner={
-                errorCode ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                    {errorCode}: This email is already registered.
-                  </div>
+                submitError ? (
+                  <ErrorBanner error={submitError} title="Không thể tạo tài khoản" />
                 ) : null
               }
               footer={
                 <p>
-                  Already have an account?{" "}
+                  Đã có tài khoản?{" "}
                   <Link href="/login" className="font-semibold text-primary hover:underline">
-                    Login
+                    Đăng nhập
                   </Link>
                 </p>
               }
             >
               <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Full name</label>
+                <label className="mb-1 block text-sm font-semibold text-foreground">Họ và tên</label>
                 <input
                   type="text"
-                  value={form.fullName}
-                  onChange={(event) => updateField("fullName", event.target.value)}
+                  autoComplete="name"
+                  {...form.register("fullName")}
                   className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                 />
                 {errors.fullName ? (
-                  <p className="mt-1 text-xs text-red-700">{errors.fullName}</p>
+                  <p className="mt-1 text-xs text-red-700">{errors.fullName.message}</p>
                 ) : null}
               </div>
 
@@ -125,63 +140,68 @@ export function RegisterPageView() {
                 <label className="mb-1 block text-sm font-semibold text-foreground">Email</label>
                 <input
                   type="email"
-                  value={form.email}
-                  onChange={(event) => updateField("email", event.target.value)}
+                  autoComplete="email"
+                  {...form.register("email")}
                   className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                 />
-                {errors.email ? <p className="mt-1 text-xs text-red-700">{errors.email}</p> : null}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Password</label>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(event) => updateField("password", event.target.value)}
-                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
-                />
-                {errors.password ? (
-                  <p className="mt-1 text-xs text-red-700">{errors.password}</p>
+                {errors.email ? (
+                  <p className="mt-1 text-xs text-red-700">{errors.email.message}</p>
                 ) : null}
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-semibold text-foreground">Roles</p>
-                <div className="flex flex-wrap gap-2">
-                  {AUTH_ROLE_OPTIONS.map((roleOption) => {
-                    const selected = form.roles.includes(roleOption.value);
+                <label className="mb-1 block text-sm font-semibold text-foreground">Mật khẩu</label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  {...form.register("password")}
+                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+                />
+                {errors.password ? (
+                  <p className="mt-1 text-xs text-red-700">{errors.password.message}</p>
+                ) : null}
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-semibold text-foreground">Vai trò</p>
+                <div className="space-y-2">
+                  {ROLE_OPTIONS.map((option) => {
+                    const selected = selectedRoles.includes(option.value);
                     return (
                       <button
-                        key={roleOption.value}
+                        key={option.value}
                         type="button"
-                        onClick={() => toggleRole(roleOption.value)}
+                        onClick={() => toggleRole(option.value)}
                         className={[
-                          "rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors",
+                          "block w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors",
                           selected
-                            ? "border-primary bg-primary text-primary-foreground"
+                            ? "border-primary bg-primary/5 text-foreground"
                             : "border-border bg-background text-foreground hover:bg-accent",
                         ].join(" ")}
+                        aria-pressed={selected}
                       >
-                        {roleOption.label}
+                        <span className="font-semibold">{option.label}</span>
+                        {option.hint ? (
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {option.hint}
+                          </span>
+                        ) : null}
                       </button>
                     );
                   })}
                 </div>
-                {errors.roles ? <p className="mt-1 text-xs text-red-700">{errors.roles}</p> : null}
+                {errors.roles ? (
+                  <p className="mt-1 text-xs text-red-700">{errors.roles.message as string}</p>
+                ) : null}
               </div>
 
               <button
                 type="submit"
-                className="h-10 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                disabled={isSubmitting}
+                className="h-10 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                Create account
+                {isSubmitting ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
               </button>
-
-              {successMessage ? (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                  {successMessage}
-                </div>
-              ) : null}
             </AuthFormLayout>
           </form>
         </AuthCard>

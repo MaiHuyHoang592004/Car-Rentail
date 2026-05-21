@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function getRemainingSeconds(expiresAt: string): number {
   const expiresAtMs = Date.parse(expiresAt);
@@ -19,17 +19,27 @@ function formatCountdown(totalSeconds: number): string {
 
 type HoldCountdownProps = {
   expiresAt: string;
+  onExpire?: () => void;
 };
 
-export function HoldCountdown({ expiresAt }: HoldCountdownProps) {
+export function HoldCountdown({ expiresAt, onExpire }: HoldCountdownProps) {
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() => getRemainingSeconds(expiresAt));
+  const firedRef = useRef<boolean>(false);
 
   useEffect(() => {
+    firedRef.current = false;
     const timer = window.setInterval(() => {
       setRemainingSeconds(getRemainingSeconds(expiresAt));
     }, 1000);
     return () => window.clearInterval(timer);
   }, [expiresAt]);
+
+  useEffect(() => {
+    if (remainingSeconds === 0 && !firedRef.current && onExpire) {
+      firedRef.current = true;
+      onExpire();
+    }
+  }, [remainingSeconds, onExpire]);
 
   const label = useMemo(() => {
     if (remainingSeconds === 0) {
