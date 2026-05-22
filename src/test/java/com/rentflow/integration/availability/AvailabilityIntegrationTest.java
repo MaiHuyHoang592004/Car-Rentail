@@ -8,6 +8,7 @@ import com.rentflow.auth.repository.UserRoleRepository;
 import com.rentflow.availability.entity.AvailabilityCalendar;
 import com.rentflow.availability.entity.AvailabilityStatus;
 import com.rentflow.availability.repository.AvailabilityCalendarRepository;
+import com.rentflow.availability.service.AvailabilityService;
 import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.common.idempotency.repository.IdempotencyKeyRepository;
 import com.rentflow.integration.BaseIntegrationTest;
@@ -49,6 +50,9 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private AvailabilityCalendarRepository availabilityRepository;
+
+    @Autowired
+    private AvailabilityService availabilityService;
 
     @Autowired
     private BookingRepository bookingRepository;
@@ -190,6 +194,29 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
                         .param("from", "2026-07-01")
                         .param("to", "2026-07-02"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("generateForListing: approves listing creates exactly 365 FREE rows in one batch")
+    void generateForListing_createsExactly365Rows() throws Exception {
+        String listingId = createAndApproveListing();
+
+        long count = availabilityRepository.countByListingId(UUID.fromString(listingId));
+        assertThat(count).isEqualTo(365L);
+    }
+
+    @Test
+    @DisplayName("generateForListing: re-running is idempotent and inserts no duplicates")
+    void generateForListing_isIdempotent() throws Exception {
+        String listingId = createAndApproveListing();
+        long firstCount = availabilityRepository.countByListingId(UUID.fromString(listingId));
+        assertThat(firstCount).isEqualTo(365L);
+
+        int inserted = availabilityService.generateForListing(UUID.fromString(listingId));
+        long secondCount = availabilityRepository.countByListingId(UUID.fromString(listingId));
+
+        assertThat(inserted).isZero();
+        assertThat(secondCount).isEqualTo(365L);
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────────

@@ -62,7 +62,18 @@ public interface AvailabilityCalendarRepository extends JpaRepository<Availabili
     @Query("SELECT COUNT(ac) FROM AvailabilityCalendar ac WHERE ac.listingId = :listingId")
     long countByListingId(@Param("listingId") UUID listingId);
 
-    boolean existsByListingIdAndAvailableDate(UUID listingId, LocalDate availableDate);
+    @Modifying
+    @Query(value = """
+            INSERT INTO availability_calendar
+                (listing_id, available_date, status, version, created_at, updated_at)
+            SELECT :listingId, gs::date, 'FREE', 0, NOW(), NOW()
+            FROM generate_series(CAST(:fromDate AS date), CAST(:toDate AS date), interval '1 day') gs
+            ON CONFLICT (listing_id, available_date) DO NOTHING
+            """, nativeQuery = true)
+    int insertAvailabilityRange(
+            @Param("listingId") UUID listingId,
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate);
 
     @Modifying
     @Query("UPDATE AvailabilityCalendar ac SET ac.status = :status " +

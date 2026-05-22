@@ -30,7 +30,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AvailabilityService {
 
-    private static final int BATCH_SIZE = 100;
     private static final int DAYS_TO_GENERATE = 365;
 
     private final AvailabilityCalendarRepository availabilityRepository;
@@ -42,34 +41,10 @@ public class AvailabilityService {
         LocalDate today = LocalDate.now(clock);
         LocalDate endDate = today.plusDays(DAYS_TO_GENERATE - 1);
 
-        log.info("Generating {} days of availability for listing {} ({} to {})",
-                DAYS_TO_GENERATE, listingId, today, endDate);
-
-        List<AvailabilityCalendar> batch = new ArrayList<>(BATCH_SIZE);
-        int totalInserted = 0;
-
-        LocalDate current = today;
-        while (!current.isAfter(endDate)) {
-            if (!availabilityRepository.existsByListingIdAndAvailableDate(listingId, current)) {
-                batch.add(new AvailabilityCalendar(listingId, current));
-            }
-
-            if (batch.size() >= BATCH_SIZE) {
-                availabilityRepository.saveAll(batch);
-                totalInserted += batch.size();
-                batch.clear();
-            }
-
-            current = current.plusDays(1);
-        }
-
-        if (!batch.isEmpty()) {
-            availabilityRepository.saveAll(batch);
-            totalInserted += batch.size();
-        }
-
-        log.info("Generated {} availability rows for listing {}", totalInserted, listingId);
-        return totalInserted;
+        int inserted = availabilityRepository.insertAvailabilityRange(listingId, today, endDate);
+        log.info("Generated {} availability rows for listing {} ({} to {})",
+                inserted, listingId, today, endDate);
+        return inserted;
     }
 
     @Transactional

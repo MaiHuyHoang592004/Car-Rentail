@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I02`, `I05-I09`, `I12`, `I15`, `I22`, `I30`.
+> Completed: `C01-C07`, `I02`, `I05-I09`, `I11`, `I12`, `I15`, `I22`, `I30`.
 
 ---
 
@@ -180,7 +180,7 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** `ListingSearchRepositoryCustomImpl.java` dual code path | **Effort:** M | **Fix:** Remove dead Specification.
 
 ## I11 — Availability Generation N+1
-**Status:** Confirmed | **Evidence:** `AvailabilityService.generateForListing()` loop 365 × `existsBy...` | **Effort:** S | **Fix:** `INSERT ... SELECT generate_series(...) ON CONFLICT DO NOTHING`.
+**Status:** Done | **Evidence:** `AvailabilityService.generateForListing()` loop 365 × `existsBy...` | **Effort:** S | **Fix:** `INSERT ... SELECT generate_series(...) ON CONFLICT DO NOTHING`.
 
 ## I12 — Vehicle Archive Loop Save
 **Status:** Done | **Evidence:** `VehicleService.archiveVehicle()` loop `save(listing)` | **Effort:** XS | **Fix:** Batch `@Modifying @Query UPDATE`.
