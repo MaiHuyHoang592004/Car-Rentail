@@ -2,6 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/rentflow/app-shell";
+import { EmptyState } from "@/components/rentflow/empty-state";
+import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { AvailabilityPreview } from "@/features/listings/availability-preview";
 import { ListingDetailHeader } from "@/features/listings/listing-detail-header";
 import { VehicleSpecsPanel } from "@/features/listings/vehicle-specs-panel";
@@ -20,9 +22,7 @@ export function ListingDetailPageView({ listingId }: ListingDetailPageViewProps)
   if (isLoading) {
     return (
       <AppShell activePath="/listings">
-        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">Đang tải thông tin xe...</p>
-        </section>
+        <PageSkeleton message="Đang tải thông tin xe..." />
       </AppShell>
     );
   }
@@ -30,12 +30,10 @@ export function ListingDetailPageView({ listingId }: ListingDetailPageViewProps)
   if (!listing) {
     return (
       <AppShell activePath="/listings">
-        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <h1 className="text-3xl font-bold text-foreground">Không tìm thấy xe</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Xe này không tồn tại hoặc không còn khả dụng.
-          </p>
-        </section>
+        <EmptyState
+          title="Không tìm thấy xe"
+          description="Xe này không tồn tại hoặc không còn khả dụng."
+        />
       </AppShell>
     );
   }

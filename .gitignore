@@ -52,3 +52,4 @@ docker-compose.override.yml
 test-output/
 surefire-reports/
 node_modules/
+.m2/

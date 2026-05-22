@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { AppShell } from "@/components/rentflow/app-shell";
+import { EmptyState } from "@/components/rentflow/empty-state";
 import { PageHeader } from "@/components/rentflow/page-header";
+import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { VehicleRow } from "@/features/host/components/vehicle-row";
 import { HOST_VEHICLE_STATUS_FILTERS, getHostVehiclesByStatus, type HostVehicleFilterValue } from "@/features/host/vehicles/api";
 
@@ -57,16 +59,12 @@ export function HostVehiclesPageView() {
         </section>
 
         {isLoading ? (
-          <section className="rounded-xl border border-border bg-card p-10 text-center">
-            <p className="text-sm text-muted-foreground">Đang tải danh sách xe...</p>
-          </section>
+          <PageSkeleton message="Đang tải danh sách xe..." />
         ) : vehicles.length === 0 ? (
-          <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <h2 className="text-xl font-bold text-foreground">Không có xe nào ở trạng thái này</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Đổi bộ lọc hoặc thêm xe mới để tiếp tục.
-            </p>
-          </section>
+          <EmptyState
+            title="Không có xe nào ở trạng thái này"
+            description="Đổi bộ lọc hoặc thêm xe mới để tiếp tục."
+          />
         ) : (
           <div className="space-y-3">
             {vehicles.map((vehicle) => (

@@ -5,7 +5,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/rentflow/app-shell";
+import { EmptyState } from "@/components/rentflow/empty-state";
 import { PageHeader } from "@/components/rentflow/page-header";
+import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { StatusBadge } from "@/components/rentflow/status-badge";
 import type { ProfileFormErrors, ProfileFormState } from "@/features/profile/types";
 import { getProfile, updateProfile } from "@/features/profile/api";
@@ -65,9 +67,7 @@ export function ProfilePageView() {
   if (isLoading) {
     return (
       <AppShell activePath="/me/profile">
-        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">Đang tải hồ sơ...</p>
-        </section>
+        <PageSkeleton message="Đang tải hồ sơ..." />
       </AppShell>
     );
   }
@@ -75,9 +75,7 @@ export function ProfilePageView() {
   if (!profile) {
     return (
       <AppShell activePath="/me/profile">
-        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">Không tải được hồ sơ.</p>
-        </section>
+        <EmptyState title="Không tải được hồ sơ" />
       </AppShell>
     );
   }

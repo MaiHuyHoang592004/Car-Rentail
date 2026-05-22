@@ -5,7 +5,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/rentflow/app-shell";
+import { EmptyState } from "@/components/rentflow/empty-state";
+import { FormError } from "@/components/rentflow/form-error";
 import { PageHeader } from "@/components/rentflow/page-header";
+import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { HostListingRow } from "@/features/host/components/host-listing-row";
 import {
   getHostListings,
@@ -63,20 +66,14 @@ export function HostListingsPageView() {
         </section>
 
         {isLoading ? (
-          <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <p className="text-sm text-muted-foreground">Đang tải tin đăng...</p>
-          </section>
+          <PageSkeleton message="Đang tải tin đăng..." />
         ) : isError ? (
-          <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-            Không tải được danh sách tin đăng. Vui lòng thử lại.
-          </section>
+          <FormError>Không tải được danh sách tin đăng. Vui lòng thử lại.</FormError>
         ) : listings.length === 0 ? (
-          <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <h2 className="text-xl font-bold text-foreground">Chưa có tin đăng nào</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Đổi bộ lọc hoặc tạo tin đăng mới để tiếp tục.
-            </p>
-          </section>
+          <EmptyState
+            title="Chưa có tin đăng nào"
+            description="Đổi bộ lọc hoặc tạo tin đăng mới để tiếp tục."
+          />
         ) : (
           <div className="space-y-3">
             {listings.map((listing) => (

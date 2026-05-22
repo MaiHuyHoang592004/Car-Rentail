@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
+import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { DEFAULT_LISTING_FILTERS, searchListings } from "@/features/listings/api";
 import { ListingFiltersPanel } from "@/features/listings/listing-filters-panel";
 import { ListingGrid } from "@/features/listings/listing-grid";
@@ -62,11 +63,7 @@ export function ListingsPageView() {
           </div>
         ) : null}
 
-        {query.isLoading ? (
-          <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <p className="text-sm text-muted-foreground">Đang tải danh sách xe...</p>
-          </section>
-        ) : null}
+        {query.isLoading ? <PageSkeleton message="Đang tải danh sách xe..." /> : null}
 
         {query.isError ? (
           <ApiErrorPanel error={query.error instanceof ApiError ? query.error : undefined} />
