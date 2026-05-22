@@ -9,7 +9,7 @@ import com.rentflow.booking.service.CancelBookingRequest;
 import com.rentflow.booking.service.CancelBookingResponse;
 import com.rentflow.booking.service.CreateBookingRequest;
 import com.rentflow.booking.service.PatchBookingLocationRequest;
-import com.rentflow.common.exception.IdempotencyException;
+import com.rentflow.common.exception.IdempotencyKeyRequiredException;
 import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.ratelimit.RateLimitService;
 import com.rentflow.common.security.SecurityContext;
@@ -91,7 +91,7 @@ public class BookingController {
 
     private void validateIdempotencyKey(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            throw new IdempotencyException("IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key header is required");
+            throw new IdempotencyKeyRequiredException("Idempotency-Key header is required");
         }
         if (!UUID_V4_PATTERN.matcher(idempotencyKey).matches()) {
             throw new ValidationException("Idempotency-Key must be a UUID-v4 value");

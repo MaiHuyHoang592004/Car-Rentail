@@ -1,8 +1,17 @@
 package com.rentflow.common.exception;
 
-public class IdempotencyException extends RentFlowException {
+import org.springframework.http.HttpStatus;
 
-    public IdempotencyException(String code, String message) {
+public abstract class IdempotencyException extends RentFlowException {
+
+    private final HttpStatus status;
+
+    protected IdempotencyException(String code, String message, HttpStatus status) {
         super(code, message);
+        this.status = status;
+    }
+
+    public HttpStatus getStatus() {
+        return status;
     }
 }

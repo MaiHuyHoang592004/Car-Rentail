@@ -1,6 +1,8 @@
 package com.rentflow.common.idempotency.service;
 
+import com.rentflow.common.exception.IdempotencyAlreadyProcessingException;
 import com.rentflow.common.exception.IdempotencyException;
+import com.rentflow.common.exception.IdempotencyKeyConflictException;
 import com.rentflow.common.idempotency.entity.IdempotencyKey;
 import com.rentflow.common.idempotency.entity.IdempotencyStatus;
 import com.rentflow.common.idempotency.repository.IdempotencyKeyRepository;
@@ -122,14 +124,10 @@ public class IdempotencyService {
     }
 
     private IdempotencyException alreadyProcessing() {
-        return new IdempotencyException(
-                "REQUEST_ALREADY_PROCESSING",
-                "Request with same idempotency key is still processing");
+        return new IdempotencyAlreadyProcessingException();
     }
 
     private IdempotencyException conflict() {
-        return new IdempotencyException(
-                "IDEMPOTENCY_KEY_CONFLICT",
-                "Same idempotency key was used with a different request body");
+        return new IdempotencyKeyConflictException();
     }
 }

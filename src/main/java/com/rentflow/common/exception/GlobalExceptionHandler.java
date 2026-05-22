@@ -147,10 +147,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleIdempotency(IdempotencyException ex, HttpServletRequest request) {
         String cid = correlationIdHelper.getCorrelationId();
         log.warn("Idempotency error [{}]: {} - {}", cid, ex.getCode(), ex.getMessage());
-        HttpStatus status = ("VALIDATION_ERROR".equals(ex.getCode()) || "IDEMPOTENCY_KEY_REQUIRED".equals(ex.getCode()))
-                ? HttpStatus.BAD_REQUEST
-                : HttpStatus.CONFLICT;
-        return ResponseEntity.status(status)
+        return ResponseEntity.status(ex.getStatus())
                 .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
     }
 
