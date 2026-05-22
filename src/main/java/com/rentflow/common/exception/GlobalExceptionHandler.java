@@ -56,6 +56,15 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of("AUTH_INVALID_CREDENTIALS", "Authentication required", cid));
     }
 
+    @ExceptionHandler(AccountSuspendedException.class)
+    public ResponseEntity<ErrorResponse> handleAccountSuspended(
+            AccountSuspendedException ex, HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        log.warn("Account suspended [{}]: {}", cid, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         String cid = correlationIdHelper.getCorrelationId();

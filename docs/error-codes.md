@@ -22,6 +22,7 @@
 |---|---|---|
 | AUTH_INVALID_CREDENTIALS | 401 | Email or password invalid |
 | AUTH_TOKEN_EXPIRED | 401 | Access token expired |
+| AUTH_ACCOUNT_SUSPENDED | 403 | Account is suspended (returned only after credential check passes) |
 | ACCESS_DENIED | 403 | User lacks permission |
 | USER_EMAIL_EXISTS | 409 | Email already registered |
 | DRIVER_LICENSE_NOT_APPROVED | 403 | Customer is not eligible to book |

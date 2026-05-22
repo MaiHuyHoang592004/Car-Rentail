@@ -8,6 +8,7 @@ import com.rentflow.auth.entity.UserStatus;
 import com.rentflow.auth.entity.UserRole;
 import com.rentflow.auth.repository.AuthUserRepository;
 import com.rentflow.auth.repository.UserRoleRepository;
+import com.rentflow.common.exception.AccountSuspendedException;
 import com.rentflow.common.exception.AuthenticationException;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.security.JwtTokenProvider;
@@ -82,12 +83,12 @@ public class AuthService {
             throw AuthenticationException.invalidCredentials();
         }
 
-        if (user.getStatus() != UserStatus.ACTIVE) {
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw AuthenticationException.invalidCredentials();
         }
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw AuthenticationException.invalidCredentials();
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccountSuspendedException();
         }
 
         user.setLastLoginAt(Instant.now());
@@ -119,7 +120,7 @@ public class AuthService {
 
         AuthUser user = oldToken.getUser();
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw AuthenticationException.invalidCredentials();
+            throw new AccountSuspendedException();
         }
 
         List<Role> roles = userRoleRepository.findByUserId(user.getId())

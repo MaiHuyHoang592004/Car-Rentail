@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I02`, `I05-I09`, `I11`, `I12`, `I15`, `I22`, `I30`.
+> Completed: `C01-C07`, `I02`, `I05-I09`, `I11`, `I12`, `I15`, `I18`, `I22`, `I30`.
 
 ---
 
@@ -198,7 +198,7 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** No failed attempt tracking | **Effort:** M | **Fix:** Counter + lock_until. **Depends:** C04.
 
 ## I18 — Suspended User Error Generic
-**Status:** Confirmed | **Evidence:** `AuthService.login()` throw same error for wrong pwd + suspended | **Effort:** S | **Fix:** Specific `AccountSuspendedException`.
+**Status:** Done | **Evidence:** `AuthService.login()` throw same error for wrong pwd + suspended | **Effort:** S | **Fix:** Specific `AccountSuspendedException` (403, code `AUTH_ACCOUNT_SUSPENDED`) thrown only after password validation to avoid enumeration leakage.
 
 ## I19 — JWT Valid After Suspend
 **Status:** Suspected | **Evidence:** Stateless JWT 15m, no blacklist | **Effort:** M | **Fix:** Redis blacklist or user-version.

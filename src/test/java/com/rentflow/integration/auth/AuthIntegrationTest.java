@@ -218,10 +218,10 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void login_suspendedUser_returns401() throws Exception {
-        AuthUser user = new AuthUser("suspended-login@example.com", "{noop}Password@123", UserStatus.SUSPENDED, false);
-        user = authUserRepository.save(user);
-        user.getRoles().add(new UserRole(user, Role.CUSTOMER));
+    void login_suspendedUser_correctPassword_returns403() throws Exception {
+        registerUser("suspended-login@example.com", "Password@123");
+        AuthUser user = authUserRepository.findByEmail("suspended-login@example.com").orElseThrow();
+        user.setStatus(UserStatus.SUSPENDED);
         authUserRepository.save(user);
 
         mockMvc.perform(post("/api/v1/auth/login")
@@ -230,6 +230,25 @@ class AuthIntegrationTest {
                                 {
                                   "email": "suspended-login@example.com",
                                   "password": "Password@123"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_SUSPENDED"));
+    }
+
+    @Test
+    void login_suspendedUser_wrongPassword_returns401Generic() throws Exception {
+        registerUser("suspended-wrong@example.com", "Password@123");
+        AuthUser user = authUserRepository.findByEmail("suspended-wrong@example.com").orElseThrow();
+        user.setStatus(UserStatus.SUSPENDED);
+        authUserRepository.save(user);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "suspended-wrong@example.com",
+                                  "password": "WrongPassword"
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
