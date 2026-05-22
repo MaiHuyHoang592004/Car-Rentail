@@ -1,16 +1,21 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { VehicleRow } from "@/features/host/components/vehicle-row";
-import { HOST_VEHICLE_STATUS_FILTERS, getHostVehiclesByStatus, type HostVehicleFilterValue } from "@/mocks/vehicles";
+import { HOST_VEHICLE_STATUS_FILTERS, getHostVehiclesByStatus, type HostVehicleFilterValue } from "@/features/host/vehicles/api";
 
 export function HostVehiclesPageView() {
   const [statusFilter, setStatusFilter] = useState<HostVehicleFilterValue>("ALL");
-  const vehicles = useMemo(() => getHostVehiclesByStatus(statusFilter), [statusFilter]);
+
+  const { data: vehicles = [], isLoading } = useQuery({
+    queryKey: ["host", "vehicles", statusFilter],
+    queryFn: () => getHostVehiclesByStatus(statusFilter),
+  });
 
   return (
     <AppShell activePath="/host/vehicles">
@@ -51,7 +56,11 @@ export function HostVehiclesPageView() {
           </div>
         </section>
 
-        {vehicles.length === 0 ? (
+        {isLoading ? (
+          <section className="rounded-xl border border-border bg-card p-10 text-center">
+            <p className="text-sm text-muted-foreground">Loading vehicles...</p>
+          </section>
+        ) : vehicles.length === 0 ? (
           <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
             <h2 className="text-xl font-bold text-foreground">No vehicles in this status</h2>
             <p className="mt-2 text-sm text-muted-foreground">

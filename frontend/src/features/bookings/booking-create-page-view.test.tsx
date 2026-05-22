@@ -44,6 +44,33 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+function listingResponse(): Response {
+  return jsonResponse({
+    id: "lst-001",
+    title: "Toyota Vios 2022",
+    description: "Listing detail",
+    city: "HCM",
+    address: "District 1",
+    basePricePerDay: 700000,
+    currency: "VND",
+    dailyKmLimit: 200,
+    instantBook: true,
+    cancellationPolicy: "FLEXIBLE",
+    photos: [],
+    vehicleSummary: {
+      category: "SEDAN",
+      make: "Toyota",
+      model: "Vios",
+      year: 2022,
+      transmission: "AUTO",
+      fuelType: "PETROL",
+      seats: 5,
+      status: "ACTIVE",
+    },
+    extras: [],
+  });
+}
+
 function isoOffset(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -65,6 +92,7 @@ describe("BookingCreatePageView", () => {
   it("submits booking and redirects to detail on success", async () => {
     const pickup = isoOffset(1);
     const ret = isoOffset(3);
+    fetchSpy.mockResolvedValueOnce(listingResponse());
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
@@ -97,7 +125,7 @@ describe("BookingCreatePageView", () => {
     await userEvent.click(screen.getByRole("button", { name: /Giữ xe này/ }));
 
     await waitFor(() => expect(routerPush).toHaveBeenCalledWith("/bookings/bk-99"));
-    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchSpy.mock.calls[1] as [string, RequestInit];
     expect(url).toBe("/api/v1/bookings");
     expect(init.method).toBe("POST");
     const headers = new Headers(init.headers);
@@ -107,6 +135,7 @@ describe("BookingCreatePageView", () => {
   });
 
   it("shows overlap banner on 409 BOOKING_OVERLAP_CUSTOMER", async () => {
+    fetchSpy.mockResolvedValueOnce(listingResponse());
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
@@ -129,6 +158,7 @@ describe("BookingCreatePageView", () => {
   });
 
   it("blocks submit with validation when return ≤ pickup", async () => {
+    fetchSpy.mockResolvedValueOnce(listingResponse());
     wrap(<BookingCreatePageView listingId="lst-001" isGuest={false} />);
     await screen.findByText(/Đặt Toyota Vios 2022/);
     const sameDay = isoOffset(1);
@@ -138,6 +168,6 @@ describe("BookingCreatePageView", () => {
     await userEvent.click(screen.getByRole("button", { name: /Giữ xe này/ }));
 
     expect(screen.getByText("Ngày trả phải sau ngày nhận.")).toBeInTheDocument();
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });

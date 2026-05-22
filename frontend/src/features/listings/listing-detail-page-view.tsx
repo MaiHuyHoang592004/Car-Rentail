@@ -1,15 +1,31 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/rentflow/app-shell";
 import { AvailabilityPreview } from "@/features/listings/availability-preview";
 import { ListingDetailHeader } from "@/features/listings/listing-detail-header";
 import { VehicleSpecsPanel } from "@/features/listings/vehicle-specs-panel";
-import { getListingDetailById } from "@/mocks/listings";
+import { getListingDetailById } from "@/features/listings/api";
 
 type ListingDetailPageViewProps = {
   listingId: string;
 };
 
 export function ListingDetailPageView({ listingId }: ListingDetailPageViewProps) {
-  const listing = getListingDetailById(listingId);
+  const { data: listing, isLoading } = useQuery({
+    queryKey: ["listings", listingId],
+    queryFn: () => getListingDetailById(listingId),
+  });
+
+  if (isLoading) {
+    return (
+      <AppShell activePath="/listings">
+        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+          <p className="text-sm text-muted-foreground">Loading listing...</p>
+        </section>
+      </AppShell>
+    );
+  }
 
   if (!listing) {
     return (
@@ -17,7 +33,7 @@ export function ListingDetailPageView({ listingId }: ListingDetailPageViewProps)
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <h1 className="text-3xl font-bold text-foreground">Listing not found</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This static mock does not include the requested listing id.
+            This listing does not exist or is no longer available.
           </p>
         </section>
       </AppShell>

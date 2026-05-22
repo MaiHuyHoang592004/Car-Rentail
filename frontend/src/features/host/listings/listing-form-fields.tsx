@@ -1,5 +1,5 @@
 import type { HostListingFormErrors, HostListingFormState } from "@/features/host/forms";
-import type { HostVehicleViewModel } from "@/features/host/types";
+import type { HostVehicleViewModel, HostListingViewModel } from "@/features/host/types";
 
 type ListingFormFieldsProps = {
   form: HostListingFormState;
@@ -8,6 +8,7 @@ type ListingFormFieldsProps = {
   vehicleOptions: HostVehicleViewModel[];
   disableVehicleSelect?: boolean;
   readOnly?: boolean;
+  listing?: HostListingViewModel;
 };
 
 export function ListingFormFields({
@@ -17,24 +18,34 @@ export function ListingFormFields({
   vehicleOptions,
   disableVehicleSelect = false,
   readOnly = false,
+  listing,
 }: ListingFormFieldsProps) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-semibold text-foreground">Vehicle</label>
-        <select
-          value={form.vehicleId}
-          onChange={(event) => onChange("vehicleId", event.target.value)}
-          disabled={disableVehicleSelect || readOnly}
-          className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          <option value="">Select active vehicle</option>
-          {vehicleOptions.map((vehicle) => (
-            <option key={vehicle.id} value={vehicle.id}>
-              {vehicle.make} {vehicle.model} ({vehicle.year})
-            </option>
-          ))}
-        </select>
+        {disableVehicleSelect ? (
+          <div className="flex items-center">
+            <span className="inline-flex items-center rounded-lg border border-input bg-muted px-3 py-2 text-sm text-foreground">
+              {listing?.vehicleLabel || `Vehicle ID: ${listing?.vehicleId ?? ""}`}
+            </span>
+            <span className="ml-2 text-xs text-muted-foreground">(cannot be changed after creation)</span>
+          </div>
+        ) : (
+          <select
+            value={form.vehicleId}
+            onChange={(event) => onChange("vehicleId", event.target.value)}
+            disabled={readOnly}
+            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            <option value="">Select active vehicle</option>
+            {vehicleOptions.map((vehicle) => (
+              <option key={vehicle.id} value={vehicle.id}>
+                {vehicle.make} {vehicle.model} ({vehicle.year})
+              </option>
+            ))}
+          </select>
+        )}
         {errors.vehicleId ? <p className="mt-1 text-xs text-rose-700">{errors.vehicleId}</p> : null}
       </div>
 

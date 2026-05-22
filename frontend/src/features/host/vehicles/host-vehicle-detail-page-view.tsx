@@ -1,7 +1,9 @@
 "use client";
 
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
@@ -10,22 +12,62 @@ import type { VehicleFormErrors, VehicleFormState } from "@/features/host/forms"
 import { HostActionDialog } from "@/features/host/components/host-action-dialog";
 import { VehicleFormFields } from "@/features/host/vehicles/vehicle-form-fields";
 import { buildVehicleFormFromViewModel, validateVehicleForm } from "@/features/host/vehicles/vehicle-form-utils";
-import type { HostVehicleViewModel } from "@/features/host/types";
-import { getHostVehicleById } from "@/mocks/vehicles";
+import { archiveHostVehicle, getHostVehicleById, updateHostVehicle } from "@/features/host/vehicles/api";
 
 type HostVehicleDetailPageViewProps = {
   vehicleId: string;
 };
 
 export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageViewProps) {
-  const initialVehicle = getHostVehicleById(vehicleId);
-  const [vehicle, setVehicle] = useState<HostVehicleViewModel | null>(initialVehicle);
+  const queryClient = useQueryClient();
+
+  const { data: vehicle, isLoading: loadingVehicle } = useQuery({
+    queryKey: ["host", "vehicles", vehicleId],
+    queryFn: () => getHostVehicleById(vehicleId),
+    enabled: true,
+  });
+
   const [form, setForm] = useState<VehicleFormState | null>(
-    initialVehicle ? buildVehicleFormFromViewModel(initialVehicle) : null,
+    vehicle ? buildVehicleFormFromViewModel(vehicle) : null,
   );
   const [errors, setErrors] = useState<VehicleFormErrors>({});
   const [archiveOpen, setArchiveOpen] = useState<boolean>(false);
   const [banner, setBanner] = useState<string>("");
+
+  const { mutate: saveVehicle, isPending: saving } = useMutation({
+    mutationFn: (body: Parameters<typeof updateHostVehicle>[1]) =>
+      updateHostVehicle(vehicleId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["host", "vehicles", vehicleId] });
+      setBanner("Vehicle details saved.");
+    },
+    onError: () => {
+      toast.error("Failed to save vehicle. Please try again.");
+    },
+  });
+
+  const { mutate: doArchive, isPending: archiving } = useMutation({
+    mutationFn: () => archiveHostVehicle(vehicleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["host", "vehicles", vehicleId] });
+      queryClient.invalidateQueries({ queryKey: ["host", "vehicles"] });
+      setBanner("Vehicle archived.");
+      setArchiveOpen(false);
+    },
+    onError: () => {
+      toast.error("Failed to archive vehicle. Please try again.");
+    },
+  });
+
+  if (loadingVehicle) {
+    return (
+      <AppShell activePath="/host/vehicles">
+        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+          <p className="text-sm text-muted-foreground">Loading vehicle...</p>
+        </section>
+      </AppShell>
+    );
+  }
 
   if (!vehicle || !form) {
     return (
@@ -33,7 +75,7 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <h1 className="text-3xl font-bold text-foreground">Vehicle not found</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This static mock does not include the requested vehicle id.
+            This vehicle does not exist or you do not have access.
           </p>
           <Link
             href="/host/vehicles"
@@ -66,33 +108,21 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
       return;
     }
 
-    setVehicle((prev) => {
-      if (!prev) {
-        return prev;
-      }
-      return {
-        ...prev,
-        category: currentForm.category.trim(),
-        make: currentForm.make.trim(),
-        model: currentForm.model.trim(),
-        year: Number(currentForm.year),
-        transmission: currentForm.transmission,
-        fuelType: currentForm.fuelType.trim(),
-        seats: Number(currentForm.seats),
-        status: currentForm.status,
-        city: currentForm.city.trim(),
-        plateNumber: currentForm.plateNumber.trim(),
-        vin: currentForm.vin.trim(),
-      };
+    saveVehicle({
+      category: currentForm.category.trim(),
+      make: currentForm.make.trim(),
+      model: currentForm.model.trim(),
+      year: Number(currentForm.year),
+      transmission: currentForm.transmission,
+      fuelType: currentForm.fuelType.trim(),
+      seats: Number(currentForm.seats),
+      status: currentForm.status,
+      city: currentForm.city.trim(),
     });
-    setBanner("Vehicle details updated in static UI.");
   }
 
   function handleArchive() {
-    setVehicle((prev) => (prev ? { ...prev, status: "ARCHIVED" } : prev));
-    setForm((prev) => (prev ? { ...prev, status: "ARCHIVED" } : prev));
-    setArchiveOpen(false);
-    setBanner("Vehicle status changed to ARCHIVED in static UI.");
+    doArchive();
   }
 
   const canArchive = vehicle.status !== "ARCHIVED";
@@ -102,7 +132,7 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
       <div className="space-y-6">
         <PageHeader
           title={`Vehicle Detail: ${vehicle.id}`}
-          description="Static update and archive workflow for host vehicle management."
+          description="Update vehicle details or archive this vehicle."
           actions={
             <Link
               href="/host/vehicles"
@@ -133,17 +163,18 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
             <div className="flex flex-wrap gap-2">
               <button
                 type="submit"
-                className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                disabled={saving}
+                className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Save changes
+                {saving ? "Saving..." : "Save changes"}
               </button>
               <button
                 type="button"
                 onClick={() => setArchiveOpen(true)}
-                disabled={!canArchive}
+                disabled={!canArchive || archiving}
                 className="rounded-full bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
               >
-                Archive vehicle
+                {archiving ? "Archiving..." : "Archive vehicle"}
               </button>
             </div>
           </form>
@@ -153,7 +184,7 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
       <HostActionDialog
         open={archiveOpen}
         title="Archive Vehicle"
-        description="This static action will set vehicle status to ARCHIVED in local UI state."
+        description="This vehicle and its listings will be archived. Existing bookings will not be affected."
         confirmLabel="Confirm archive"
         tone="danger"
         onClose={() => setArchiveOpen(false)}

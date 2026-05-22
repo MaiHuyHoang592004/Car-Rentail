@@ -1,12 +1,14 @@
 "use client";
 
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { StatusBadge } from "@/components/rentflow/status-badge";
-import type { ProfileFormErrors, ProfileFormState, ProfileViewModel } from "@/features/profile/types";
-import { getMockProfile } from "@/mocks/profile";
+import type { ProfileFormErrors, ProfileFormState } from "@/features/profile/types";
+import { getProfile, updateProfile } from "@/features/profile/api";
 
 function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
   const errors: ProfileFormErrors = {};
@@ -15,7 +17,7 @@ function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
     errors.fullName = "Full name is required.";
   }
 
-  if (form.phone.trim() && !/^[0-9+\s()-]{8,20}$/.test(form.phone.trim())) {
+  if (form.phone.trim() && !/^\+?[0-9\-\s]{7,20}$/.test(form.phone.trim())) {
     errors.phone = "Enter a valid phone number.";
   }
 
@@ -33,15 +35,61 @@ function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
 }
 
 export function ProfilePageView() {
-  const [profile, setProfile] = useState<ProfileViewModel>(() => getMockProfile());
+  const queryClient = useQueryClient();
+
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+  });
+
+  const { mutate: doUpdate, isPending: saving } = useMutation({
+    mutationFn: updateProfile,
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["profile"], updated);
+      setBanner("Profile saved.");
+    },
+    onError: () => {
+      toast.error("Failed to save profile. Please try again.");
+    },
+  });
+
   const [form, setForm] = useState<ProfileFormState>({
-    fullName: profile.fullName,
-    phone: profile.phone,
-    dateOfBirth: profile.dateOfBirth,
-    addressLine: profile.addressLine,
+    fullName: "",
+    phone: "",
+    dateOfBirth: "",
+    addressLine: "",
   });
   const [errors, setErrors] = useState<ProfileFormErrors>({});
   const [banner, setBanner] = useState<string>("");
+
+  if (isLoading) {
+    return (
+      <AppShell activePath="/me/profile">
+        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+          <p className="text-sm text-muted-foreground">Loading profile...</p>
+        </section>
+      </AppShell>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <AppShell activePath="/me/profile">
+        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+          <p className="text-sm text-muted-foreground">Unable to load profile.</p>
+        </section>
+      </AppShell>
+    );
+  }
+
+  if (form.fullName === "") {
+    setForm({
+      fullName: profile.fullName,
+      phone: profile.phone,
+      dateOfBirth: profile.dateOfBirth,
+      addressLine: profile.addressLine,
+    });
+  }
 
   function updateField(field: keyof ProfileFormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -59,14 +107,12 @@ export function ProfilePageView() {
       return;
     }
 
-    setProfile((prev) => ({
-      ...prev,
+    doUpdate({
       fullName: form.fullName.trim(),
       phone: form.phone.trim(),
-      dateOfBirth: form.dateOfBirth,
+      dateOfBirth: form.dateOfBirth || null,
       addressLine: form.addressLine.trim(),
-    }));
-    setBanner("Profile updated in static UI.");
+    });
   }
 
   return (
@@ -74,7 +120,7 @@ export function ProfilePageView() {
       <div className="space-y-6">
         <PageHeader
           title="Profile Settings"
-          description="Edit personal fields with local validation. Email, roles, and verification remain read-only."
+          description="Edit personal fields. Email, roles, and verification remain read-only."
         />
 
         {banner ? (
@@ -168,9 +214,10 @@ export function ProfilePageView() {
 
             <button
               type="submit"
-              className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              disabled={saving}
+              className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Save profile
+              {saving ? "Saving..." : "Save profile"}
             </button>
           </form>
         </section>

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
@@ -116,6 +116,13 @@ function BookingDetailContent({ bookingId }: BookingDetailPageViewProps) {
     scheduleExpireRetry();
   }, [bookingId, queryClient, scheduleExpireRetry]);
 
+  const bookingStatus = detailQuery.data?.status;
+  useEffect(() => {
+    if (bookingStatus && bookingStatus !== "HELD") {
+      expireRetryRef.current = 0;
+    }
+  }, [bookingStatus]);
+
   if (detailQuery.isLoading) {
     return (
       <AppShell activePath="/me/bookings">
@@ -146,10 +153,6 @@ function BookingDetailContent({ bookingId }: BookingDetailPageViewProps) {
   const booking = detailQuery.data;
   if (!booking) {
     return null;
-  }
-
-  if (booking.status !== "HELD") {
-    expireRetryRef.current = 0;
   }
 
   const canEditLocations = LOCATION_EDITABLE_STATUSES.includes(booking.status);

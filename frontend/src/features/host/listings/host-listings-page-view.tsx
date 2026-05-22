@@ -1,27 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { HostListingRow } from "@/features/host/components/host-listing-row";
 import {
+  getHostListings,
   HOST_LISTING_STATUS_FILTERS,
-  getHostListingsByStatus,
   type HostListingFilterValue,
-} from "@/mocks/host-listings";
+} from "@/features/host/listings/api";
 
 export function HostListingsPageView() {
   const [statusFilter, setStatusFilter] = useState<HostListingFilterValue>("ALL");
-  const listings = useMemo(() => getHostListingsByStatus(statusFilter), [statusFilter]);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["host", "listings", statusFilter],
+    queryFn: () => getHostListings(statusFilter),
+  });
+
+  const listings = data?.listings ?? [];
 
   return (
     <AppShell activePath="/host/listings">
       <div className="space-y-6">
         <PageHeader
           title="Host Listings"
-          description="Manage listing lifecycle with static status filters and action hints."
+          description="Manage your vehicle listings across their lifecycle."
           actions={
             <Link
               href="/host/listings/new"
@@ -55,9 +62,17 @@ export function HostListingsPageView() {
           </div>
         </section>
 
-        {listings.length === 0 ? (
+        {isLoading ? (
           <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <h2 className="text-xl font-bold text-foreground">No listings in this status</h2>
+            <p className="text-sm text-muted-foreground">Loading listings...</p>
+          </section>
+        ) : isError ? (
+          <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+            Failed to load listings. Please try again.
+          </section>
+        ) : listings.length === 0 ? (
+          <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+            <h2 className="text-xl font-bold text-foreground">No listings found</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Switch filter or create a new listing to continue.
             </p>

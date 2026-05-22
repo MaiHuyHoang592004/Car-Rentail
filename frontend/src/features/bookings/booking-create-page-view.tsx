@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
@@ -15,8 +15,7 @@ import type {
   BookingCreateFormErrors,
   BookingCreateFormState,
 } from "@/features/bookings/types";
-// TODO Phase 3: replace với GET /listings/:id qua api-client.
-import { getListingDetailById } from "@/mocks/listings";
+import { getListingDetailById } from "@/features/listings/api";
 import { ApiError } from "@/lib/api-error";
 import { newIdempotencyKey } from "@/lib/idempotency";
 
@@ -87,7 +86,10 @@ export function BookingCreatePageView(props: BookingCreatePageViewProps) {
 function BookingCreateContent({ listingId, isGuest }: BookingCreatePageViewProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const listing = getListingDetailById(listingId);
+  const { data: listing } = useQuery({
+    queryKey: ["listings", listingId],
+    queryFn: () => getListingDetailById(listingId),
+  });
   const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
   const [form, setForm] = useState<BookingCreateFormState>({
     pickupDate: "",

@@ -22,9 +22,13 @@ const sessionUser = {
 };
 
 function wrapperWithInitial(initial: Parameters<typeof AuthProvider>[0]["initialSession"]) {
-  return ({ children }: { children: ReactNode }) => (
+  function InitialAuthWrapper({ children }: { children: ReactNode }) {
+    return (
     <AuthProvider initialSession={initial}>{children}</AuthProvider>
-  );
+    );
+  }
+
+  return InitialAuthWrapper;
 }
 
 describe("AuthProvider", () => {

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
@@ -9,54 +10,114 @@ import { StatusBadge } from "@/components/rentflow/status-badge";
 import type { HostListingFormErrors, HostListingFormState } from "@/features/host/forms";
 import { HostActionDialog } from "@/features/host/components/host-action-dialog";
 import { ListingFormFields } from "@/features/host/listings/listing-form-fields";
-import { buildListingFormFromViewModel, validateListingForm } from "@/features/host/listings/listing-form-utils";
-import type { HostListingViewModel } from "@/features/host/types";
+import { validateListingForm } from "@/features/host/listings/listing-form-utils";
 import {
-  archiveListingTransition,
+  archiveListingSafe,
   getHostListingById,
-  reactivateListingTransition,
-  submitListingTransition,
-} from "@/mocks/host-listings";
-import { getHostActiveVehicles, getHostVehicleById } from "@/mocks/vehicles";
+  reactivateListingSafe,
+  submitListingSafe,
+  ListingTransitionError,
+} from "@/features/host/listings/api";
+import type { HostListingViewModel } from "@/features/host/types";
 
 type HostListingDetailPageViewProps = {
   listingId: string;
 };
 
+function buildFormFromListing(listing: HostListingViewModel): HostListingFormState {
+  return {
+    vehicleId: listing.vehicleId,
+    title: listing.title,
+    description: listing.description,
+    city: listing.city,
+    address: listing.address,
+    basePricePerDay: String(listing.basePricePerDay),
+    dailyKmLimit: String(listing.dailyKmLimit),
+    instantBook: listing.instantBook,
+    cancellationPolicy: listing.cancellationPolicy,
+  };
+}
+
 export function HostListingDetailPageView({ listingId }: HostListingDetailPageViewProps) {
-  const initialListing = getHostListingById(listingId);
-  const [listing, setListing] = useState<HostListingViewModel | null>(initialListing);
-  const [form, setForm] = useState<HostListingFormState | null>(
-    initialListing ? buildListingFormFromViewModel(initialListing) : null,
-  );
+  const queryClient = useQueryClient();
+
+  const {
+    data: listing,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["host", "listings", listingId],
+    queryFn: () => getHostListingById(listingId),
+    retry: false,
+  });
+
+  const [form, setForm] = useState<HostListingFormState | null>(null);
   const [errors, setErrors] = useState<HostListingFormErrors>({});
-  const [banner, setBanner] = useState<string>("");
-  const [archiveOpen, setArchiveOpen] = useState<boolean>(false);
-  const [reactivateOpen, setReactivateOpen] = useState<boolean>(false);
+  const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [reactivateOpen, setReactivateOpen] = useState(false);
 
-  const vehicleOptions = useMemo(() => {
-    if (!listing) {
-      return [];
-    }
-    const activeVehicles = getHostActiveVehicles();
-    const currentVehicleExists = activeVehicles.some((vehicle) => vehicle.id === listing.vehicleId);
-    if (currentVehicleExists) {
-      return activeVehicles;
-    }
-    const currentVehicle = getHostVehicleById(listing.vehicleId);
-    if (!currentVehicle) {
-      return activeVehicles;
-    }
-    return [currentVehicle, ...activeVehicles];
-  }, [listing]);
+  // Populate form once listing is fetched
+  const formState = useMemo(() => {
+    if (form) return form;
+    if (!listing) return null;
+    return buildFormFromListing(listing);
+  }, [form, listing]);
 
-  if (!listing || !form) {
+  const submitMutation = useMutation({
+    mutationFn: () => submitListingSafe(listingId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["host", "listings", listingId], updated);
+      setBanner({ type: "success", message: "Listing submitted for approval." });
+    },
+    onError: (err: ListingTransitionError) => {
+      setBanner({ type: "error", message: err.message || "Failed to submit listing." });
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () => archiveListingSafe(listingId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["host", "listings", listingId], updated);
+      setBanner({ type: "success", message: "Listing archived." });
+      setArchiveOpen(false);
+    },
+    onError: (err: ListingTransitionError) => {
+      setBanner({ type: "error", message: err.message || "Failed to archive listing." });
+      setArchiveOpen(false);
+    },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: () => reactivateListingSafe(listingId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["host", "listings", listingId], updated);
+      setBanner({ type: "success", message: "Listing reactivated." });
+      setReactivateOpen(false);
+    },
+    onError: (err: ListingTransitionError) => {
+      setBanner({ type: "error", message: err.message || "Failed to reactivate listing." });
+      setReactivateOpen(false);
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <AppShell activePath="/host/listings">
+        <div className="flex items-center justify-center p-20">
+          <p className="text-sm text-muted-foreground">Loading listing...</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (isError || !listing || !formState) {
     return (
       <AppShell activePath="/host/listings">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <h1 className="text-3xl font-bold text-foreground">Listing not found</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This static mock does not include the requested listing id.
+            The listing does not exist or you do not have permission to view it.
           </p>
           <Link
             href="/host/listings"
@@ -68,105 +129,64 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
       </AppShell>
     );
   }
-  const listingData = listing;
 
-  const canEdit = listingData.status === "DRAFT";
-  const canSubmit = listingData.status === "DRAFT";
-  const canArchive = ["DRAFT", "PENDING_APPROVAL", "ACTIVE"].includes(listingData.status);
-  const canReactivate = listingData.status === "SUSPENDED";
+  const currentListing = queryClient.getQueryData<HostListingViewModel>(["host", "listings", listingId]) ?? listing;
+  const canEdit = currentListing.status === "DRAFT";
+  const canSubmit = currentListing.status === "DRAFT";
+  const canArchive = ["DRAFT", "PENDING_APPROVAL", "ACTIVE", "SUSPENDED"].includes(currentListing.status);
+  const canReactivate = currentListing.status === "ARCHIVED";
 
   function updateField<K extends keyof HostListingFormState>(
     field: K,
     value: HostListingFormState[K],
   ) {
-    setForm((prev) => (prev ? { ...prev, [field]: value } : prev));
+    setForm((prev) => (prev ? { ...prev, [field]: value } : { ...buildFormFromListing(currentListing), [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined, form: undefined }));
-    setBanner("");
+    setBanner(null);
   }
 
   function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canEdit || !form) {
+    if (!canEdit || !formState) {
       return;
     }
 
-    const nextErrors = validateListingForm(form);
+    const currentForm = formState;
+    if (!currentForm) {
+      return;
+    }
+
+    const nextErrors = validateListingForm(currentForm);
     setErrors(nextErrors);
-    setBanner("");
+    setBanner(null);
     if (Object.keys(nextErrors).length > 0) {
       return;
     }
 
-    const selectedVehicle = vehicleOptions.find((vehicle) => vehicle.id === form.vehicleId);
-    if (!selectedVehicle) {
-      setErrors({ vehicleId: "Selected vehicle is not available." });
-      return;
-    }
-
-    setListing((prev) => {
-      if (!prev) {
-        return prev;
-      }
-      return {
-        ...prev,
-        vehicleId: selectedVehicle.id,
-        vehicleLabel: `${selectedVehicle.make} ${selectedVehicle.model} (${selectedVehicle.year})`,
-        title: form.title.trim(),
-        description: form.description.trim(),
-        city: form.city.trim(),
-        address: form.address.trim(),
-        basePricePerDay: Number(form.basePricePerDay),
-        dailyKmLimit: Number(form.dailyKmLimit),
-        instantBook: form.instantBook,
-        cancellationPolicy: form.cancellationPolicy,
-      };
-    });
-    setBanner("Listing fields updated in static UI.");
+    setBanner({ type: "success", message: "Save is read-only in this implementation. Use the API to update listings." });
   }
 
   function handleSubmitForApproval() {
-    const nextListing = submitListingTransition(listingData);
-    if (!nextListing) {
-      setBanner("Submit action is not available for current status.");
-      return;
-    }
-    setListing(nextListing);
-    setBanner("Listing transitioned from DRAFT to PENDING_APPROVAL.");
+    submitMutation.mutate();
   }
 
   function handleArchive() {
-    const nextListing = archiveListingTransition(listingData);
-    if (!nextListing) {
-      setBanner("Archive action is not available for current status.");
-      setArchiveOpen(false);
-      return;
-    }
-    setListing(nextListing);
-    setArchiveOpen(false);
-    setBanner("Listing archived in static UI.");
+    archiveMutation.mutate();
   }
 
   function handleReactivate() {
-    const nextListing = reactivateListingTransition(listingData);
-    if (!nextListing) {
-      setBanner("Reactivate action is not available for current status.");
-      setReactivateOpen(false);
-      return;
-    }
-    setListing(nextListing);
-    setReactivateOpen(false);
-    setBanner("Listing reactivated to ACTIVE in static UI.");
+    reactivateMutation.mutate();
   }
 
   return (
     <AppShell activePath="/host/listings">
       <div className="space-y-6">
         <PageHeader
-          title={`Listing Detail: ${listingData.id}`}
-          description="Static preview and lifecycle actions for host listing management."
+          title={`Listing Detail: ${listingId}`}
+          description="Manage listing information and lifecycle actions."
           actions={
             <Link
-              href={`/host/listings/${listingData.id}/availability`}
+              href={`/host/listings/${listingId}/availability`}
               className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
             >
               Availability
@@ -175,8 +195,14 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
         />
 
         {banner ? (
-          <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            {banner}
+          <section
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              banner.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-rose-200 bg-rose-50 text-rose-900"
+            }`}
+          >
+            {banner.message}
           </section>
         ) : null}
 
@@ -185,45 +211,46 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Current status</p>
               <div className="mt-1">
-                <StatusBadge status={listing.status} />
+                <StatusBadge status={currentListing.status} />
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={!canSubmit}
+                disabled={!canSubmit || submitMutation.isPending}
                 onClick={handleSubmitForApproval}
                 className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
               >
-                Submit
+                {submitMutation.isPending ? "Submitting..." : "Submit"}
               </button>
               <button
                 type="button"
-                disabled={!canArchive}
+                disabled={!canArchive || archiveMutation.isPending}
                 onClick={() => setArchiveOpen(true)}
                 className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
               >
-                Archive
+                {archiveMutation.isPending ? "Archiving..." : "Archive"}
               </button>
               <button
                 type="button"
-                disabled={!canReactivate}
+                disabled={!canReactivate || reactivateMutation.isPending}
                 onClick={() => setReactivateOpen(true)}
                 className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:bg-accent"
               >
-                Reactivate
+                {reactivateMutation.isPending ? "Reactivating..." : "Reactivate"}
               </button>
             </div>
           </div>
 
           <form onSubmit={handleSave} noValidate className="space-y-4">
             <ListingFormFields
-              form={form}
+              form={formState}
               errors={errors}
               onChange={updateField}
-              vehicleOptions={vehicleOptions}
+              vehicleOptions={[]}
               disableVehicleSelect
               readOnly={!canEdit}
+              listing={currentListing}
             />
             <div className="flex flex-wrap gap-2">
               <button
@@ -247,7 +274,7 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
       <HostActionDialog
         open={archiveOpen}
         title="Archive Listing"
-        description="This static action transitions listing status to ARCHIVED when allowed."
+        description="This listing will be moved to archived status. It will no longer be visible to renters."
         confirmLabel="Confirm archive"
         tone="danger"
         onClose={() => setArchiveOpen(false)}
@@ -257,7 +284,7 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
       <HostActionDialog
         open={reactivateOpen}
         title="Reactivate Listing"
-        description="This static action transitions listing status from SUSPENDED to ACTIVE."
+        description="This archived listing will be reset to DRAFT status, allowing you to edit and resubmit."
         confirmLabel="Reactivate"
         onClose={() => setReactivateOpen(false)}
         onConfirm={handleReactivate}

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useState } from "react";
 
 function generateUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -12,11 +12,8 @@ function generateUuid(): string {
 }
 
 export function useIdempotencyKey(): string {
-  const ref = useRef<string | null>(null);
-  if (ref.current === null) {
-    ref.current = generateUuid();
-  }
-  return ref.current;
+  const [key] = useState(generateUuid);
+  return key;
 }
 
 export function newIdempotencyKey(): string {
