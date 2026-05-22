@@ -1,16 +1,17 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { StatusBadge } from "@/components/rentflow/status-badge";
-import type { HostListingFormErrors, HostListingFormState } from "@/features/host/forms";
+import { listingFormSchema, type HostListingFormState } from "@/features/host/forms";
 import { ListingFormFields } from "@/features/host/listings/listing-form-fields";
-import { validateListingForm } from "@/features/host/listings/listing-form-utils";
 import { createListing } from "@/features/host/listings/api";
 import { getHostActiveVehicles } from "@/features/host/vehicles/api";
 import type { HostListingViewModel } from "@/features/host/types";
@@ -30,7 +31,7 @@ const INITIAL_FORM: HostListingFormState = {
 export function HostListingCreatePageView() {
   const queryClient = useQueryClient();
 
-  const { data: vehicleOptions = [], isLoading: loadingVehicles } = useQuery({
+  const { data: vehicleOptions = [] } = useQuery({
     queryKey: ["host", "vehicles", "ACTIVE"],
     queryFn: async () => {
       const opts = await getHostActiveVehicles();
@@ -56,7 +57,7 @@ export function HostListingCreatePageView() {
     onSuccess: (listing) => {
       queryClient.invalidateQueries({ queryKey: ["host", "listings"] });
       setCreatedListing(listing);
-      setForm(INITIAL_FORM);
+      form.reset(INITIAL_FORM);
       toast.success("Listing created successfully.");
     },
     onError: () => {
@@ -64,42 +65,30 @@ export function HostListingCreatePageView() {
     },
   });
 
-  const [form, setForm] = useState<HostListingFormState>(INITIAL_FORM);
-  const [errors, setErrors] = useState<HostListingFormErrors>({});
+  const form = useForm<HostListingFormState>({
+    resolver: zodResolver(listingFormSchema),
+    defaultValues: INITIAL_FORM,
+  });
   const [createdListing, setCreatedListing] = useState<HostListingViewModel | null>(null);
 
-  function updateField<K extends keyof HostListingFormState>(field: K, value: HostListingFormState[K]) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined, form: undefined }));
-  }
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function handleSubmit(values: HostListingFormState) {
     setCreatedListing(null);
-
-    const nextErrors = validateListingForm(form);
-    setErrors(nextErrors);
-
-    if (Object.keys(nextErrors).length > 0) {
-      return;
-    }
-
-    const selectedVehicle = vehicleOptions.find((v) => v.id === form.vehicleId);
+    const selectedVehicle = vehicleOptions.find((v) => v.id === values.vehicleId);
     if (!selectedVehicle) {
-      setErrors({ vehicleId: "Select an ACTIVE vehicle." });
+      form.setError("vehicleId", { message: "Select an ACTIVE vehicle." });
       return;
     }
 
     doCreate({
-      vehicleId: form.vehicleId,
-      title: form.title.trim(),
-      description: form.description.trim(),
-      city: form.city.trim(),
-      address: form.address.trim(),
-      basePricePerDay: Number(form.basePricePerDay),
-      dailyKmLimit: Number(form.dailyKmLimit),
-      instantBook: form.instantBook,
-      cancellationPolicy: form.cancellationPolicy,
+      vehicleId: values.vehicleId,
+      title: values.title.trim(),
+      description: values.description.trim(),
+      city: values.city.trim(),
+      address: values.address.trim(),
+      basePricePerDay: Number(values.basePricePerDay),
+      dailyKmLimit: Number(values.dailyKmLimit),
+      instantBook: values.instantBook,
+      cancellationPolicy: values.cancellationPolicy,
     });
   }
 
@@ -130,11 +119,12 @@ export function HostListingCreatePageView() {
         ) : null}
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} noValidate className="space-y-4">
             <ListingFormFields
-              form={form}
-              errors={errors}
-              onChange={updateField}
+              register={form.register}
+              errors={form.formState.errors}
+              setValue={form.setValue}
+              watch={form.watch}
               vehicleOptions={vehicleOptions}
             />
             <div className="flex flex-wrap gap-2">
@@ -148,8 +138,7 @@ export function HostListingCreatePageView() {
               <button
                 type="button"
                 onClick={() => {
-                  setForm(INITIAL_FORM);
-                  setErrors({});
+                  form.reset(INITIAL_FORM);
                   setCreatedListing(null);
                 }}
                 className="rounded-full border border-border bg-background px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-accent"

@@ -1,16 +1,16 @@
-import type { VehicleFormErrors, VehicleFormState } from "@/features/host/forms";
+import type { FieldErrors, UseFormRegister } from "react-hook-form";
+
+import type { VehicleFormState } from "@/features/host/forms";
 
 type VehicleFormFieldsProps = {
-  form: VehicleFormState;
-  errors: VehicleFormErrors;
-  onChange: <K extends keyof VehicleFormState>(field: K, value: VehicleFormState[K]) => void;
+  register: UseFormRegister<VehicleFormState>;
+  errors: FieldErrors<VehicleFormState>;
   disabledStatus?: boolean;
 };
 
 export function VehicleFormFields({
-  form,
+  register,
   errors,
-  onChange,
   disabledStatus = false,
 }: VehicleFormFieldsProps) {
   return (
@@ -19,51 +19,46 @@ export function VehicleFormFields({
         <label className="mb-1 block text-sm font-semibold text-foreground">Category</label>
         <input
           type="text"
-          value={form.category}
-          onChange={(event) => onChange("category", event.target.value)}
+          {...register("category")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         />
-        {errors.category ? <p className="mt-1 text-xs text-rose-700">{errors.category}</p> : null}
+        {errors.category ? <p className="mt-1 text-xs text-rose-700">{errors.category.message}</p> : null}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Make</label>
         <input
           type="text"
-          value={form.make}
-          onChange={(event) => onChange("make", event.target.value)}
+          {...register("make")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         />
-        {errors.make ? <p className="mt-1 text-xs text-rose-700">{errors.make}</p> : null}
+        {errors.make ? <p className="mt-1 text-xs text-rose-700">{errors.make.message}</p> : null}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Model</label>
         <input
           type="text"
-          value={form.model}
-          onChange={(event) => onChange("model", event.target.value)}
+          {...register("model")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         />
-        {errors.model ? <p className="mt-1 text-xs text-rose-700">{errors.model}</p> : null}
+        {errors.model ? <p className="mt-1 text-xs text-rose-700">{errors.model.message}</p> : null}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Year</label>
         <input
           type="number"
-          value={form.year}
-          onChange={(event) => onChange("year", event.target.value)}
+          {...register("year")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         />
-        {errors.year ? <p className="mt-1 text-xs text-rose-700">{errors.year}</p> : null}
+        {errors.year ? <p className="mt-1 text-xs text-rose-700">{errors.year.message}</p> : null}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Transmission</label>
         <select
-          value={form.transmission}
-          onChange={(event) => onChange("transmission", event.target.value as "AUTO" | "MANUAL")}
+          {...register("transmission")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         >
           <option value="AUTO">Auto</option>
@@ -75,8 +70,7 @@ export function VehicleFormFields({
         <label className="mb-1 block text-sm font-semibold text-foreground">Fuel type</label>
         <input
           type="text"
-          value={form.fuelType}
-          onChange={(event) => onChange("fuelType", event.target.value)}
+          {...register("fuelType")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         />
       </div>
@@ -85,18 +79,16 @@ export function VehicleFormFields({
         <label className="mb-1 block text-sm font-semibold text-foreground">Seats</label>
         <input
           type="number"
-          value={form.seats}
-          onChange={(event) => onChange("seats", event.target.value)}
+          {...register("seats")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         />
-        {errors.seats ? <p className="mt-1 text-xs text-rose-700">{errors.seats}</p> : null}
+        {errors.seats ? <p className="mt-1 text-xs text-rose-700">{errors.seats.message}</p> : null}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Status</label>
         <select
-          value={form.status}
-          onChange={(event) => onChange("status", event.target.value as VehicleFormState["status"])}
+          {...register("status")}
           disabled={disabledStatus}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
         >
@@ -112,23 +104,21 @@ export function VehicleFormFields({
         <label className="mb-1 block text-sm font-semibold text-foreground">City</label>
         <input
           type="text"
-          value={form.city}
-          onChange={(event) => onChange("city", event.target.value)}
+          {...register("city")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         />
-        {errors.city ? <p className="mt-1 text-xs text-rose-700">{errors.city}</p> : null}
+        {errors.city ? <p className="mt-1 text-xs text-rose-700">{errors.city.message}</p> : null}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Plate number</label>
         <input
           type="text"
-          value={form.plateNumber}
-          onChange={(event) => onChange("plateNumber", event.target.value)}
+          {...register("plateNumber")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         />
         {errors.plateNumber ? (
-          <p className="mt-1 text-xs text-rose-700">{errors.plateNumber}</p>
+          <p className="mt-1 text-xs text-rose-700">{errors.plateNumber.message}</p>
         ) : null}
       </div>
 
@@ -136,8 +126,7 @@ export function VehicleFormFields({
         <label className="mb-1 block text-sm font-semibold text-foreground">VIN (optional)</label>
         <input
           type="text"
-          value={form.vin}
-          onChange={(event) => onChange("vin", event.target.value)}
+          {...register("vin")}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2"
         />
       </div>

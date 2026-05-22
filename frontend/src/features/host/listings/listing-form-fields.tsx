@@ -1,10 +1,18 @@
-import type { HostListingFormErrors, HostListingFormState } from "@/features/host/forms";
+import type {
+  FieldErrors,
+  UseFormRegister,
+  UseFormSetValue,
+  UseFormWatch,
+} from "react-hook-form";
+
+import type { HostListingFormState } from "@/features/host/forms";
 import type { HostVehicleViewModel, HostListingViewModel } from "@/features/host/types";
 
 type ListingFormFieldsProps = {
-  form: HostListingFormState;
-  errors: HostListingFormErrors;
-  onChange: <K extends keyof HostListingFormState>(field: K, value: HostListingFormState[K]) => void;
+  register: UseFormRegister<HostListingFormState>;
+  errors: FieldErrors<HostListingFormState>;
+  setValue: UseFormSetValue<HostListingFormState>;
+  watch: UseFormWatch<HostListingFormState>;
   vehicleOptions: HostVehicleViewModel[];
   disableVehicleSelect?: boolean;
   readOnly?: boolean;
@@ -12,9 +20,10 @@ type ListingFormFieldsProps = {
 };
 
 export function ListingFormFields({
-  form,
+  register,
   errors,
-  onChange,
+  setValue,
+  watch,
   vehicleOptions,
   disableVehicleSelect = false,
   readOnly = false,
@@ -33,8 +42,7 @@ export function ListingFormFields({
           </div>
         ) : (
           <select
-            value={form.vehicleId}
-            onChange={(event) => onChange("vehicleId", event.target.value)}
+            {...register("vehicleId")}
             disabled={readOnly}
             className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
           >
@@ -46,32 +54,30 @@ export function ListingFormFields({
             ))}
           </select>
         )}
-        {errors.vehicleId ? <p className="mt-1 text-xs text-rose-700">{errors.vehicleId}</p> : null}
+        {errors.vehicleId ? <p className="mt-1 text-xs text-rose-700">{errors.vehicleId.message}</p> : null}
       </div>
 
       <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-semibold text-foreground">Title</label>
         <input
           type="text"
-          value={form.title}
+          {...register("title")}
           disabled={readOnly}
-          onChange={(event) => onChange("title", event.target.value)}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
         />
-        {errors.title ? <p className="mt-1 text-xs text-rose-700">{errors.title}</p> : null}
+        {errors.title ? <p className="mt-1 text-xs text-rose-700">{errors.title.message}</p> : null}
       </div>
 
       <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-semibold text-foreground">Description</label>
         <textarea
-          value={form.description}
+          {...register("description")}
           disabled={readOnly}
-          onChange={(event) => onChange("description", event.target.value)}
           rows={4}
           className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
         />
         {errors.description ? (
-          <p className="mt-1 text-xs text-rose-700">{errors.description}</p>
+          <p className="mt-1 text-xs text-rose-700">{errors.description.message}</p>
         ) : null}
       </div>
 
@@ -79,37 +85,34 @@ export function ListingFormFields({
         <label className="mb-1 block text-sm font-semibold text-foreground">City</label>
         <input
           type="text"
-          value={form.city}
+          {...register("city")}
           disabled={readOnly}
-          onChange={(event) => onChange("city", event.target.value)}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
         />
-        {errors.city ? <p className="mt-1 text-xs text-rose-700">{errors.city}</p> : null}
+        {errors.city ? <p className="mt-1 text-xs text-rose-700">{errors.city.message}</p> : null}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Address</label>
         <input
           type="text"
-          value={form.address}
+          {...register("address")}
           disabled={readOnly}
-          onChange={(event) => onChange("address", event.target.value)}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
         />
-        {errors.address ? <p className="mt-1 text-xs text-rose-700">{errors.address}</p> : null}
+        {errors.address ? <p className="mt-1 text-xs text-rose-700">{errors.address.message}</p> : null}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Base price/day (VND)</label>
         <input
           type="number"
-          value={form.basePricePerDay}
+          {...register("basePricePerDay")}
           disabled={readOnly}
-          onChange={(event) => onChange("basePricePerDay", event.target.value)}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
         />
         {errors.basePricePerDay ? (
-          <p className="mt-1 text-xs text-rose-700">{errors.basePricePerDay}</p>
+          <p className="mt-1 text-xs text-rose-700">{errors.basePricePerDay.message}</p>
         ) : null}
       </div>
 
@@ -117,24 +120,20 @@ export function ListingFormFields({
         <label className="mb-1 block text-sm font-semibold text-foreground">Daily km limit</label>
         <input
           type="number"
-          value={form.dailyKmLimit}
+          {...register("dailyKmLimit")}
           disabled={readOnly}
-          onChange={(event) => onChange("dailyKmLimit", event.target.value)}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
         />
         {errors.dailyKmLimit ? (
-          <p className="mt-1 text-xs text-rose-700">{errors.dailyKmLimit}</p>
+          <p className="mt-1 text-xs text-rose-700">{errors.dailyKmLimit.message}</p>
         ) : null}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Cancellation policy</label>
         <select
-          value={form.cancellationPolicy}
+          {...register("cancellationPolicy")}
           disabled={readOnly}
-          onChange={(event) =>
-            onChange("cancellationPolicy", event.target.value as HostListingFormState["cancellationPolicy"])
-          }
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
         >
           <option value="FLEXIBLE">FLEXIBLE</option>
@@ -146,9 +145,9 @@ export function ListingFormFields({
       <div>
         <label className="mb-1 block text-sm font-semibold text-foreground">Instant book</label>
         <select
-          value={form.instantBook ? "YES" : "NO"}
+          value={watch("instantBook") ? "YES" : "NO"}
           disabled={readOnly}
-          onChange={(event) => onChange("instantBook", event.target.value === "YES")}
+          onChange={(event) => setValue("instantBook", event.target.value === "YES", { shouldDirty: true })}
           className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
         >
           <option value="NO">No</option>

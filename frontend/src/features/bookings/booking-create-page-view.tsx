@@ -1,20 +1,19 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { createBooking, type CreateBookingInput } from "@/features/bookings/api";
-import { getTodayIsoDate, validateBookingForm } from "@/features/bookings/date-utils";
-import type {
-  BookingCreateFormErrors,
-  BookingCreateFormState,
-} from "@/features/bookings/types";
+import { getTodayIsoDate } from "@/features/bookings/date-utils";
+import { bookingCreateSchema, type BookingCreateFormState } from "@/features/bookings/forms";
 import { getListingDetailById } from "@/features/listings/api";
 import { ApiError } from "@/lib/api-error";
 import { handleApiError } from "@/lib/handle-api-error";
@@ -33,21 +32,26 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
     queryFn: () => getListingDetailById(listingId),
   });
   const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
-  const [form, setForm] = useState<BookingCreateFormState>({
-    pickupDate: "",
-    returnDate: "",
-    pickupLocation: "",
-    returnLocation: "",
-    selectedExtraIds: [],
+  const form = useForm<BookingCreateFormState>({
+    resolver: zodResolver(bookingCreateSchema),
+    defaultValues: {
+      pickupDate: "",
+      returnDate: "",
+      pickupLocation: "",
+      returnLocation: "",
+      selectedExtraIds: [],
+    },
   });
-  const [errors, setErrors] = useState<BookingCreateFormErrors>({});
   const [overlap, setOverlap] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
+  const selectedExtraIds = form.watch("selectedExtraIds");
+  const pickupDate = form.watch("pickupDate");
+  const errors = form.formState.errors;
 
   const selectedExtras = useMemo(() => {
     if (!listing) return [];
-    return listing.extras.filter((extra) => form.selectedExtraIds.includes(extra.id));
-  }, [form.selectedExtraIds, listing]);
+    return listing.extras.filter((extra) => selectedExtraIds.includes(extra.id));
+  }, [listing, selectedExtraIds]);
 
   const createMutation = useMutation({
     mutationFn: (input: CreateBookingInput) => createBooking(input, idempotencyKeyRef.current),
@@ -62,10 +66,9 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
           BOOKING_OVERLAP_CUSTOMER: (e) =>
             setOverlap(e.message || "Bạn đã có booking trùng thời gian."),
           LISTING_NOT_AVAILABLE: (e) =>
-            setErrors((prev) => ({
-              ...prev,
-              form: e.message || "Xe không khả dụng cho ngày đã chọn.",
-            })),
+            form.setError("root", {
+              message: e.message || "Xe không khả dụng cho ngày đã chọn.",
+            }),
           IDEMPOTENCY_KEY_CONFLICT: () => {
             idempotencyKeyRef.current = newIdempotencyKey();
             toast.error("Yêu cầu đã thay đổi, vui lòng submit lại");
@@ -78,7 +81,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
             field === "pickupLocation" ||
             field === "returnLocation"
           ) {
-            setErrors((prev) => ({ ...prev, [field]: message }));
+            form.setError(field, { message });
           }
         },
         onUnknown: (e) => setSubmitError(e),
@@ -100,36 +103,16 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
   }
   const listingData = listing;
 
-  function updateField(
-    field: Exclude<keyof BookingCreateFormState, "selectedExtraIds">,
-    value: string,
-  ) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined, form: undefined }));
-    setOverlap(null);
-    setSubmitError(null);
-  }
-
   function toggleExtra(extraId: string) {
-    setForm((prev) => {
-      if (prev.selectedExtraIds.includes(extraId)) {
-        return { ...prev, selectedExtraIds: prev.selectedExtraIds.filter((id) => id !== extraId) };
-      }
-      return { ...prev, selectedExtraIds: [...prev.selectedExtraIds, extraId] };
-    });
+    const next = selectedExtraIds.includes(extraId)
+      ? selectedExtraIds.filter((id) => id !== extraId)
+      : [...selectedExtraIds, extraId];
+    form.setValue("selectedExtraIds", next, { shouldDirty: true });
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  function handleSubmit(values: BookingCreateFormState) {
     if (isGuest) {
-      setErrors({ form: "Bạn cần đăng nhập trước khi tạo booking." });
-      return;
-    }
-
-    const nextErrors = validateBookingForm(form);
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) {
+      form.setError("root", { message: "Bạn cần đăng nhập trước khi tạo booking." });
       return;
     }
 
@@ -137,11 +120,11 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
     setSubmitError(null);
     createMutation.mutate({
       listingId: listingData.id,
-      pickupDate: form.pickupDate,
-      returnDate: form.returnDate,
-      pickupLocation: form.pickupLocation || undefined,
-      returnLocation: form.returnLocation || undefined,
-      selectedExtraIds: form.selectedExtraIds,
+      pickupDate: values.pickupDate,
+      returnDate: values.returnDate,
+      pickupLocation: values.pickupLocation || undefined,
+      returnLocation: values.returnLocation || undefined,
+      selectedExtraIds: values.selectedExtraIds,
     });
   }
 
@@ -188,32 +171,40 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
             Giá cơ bản: {listingData.basePricePerDay.toLocaleString("en-US")} {listingData.currency} / ngày
           </p>
 
-          <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} noValidate className="mt-4 space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-foreground">Ngày nhận</label>
                 <input
                   type="date"
-                  value={form.pickupDate}
+                  {...form.register("pickupDate", {
+                    onChange: () => {
+                      setOverlap(null);
+                      setSubmitError(null);
+                    },
+                  })}
                   min={getTodayIsoDate()}
-                  onChange={(event) => updateField("pickupDate", event.target.value)}
                   className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                 />
                 {errors.pickupDate ? (
-                  <p className="mt-1 text-xs text-rose-700">{errors.pickupDate}</p>
+                  <p className="mt-1 text-xs text-rose-700">{errors.pickupDate.message}</p>
                 ) : null}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-foreground">Ngày trả</label>
                 <input
                   type="date"
-                  value={form.returnDate}
-                  min={form.pickupDate || getTodayIsoDate()}
-                  onChange={(event) => updateField("returnDate", event.target.value)}
+                  {...form.register("returnDate", {
+                    onChange: () => {
+                      setOverlap(null);
+                      setSubmitError(null);
+                    },
+                  })}
+                  min={pickupDate || getTodayIsoDate()}
                   className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                 />
                 {errors.returnDate ? (
-                  <p className="mt-1 text-xs text-rose-700">{errors.returnDate}</p>
+                  <p className="mt-1 text-xs text-rose-700">{errors.returnDate.message}</p>
                 ) : null}
               </div>
             </div>
@@ -223,8 +214,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
                 <label className="mb-1 block text-sm font-semibold text-foreground">Địa điểm nhận</label>
                 <input
                   type="text"
-                  value={form.pickupLocation}
-                  onChange={(event) => updateField("pickupLocation", event.target.value)}
+                  {...form.register("pickupLocation")}
                   placeholder={listingData.address}
                   className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                 />
@@ -233,8 +223,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
                 <label className="mb-1 block text-sm font-semibold text-foreground">Địa điểm trả</label>
                 <input
                   type="text"
-                  value={form.returnLocation}
-                  onChange={(event) => updateField("returnLocation", event.target.value)}
+                  {...form.register("returnLocation")}
                   placeholder={listingData.address}
                   className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                 />
@@ -245,7 +234,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
               <p className="mb-2 text-sm font-semibold text-foreground">Dịch vụ thêm</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {listingData.extras.map((extra) => {
-                  const checked = form.selectedExtraIds.includes(extra.id);
+                  const checked = selectedExtraIds.includes(extra.id);
                   return (
                     <label
                       key={extra.id}
@@ -275,9 +264,9 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
               </p>
             ) : null}
 
-            {errors.form ? (
+            {errors.root ? (
               <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-                {errors.form}
+                {errors.root.message}
               </p>
             ) : null}
 

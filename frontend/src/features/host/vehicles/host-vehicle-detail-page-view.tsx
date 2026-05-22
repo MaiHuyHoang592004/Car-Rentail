@@ -1,17 +1,19 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { StatusBadge } from "@/components/rentflow/status-badge";
-import type { VehicleFormErrors, VehicleFormState } from "@/features/host/forms";
+import { vehicleFormSchema, type VehicleFormState } from "@/features/host/forms";
 import { HostActionDialog } from "@/features/host/components/host-action-dialog";
 import { VehicleFormFields } from "@/features/host/vehicles/vehicle-form-fields";
-import { buildVehicleFormFromViewModel, validateVehicleForm } from "@/features/host/vehicles/vehicle-form-utils";
+import { buildVehicleFormFromViewModel } from "@/features/host/vehicles/vehicle-form-utils";
 import { archiveHostVehicle, getHostVehicleById, updateHostVehicle } from "@/features/host/vehicles/api";
 
 type HostVehicleDetailPageViewProps = {
@@ -27,12 +29,17 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
     enabled: true,
   });
 
-  const [form, setForm] = useState<VehicleFormState | null>(
-    vehicle ? buildVehicleFormFromViewModel(vehicle) : null,
-  );
-  const [errors, setErrors] = useState<VehicleFormErrors>({});
+  const form = useForm<VehicleFormState>({
+    resolver: zodResolver(vehicleFormSchema),
+  });
   const [archiveOpen, setArchiveOpen] = useState<boolean>(false);
   const [banner, setBanner] = useState<string>("");
+
+  useEffect(() => {
+    if (vehicle) {
+      form.reset(buildVehicleFormFromViewModel(vehicle));
+    }
+  }, [form, vehicle]);
 
   const { mutate: saveVehicle, isPending: saving } = useMutation({
     mutationFn: (body: Parameters<typeof updateHostVehicle>[1]) =>
@@ -69,7 +76,7 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
     );
   }
 
-  if (!vehicle || !form) {
+  if (!vehicle) {
     return (
       <AppShell activePath="/host/vehicles">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
@@ -88,36 +95,18 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
     );
   }
 
-  function updateField<K extends keyof VehicleFormState>(field: K, value: VehicleFormState[K]) {
-    setForm((prev) => (prev ? { ...prev, [field]: value } : prev));
-    setErrors((prev) => ({ ...prev, [field]: undefined, form: undefined }));
+  function handleSave(values: VehicleFormState) {
     setBanner("");
-  }
-
-  function handleSave(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const currentForm = form;
-    if (!currentForm) {
-      return;
-    }
-    const nextErrors = validateVehicleForm(currentForm);
-    setErrors(nextErrors);
-    setBanner("");
-
-    if (Object.keys(nextErrors).length > 0) {
-      return;
-    }
-
     saveVehicle({
-      category: currentForm.category.trim(),
-      make: currentForm.make.trim(),
-      model: currentForm.model.trim(),
-      year: Number(currentForm.year),
-      transmission: currentForm.transmission,
-      fuelType: currentForm.fuelType.trim(),
-      seats: Number(currentForm.seats),
-      status: currentForm.status,
-      city: currentForm.city.trim(),
+      category: values.category.trim(),
+      make: values.make.trim(),
+      model: values.model.trim(),
+      year: Number(values.year),
+      transmission: values.transmission,
+      fuelType: values.fuelType.trim(),
+      seats: Number(values.seats),
+      status: values.status,
+      city: values.city.trim(),
     });
   }
 
@@ -157,8 +146,8 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
             <StatusBadge status={vehicle.status} />
           </div>
 
-          <form onSubmit={handleSave} noValidate className="space-y-4">
-            <VehicleFormFields form={form} errors={errors} onChange={updateField} />
+          <form onSubmit={form.handleSubmit(handleSave)} noValidate className="space-y-4">
+            <VehicleFormFields register={form.register} errors={form.formState.errors} />
 
             <div className="flex flex-wrap gap-2">
               <button

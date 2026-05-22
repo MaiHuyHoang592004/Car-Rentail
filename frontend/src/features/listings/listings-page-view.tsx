@@ -1,7 +1,9 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 
 import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
 import { AppShell } from "@/components/rentflow/app-shell";
@@ -10,13 +12,19 @@ import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { DEFAULT_LISTING_FILTERS, searchListings } from "@/features/listings/api";
 import { ListingFiltersPanel } from "@/features/listings/listing-filters-panel";
 import { ListingGrid } from "@/features/listings/listing-grid";
+import { listingFilterSchema } from "@/features/listings/forms";
 import type { ListingFilterState } from "@/features/listings/types";
 import { ApiError } from "@/lib/api-error";
 
 const PAGE_SIZE = 20;
 
 export function ListingsPageView() {
-  const [filters, setFilters] = useState<ListingFilterState>(DEFAULT_LISTING_FILTERS);
+  const filterForm = useForm<ListingFilterState>({
+    resolver: zodResolver(listingFilterSchema),
+    defaultValues: DEFAULT_LISTING_FILTERS,
+    mode: "onChange",
+  });
+  const filters = useWatch({ control: filterForm.control }) as ListingFilterState;
   const [page, setPage] = useState(0);
   const dateRangeInvalid =
     Boolean(filters.pickupDate) &&
@@ -30,13 +38,13 @@ export function ListingsPageView() {
     placeholderData: keepPreviousData,
   });
 
-  function handleFiltersChange(next: ListingFilterState) {
-    setFilters(next);
-    setPage(0);
-  }
+  useEffect(() => {
+    const subscription = filterForm.watch(() => setPage(0));
+    return () => subscription.unsubscribe();
+  }, [filterForm]);
 
   function handleReset() {
-    setFilters(DEFAULT_LISTING_FILTERS);
+    filterForm.reset(DEFAULT_LISTING_FILTERS);
     setPage(0);
   }
 
@@ -52,8 +60,7 @@ export function ListingsPageView() {
         />
 
         <ListingFiltersPanel
-          value={filters}
-          onChange={handleFiltersChange}
+          form={filterForm}
           onReset={handleReset}
         />
 

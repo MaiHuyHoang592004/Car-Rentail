@@ -1,3 +1,5 @@
+import type { BookingLocationPatchFormState } from "@/features/bookings/forms";
+
 export type BookingStatus =
   | "HELD"
   | "PENDING_HOST_APPROVAL"
@@ -12,14 +14,6 @@ export type BookingListFilterValue = "ALL" | BookingStatus;
 
 export type BookingListFilterState = {
   status: BookingListFilterValue;
-};
-
-export type BookingCreateFormState = {
-  pickupDate: string;
-  returnDate: string;
-  pickupLocation: string;
-  returnLocation: string;
-  selectedExtraIds: string[];
 };
 
 export type BookingCreateFormErrors = Partial<
@@ -73,13 +67,4 @@ export type BookingDetailViewModel = BookingSummaryViewModel & {
   policySnapshot: BookingPolicySnapshot;
 };
 
-export type BookingLocationPatchFormState = {
-  pickupLocation: string;
-  returnLocation: string;
-};
-
 export type BookingLocationPatchPayload = Partial<BookingLocationPatchFormState>;
-
-export type CancelBookingFormState = {
-  reason: string;
-};

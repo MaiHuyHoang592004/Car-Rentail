@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
-import type { VehicleFormErrors, VehicleFormState } from "@/features/host/forms";
+import { vehicleFormSchema, type VehicleFormState } from "@/features/host/forms";
 import { VehicleFormFields } from "@/features/host/vehicles/vehicle-form-fields";
-import { validateVehicleForm } from "@/features/host/vehicles/vehicle-form-utils";
 
 const INITIAL_FORM: VehicleFormState = {
   category: "",
@@ -24,30 +25,18 @@ const INITIAL_FORM: VehicleFormState = {
 };
 
 export function HostVehicleCreatePageView() {
-  const [form, setForm] = useState<VehicleFormState>(INITIAL_FORM);
-  const [errors, setErrors] = useState<VehicleFormErrors>({});
+  const form = useForm<VehicleFormState>({
+    resolver: zodResolver(vehicleFormSchema),
+    defaultValues: INITIAL_FORM,
+  });
   const [successMessage, setSuccessMessage] = useState<string>("");
 
-  function updateField<K extends keyof VehicleFormState>(field: K, value: VehicleFormState[K]) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined, form: undefined }));
+  function handleSubmit(values: VehicleFormState) {
     setSuccessMessage("");
-  }
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const nextErrors = validateVehicleForm(form);
-    setErrors(nextErrors);
-    setSuccessMessage("");
-
-    if (Object.keys(nextErrors).length > 0) {
-      return;
-    }
-
     setSuccessMessage(
-      `Đã tạo xe (chế độ tĩnh): ${form.make} ${form.model} (${form.year}) trạng thái ${form.status}.`,
+      `Đã tạo xe (chế độ tĩnh): ${values.make} ${values.model} (${values.year}) trạng thái ${values.status}.`,
     );
-    setForm(INITIAL_FORM);
+    form.reset(INITIAL_FORM);
   }
 
   return (
@@ -73,8 +62,8 @@ export function HostVehicleCreatePageView() {
         ) : null}
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            <VehicleFormFields form={form} errors={errors} onChange={updateField} />
+          <form onSubmit={form.handleSubmit(handleSubmit)} noValidate className="space-y-4">
+            <VehicleFormFields register={form.register} errors={form.formState.errors} />
             <div className="flex flex-wrap gap-2">
               <button
                 type="submit"
@@ -85,8 +74,7 @@ export function HostVehicleCreatePageView() {
               <button
                 type="button"
                 onClick={() => {
-                  setForm(INITIAL_FORM);
-                  setErrors({});
+                  form.reset(INITIAL_FORM);
                   setSuccessMessage("");
                 }}
                 className="rounded-full border border-border bg-background px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-accent"

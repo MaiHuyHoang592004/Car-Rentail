@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-23
 >
-> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I27`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I41`, `I42`, `I43`, `I44`, `I46`, `I47`.
+> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I27`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I40`, `I41`, `I42`, `I43`, `I44`, `I46`, `I47`.
 
 ---
 
@@ -249,7 +249,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** Auth=VN, listings/host=EN | **Effort:** S | **Fix:** Translated listings/host/profile/admin scaffold copy to Vietnamese; currency formatter switched to vi-VN. No i18n framework added (deferred to N04).
 
 ## I40 — Form Handling 3 Patterns
-**Status:** Confirmed | **Evidence:** Auth=Zod+RHF, host/booking=useState+manual, filter=no schema | **Effort:** L | **Fix:** Standardize Zod+RHF.
+**Status:** Done | **Evidence:** Auth=Zod+RHF, host/booking=useState+manual, filter=no schema | **Effort:** L | **Fix:** Standardized host vehicle/listing forms, booking create/dialog forms, and public listing filters on Zod + React Hook Form schemas.
 
 ## I41 — Error Handling Per-Page
 **Status:** Done | **Evidence:** `booking-create-page-view.tsx` if-else chain by error code | **Effort:** M | **Fix:** Added `lib/handle-api-error.ts` dispatcher: `onCode` map for specific codes, `onFieldError` per-detail for VALIDATION_ERROR, `onUnknown` + `onNetwork` fallbacks. Refactored `booking-create-page-view.tsx` and `login-page-view.tsx` to use it. Pattern can be adopted incrementally by remaining pages (host/availability flows kept inline for now).

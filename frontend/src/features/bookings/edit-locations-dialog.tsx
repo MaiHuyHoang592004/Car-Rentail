@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
 
-import type {
-  BookingLocationPatchFormState,
-  BookingLocationPatchPayload,
-} from "@/features/bookings/types";
+import {
+  bookingLocationPatchSchema,
+  type BookingLocationPatchFormState,
+} from "@/features/bookings/forms";
+import type { BookingLocationPatchPayload } from "@/features/bookings/types";
 
 type EditLocationsDialogProps = {
   open: boolean;
@@ -20,22 +23,24 @@ export function EditLocationsDialog({
   onClose,
   onConfirm,
 }: EditLocationsDialogProps) {
-  const [form, setForm] = useState<BookingLocationPatchFormState>(initialValue);
-  const [error, setError] = useState<string>("");
+  const form = useForm<BookingLocationPatchFormState>({
+    resolver: zodResolver(bookingLocationPatchSchema),
+    defaultValues: initialValue,
+  });
+
+  useEffect(() => {
+    if (open) {
+      form.reset(initialValue);
+    }
+  }, [form, initialValue, open]);
 
   if (!open) {
     return null;
   }
 
-  function handleConfirm() {
-    const pickupLocation = form.pickupLocation.trim();
-    const returnLocation = form.returnLocation.trim();
-
-    if (!pickupLocation && !returnLocation) {
-      setError("Provide at least one location.");
-      return;
-    }
-
+  function handleConfirm(values: BookingLocationPatchFormState) {
+    const pickupLocation = values.pickupLocation.trim();
+    const returnLocation = values.returnLocation.trim();
     onConfirm({
       ...(pickupLocation ? { pickupLocation } : {}),
       ...(returnLocation ? { returnLocation } : {}),
@@ -55,16 +60,12 @@ export function EditLocationsDialog({
           Update pickup and return locations for the current booking.
         </p>
 
-        <div className="mt-4 space-y-3">
+        <form onSubmit={form.handleSubmit(handleConfirm)} className="mt-4 space-y-3">
           <div>
             <label className="mb-1 block text-sm font-semibold text-foreground">Pickup location</label>
             <input
               type="text"
-              value={form.pickupLocation}
-              onChange={(event) => {
-                setForm((prev) => ({ ...prev, pickupLocation: event.target.value }));
-                setError("");
-              }}
+              {...form.register("pickupLocation")}
               className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
             />
           </div>
@@ -73,38 +74,32 @@ export function EditLocationsDialog({
             <label className="mb-1 block text-sm font-semibold text-foreground">Return location</label>
             <input
               type="text"
-              value={form.returnLocation}
-              onChange={(event) => {
-                setForm((prev) => ({ ...prev, returnLocation: event.target.value }));
-                setError("");
-              }}
+              {...form.register("returnLocation")}
               className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
             />
           </div>
-        </div>
+          {form.formState.errors.root ? (
+            <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              {form.formState.errors.root.message}
+            </p>
+          ) : null}
 
-        {error ? (
-          <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
-          >
-            Close
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            Save locations
-          </button>
-        </div>
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+            >
+              Close
+            </button>
+            <button
+              type="submit"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Save locations
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

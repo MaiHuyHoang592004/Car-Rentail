@@ -1,23 +1,13 @@
+import type { UseFormReturn } from "react-hook-form";
+
 import type { ListingFilterState } from "@/features/listings/types";
 
 type ListingFiltersPanelProps = {
-  value: ListingFilterState;
-  onChange: (next: ListingFilterState) => void;
+  form: UseFormReturn<ListingFilterState>;
   onReset: () => void;
 };
 
-type InputKey = keyof ListingFilterState;
-
-function updateValue(
-  current: ListingFilterState,
-  key: InputKey,
-  value: string,
-  onChange: (next: ListingFilterState) => void,
-) {
-  onChange({ ...current, [key]: value });
-}
-
-export function ListingFiltersPanel({ value, onChange, onReset }: ListingFiltersPanelProps) {
+export function ListingFiltersPanel({ form, onReset }: ListingFiltersPanelProps) {
   return (
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -35,28 +25,24 @@ export function ListingFiltersPanel({ value, onChange, onReset }: ListingFilters
         <input
           type="text"
           placeholder="Thành phố"
-          value={value.city}
-          onChange={(event) => updateValue(value, "city", event.target.value, onChange)}
+          {...form.register("city")}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
         />
 
         <input
           type="date"
-          value={value.pickupDate}
-          onChange={(event) => updateValue(value, "pickupDate", event.target.value, onChange)}
+          {...form.register("pickupDate")}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
         />
 
         <input
           type="date"
-          value={value.returnDate}
-          onChange={(event) => updateValue(value, "returnDate", event.target.value, onChange)}
+          {...form.register("returnDate")}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
         />
 
         <select
-          value={value.category}
-          onChange={(event) => updateValue(value, "category", event.target.value, onChange)}
+          {...form.register("category")}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
         >
           <option value="ALL">Tất cả phân loại</option>
@@ -66,8 +52,7 @@ export function ListingFiltersPanel({ value, onChange, onReset }: ListingFilters
         </select>
 
         <select
-          value={value.transmission}
-          onChange={(event) => updateValue(value, "transmission", event.target.value, onChange)}
+          {...form.register("transmission")}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
         >
           <option value="ALL">Mọi hộp số</option>
@@ -76,8 +61,7 @@ export function ListingFiltersPanel({ value, onChange, onReset }: ListingFilters
         </select>
 
         <select
-          value={value.fuelType}
-          onChange={(event) => updateValue(value, "fuelType", event.target.value, onChange)}
+          {...form.register("fuelType")}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
         >
           <option value="ALL">Mọi loại nhiên liệu</option>
@@ -90,8 +74,7 @@ export function ListingFiltersPanel({ value, onChange, onReset }: ListingFilters
           type="number"
           min={1}
           placeholder="Số chỗ"
-          value={value.seats}
-          onChange={(event) => updateValue(value, "seats", event.target.value, onChange)}
+          {...form.register("seats")}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
         />
 
@@ -99,8 +82,7 @@ export function ListingFiltersPanel({ value, onChange, onReset }: ListingFilters
           type="number"
           min={0}
           placeholder="Giá tối thiểu (VND/ngày)"
-          value={value.minPrice}
-          onChange={(event) => updateValue(value, "minPrice", event.target.value, onChange)}
+          {...form.register("minPrice")}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
         />
 
@@ -108,8 +90,7 @@ export function ListingFiltersPanel({ value, onChange, onReset }: ListingFilters
           type="number"
           min={0}
           placeholder="Giá tối đa (VND/ngày)"
-          value={value.maxPrice}
-          onChange={(event) => updateValue(value, "maxPrice", event.target.value, onChange)}
+          {...form.register("maxPrice")}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
         />
       </div>

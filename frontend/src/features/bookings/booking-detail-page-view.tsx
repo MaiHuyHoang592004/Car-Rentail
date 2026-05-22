@@ -17,14 +17,12 @@ import {
 import { BookingStatusBadge } from "@/features/bookings/booking-status-badge";
 import { CancelBookingDialog } from "@/features/bookings/cancel-booking-dialog";
 import { EditLocationsDialog } from "@/features/bookings/edit-locations-dialog";
+import type { CancelBookingFormState } from "@/features/bookings/forms";
 import { HoldCountdown } from "@/features/bookings/hold-countdown";
 import { LocationSummary } from "@/features/bookings/location-summary";
 import { PolicySnapshotPanel } from "@/features/bookings/policy-snapshot-panel";
 import { PriceSnapshotPanel } from "@/features/bookings/price-snapshot-panel";
-import type {
-  BookingStatus,
-  CancelBookingFormState,
-} from "@/features/bookings/types";
+import type { BookingStatus } from "@/features/bookings/types";
 import { ApiError } from "@/lib/api-error";
 import { newIdempotencyKey } from "@/lib/idempotency";
 

@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { StatusBadge } from "@/components/rentflow/status-badge";
-import type { HostListingFormErrors, HostListingFormState } from "@/features/host/forms";
+import { listingFormSchema, type HostListingFormState } from "@/features/host/forms";
 import { HostActionDialog } from "@/features/host/components/host-action-dialog";
 import { ListingFormFields } from "@/features/host/listings/listing-form-fields";
-import { validateListingForm } from "@/features/host/listings/listing-form-utils";
 import {
   archiveListingSafe,
   getHostListingById,
@@ -51,17 +52,17 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
     retry: false,
   });
 
-  const [form, setForm] = useState<HostListingFormState | null>(null);
-  const [errors, setErrors] = useState<HostListingFormErrors>({});
+  const form = useForm<HostListingFormState>({
+    resolver: zodResolver(listingFormSchema),
+  });
   const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [reactivateOpen, setReactivateOpen] = useState(false);
 
-  // Populate form once listing is fetched
-  const formState = useMemo(() => {
-    if (form) return form;
-    if (!listing) return null;
-    return buildFormFromListing(listing);
+  useEffect(() => {
+    if (listing) {
+      form.reset(buildFormFromListing(listing));
+    }
   }, [form, listing]);
 
   const submitMutation = useMutation({
@@ -111,7 +112,7 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
     );
   }
 
-  if (isError || !listing || !formState) {
+  if (isError || !listing) {
     return (
       <AppShell activePath="/host/listings">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
@@ -136,33 +137,11 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
   const canArchive = ["DRAFT", "PENDING_APPROVAL", "ACTIVE", "SUSPENDED"].includes(currentListing.status);
   const canReactivate = currentListing.status === "ARCHIVED";
 
-  function updateField<K extends keyof HostListingFormState>(
-    field: K,
-    value: HostListingFormState[K],
-  ) {
-    setForm((prev) => (prev ? { ...prev, [field]: value } : { ...buildFormFromListing(currentListing), [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined, form: undefined }));
+  function handleSave() {
+    if (!canEdit) {
+      return;
+    }
     setBanner(null);
-  }
-
-  function handleSave(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canEdit || !formState) {
-      return;
-    }
-
-    const currentForm = formState;
-    if (!currentForm) {
-      return;
-    }
-
-    const nextErrors = validateListingForm(currentForm);
-    setErrors(nextErrors);
-    setBanner(null);
-    if (Object.keys(nextErrors).length > 0) {
-      return;
-    }
-
     setBanner({ type: "success", message: "Save is read-only in this implementation. Use the API to update listings." });
   }
 
@@ -242,11 +221,12 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
             </div>
           </div>
 
-          <form onSubmit={handleSave} noValidate className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSave)} noValidate className="space-y-4">
             <ListingFormFields
-              form={formState}
-              errors={errors}
-              onChange={updateField}
+              register={form.register}
+              errors={form.formState.errors}
+              setValue={form.setValue}
+              watch={form.watch}
               vehicleOptions={[]}
               disableVehicleSelect
               readOnly={!canEdit}
