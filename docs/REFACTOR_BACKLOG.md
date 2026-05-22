@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I01`, `I02`, `I04`, `I05-I12`, `I15`, `I18`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
+> Completed: `C01-C07`, `I01-I12`, `I15`, `I18`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
 
 ---
 
@@ -156,7 +156,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** `GlobalExceptionHandler.java` handlers riêng cho Vehicle/Listing/BookingNotFoundException — duplicate ResourceNotFoundException | **Effort:** M | **Fix:** Collapse thành 1 generic handler.
 
 ## I03 — DataIntegrity String Matching
-**Status:** Confirmed | **Evidence:** `GlobalExceptionHandler.java`: `message.contains("uq_listings_one_active_per_vehicle")` | **Effort:** S | **Fix:** SQLState/constraint check. **Depends:** I02.
+**Status:** Done | **Evidence:** `GlobalExceptionHandler.java`: `message.contains("uq_listings_one_active_per_vehicle")` | **Effort:** S | **Fix:** Walk cause chain to Hibernate `ConstraintViolationException.getConstraintName()` and switch on the typed constraint name. **Depends:** I02.
 
 ## I04 — IdempotencyException Magic String Status
 **Status:** Done | **Evidence:** `GlobalExceptionHandler.java`: string compare code → HTTP status | **Effort:** M | **Fix:** `IdempotencyException` now abstract with typed subclasses (`IdempotencyKeyRequiredException`→400, `IdempotencyKeyConflictException`→409, `IdempotencyAlreadyProcessingException`→409); handler uses `ex.getStatus()`.

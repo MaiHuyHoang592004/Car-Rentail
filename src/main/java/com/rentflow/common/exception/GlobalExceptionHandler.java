@@ -182,22 +182,37 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
             DataIntegrityViolationException ex, HttpServletRequest request) {
         String cid = correlationIdHelper.getCorrelationId();
-        String message = ex.getMessage() != null ? ex.getMessage() : "";
-        if (message.contains("uq_listings_one_active_per_vehicle")) {
+        String constraint = extractConstraintName(ex);
+
+        if ("uq_listings_one_active_per_vehicle".equals(constraint)) {
             log.warn("Data integrity violation [{}]: one active listing per vehicle", cid);
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(ErrorResponse.of("ONE_ACTIVE_LISTING_PER_VEHICLE",
                             "Vehicle already has an active listing", cid));
         }
-        if (message.contains("uq_driver_verification_active")) {
+        if ("uq_driver_verification_active".equals(constraint)) {
             log.warn("Data integrity violation [{}]: duplicate driver verification", cid);
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(ErrorResponse.of("ALREADY_SUBMITTED", "Verification already submitted", cid));
         }
-        log.error("Data integrity violation [{}]: {}", cid, ex.getMessage(), ex);
+        log.error("Data integrity violation [{}] constraint={}: {}", cid, constraint, ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ErrorResponse.of("DATA_INTEGRITY_VIOLATION",
                         "Data integrity constraint was violated", cid));
+    }
+
+    private String extractConstraintName(DataIntegrityViolationException ex) {
+        Throwable cause = ex.getCause();
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException cve) {
+                String name = cve.getConstraintName();
+                if (name != null && !name.isBlank()) {
+                    return name.toLowerCase();
+                }
+            }
+            cause = cause.getCause();
+        }
+        return "";
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
