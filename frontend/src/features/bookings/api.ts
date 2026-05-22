@@ -201,17 +201,21 @@ export async function getBookingById(id: string): Promise<BookingDetailViewModel
   return mapBookingResponse(raw);
 }
 
-export async function listMyBookings(params: {
-  status: BookingListFilterValue;
-  page?: number;
-  size?: number;
-}): Promise<BookingPage> {
+export async function listMyBookings(
+  params: {
+    status: BookingListFilterValue;
+    page?: number;
+    size?: number;
+  },
+  signal?: AbortSignal,
+): Promise<BookingPage> {
   const search = new URLSearchParams();
   if (params.status !== "ALL") search.set("status", params.status);
   search.set("page", String(params.page ?? 0));
   search.set("size", String(params.size ?? 20));
   const raw = await api.get<RawPageResponse<RawSummaryResponse>>(
     `/bookings/me?${search.toString()}`,
+    { signal },
   );
   return {
     content: raw.content.map(mapSummaryResponse),

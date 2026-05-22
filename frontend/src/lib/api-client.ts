@@ -2,6 +2,11 @@ import { ApiError, type ApiErrorPayload } from "@/lib/api-error";
 
 const API_PREFIX = "/api/v1";
 
+/**
+ * Init options for apiFetch. Extends RequestInit so callers can pass `signal`
+ * for cancellation (forwarded to the underlying fetch); React Query queryFns
+ * receive an AbortSignal that should be threaded through here.
+ */
 export type ApiFetchInit = Omit<RequestInit, "body"> & {
   body?: unknown;
   idempotencyKey?: string;
@@ -63,6 +68,10 @@ export function createApiClient(): ApiClient {
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);
       }
+    }
+
+    if (init.signal?.aborted) {
+      throw ApiError.network("Request aborted");
     }
 
     let response: Response;

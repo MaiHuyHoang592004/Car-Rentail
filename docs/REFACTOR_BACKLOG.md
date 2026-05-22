@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-23
 >
-> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I30`, `I31`, `I32`, `I34`, `I36`, `I37`, `I38`, `I39`, `I43`.
+> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I42`, `I43`, `I44`, `I46`, `I47`.
 
 ---
 
@@ -234,7 +234,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** `api-client.ts` module-level mutable `let accessTokenGetter` | **Effort:** M | **Fix:** Added `createApiClient()` factory (isolated instances) and `resetApiClient()` for test isolation; default singleton preserved for back-compat.
 
 ## I35 — BFF vs Direct API Undocumented
-**Status:** Confirmed | **Evidence:** Auth via BFF, others via rewrite | **Effort:** XS | **Fix:** Document.
+**Status:** Done | **Evidence:** Auth via BFF, others via rewrite | **Effort:** XS | **Fix:** Added `docs/frontend/bff-architecture.md` describing 2 flows + criteria for adding new BFF endpoints.
 
 ## I36 — Middleware No Role Check
 **Status:** Done | **Evidence:** `middleware.ts` previously only checked `refreshCookie` presence | **Effort:** M | **Fix:** Added companion httpOnly cookie `rentflow_role` set by BFF login/register/session (cleared on logout + refresh/session error). Middleware now matches per-prefix role requirements (`/admin`→ADMIN, `/host`→HOST, `/bookings` & `/listings/:id/book` & `/me/bookings`→CUSTOMER, `/me`→any authed) and redirects to `/forbidden` on role mismatch. `parseRoles` + cookie names live in Edge-safe `src/lib/session-cookie-shared.ts`.
@@ -255,19 +255,19 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** `booking-create-page-view.tsx` if-else chain by error code | **Effort:** M | **Fix:** Central handler. **Depends:** I40.
 
 ## I42 — Date Timezone Risk
-**Status:** Suspected | **Evidence:** `Date.parse(\`${date}T00:00:00\`)` in booking-create | **Effort:** S | **Fix:** String compare or date-fns.
+**Status:** Done | **Evidence:** `Date.parse(\`${date}T00:00:00\`)` in booking-create | **Effort:** S | **Fix:** Extracted `validateBookingForm` to `bookings/date-utils.ts`; date ordering uses string compare (safe for `YYYY-MM-DD` format), rentalDays uses `Date.UTC(y, m-1, d)` math. Timezone-agnostic.
 
 ## I43 — Loading/Empty/Error Inconsistent
 **Status:** Done | **Evidence:** 3+ loading styles, 3+ error styles | **Effort:** M | **Fix:** Added `PageSkeleton`, `EmptyState`, `FormError` under `components/rentflow/*`; migrated 5 high-visibility pages. Remaining callsites can adopt incrementally.
 
 ## I44 — Pay Now Exposes Phase 6 Language
-**Status:** Suspected | **Evidence:** `PAY_NOW_TOOLTIP = "...Phase 6 (sắp ra mắt)"` | **Effort:** XS | **Fix:** Remove phase mention.
+**Status:** Done | **Evidence:** `PAY_NOW_TOOLTIP = "...Phase 6 (sắp ra mắt)"` | **Effort:** XS | **Fix:** Changed to "Thanh toán sẽ sớm có mặt."
 
 ## I46 — No AbortController
-**Status:** Confirmed | **Evidence:** `api-client.ts` no signal param | **Effort:** S | **Fix:** Add AbortSignal.
+**Status:** Done | **Evidence:** `api-client.ts` no signal param | **Effort:** S | **Fix:** `ApiFetchInit` already extends `RequestInit` (signal type-supported); added explicit JSDoc + early-abort guard in `executeFetch`; tests cover pre-abort + signal forwarding. Wired through `searchListings` and `listMyBookings` queryFns so React Query cancellation works.
 
 ## I47 — Mocks Global Instead of Feature-local
-**Status:** Confirmed | **Evidence:** `src/mocks/*.ts` imported across features | **Effort:** M | **Fix:** Move to `__mocks__/` or env adapter. **Depends:** C05, C06.
+**Status:** Done | **Evidence:** `src/mocks/*.ts` imported across features | **Effort:** M | **Fix:** Verified 2026-05-23 — `grep -rln '@/mocks' src/` returned no results. Cross-feature imports were eliminated as a side effect of C05/C06 (replacing mock data with real API integrations). **Depends:** C05, C06.
 
 ---
 

@@ -25,7 +25,7 @@ export function ListingsPageView() {
 
   const query = useQuery({
     queryKey: ["listings", "search", filters, page],
-    queryFn: () => searchListings(filters, page, PAGE_SIZE),
+    queryFn: ({ signal }) => searchListings(filters, page, PAGE_SIZE, signal),
     enabled: !dateRangeInvalid,
     placeholderData: keepPreviousData,
   });

@@ -40,7 +40,7 @@ const PAY_NOW_VISIBLE_STATUSES: BookingStatus[] = [
   "CONFIRMED",
 ];
 
-const PAY_NOW_TOOLTIP = "Thanh toán sẽ khả dụng ở Phase 6 (sắp ra mắt)";
+const PAY_NOW_TOOLTIP = "Thanh toán sẽ sớm có mặt.";
 
 const MAX_EXPIRE_RETRIES = 3;
 const EXPIRE_RETRY_DELAY_MS = 5000;

@@ -10,6 +10,7 @@ import { AppShell } from "@/components/rentflow/app-shell";
 import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { createBooking, type CreateBookingInput } from "@/features/bookings/api";
+import { getTodayIsoDate, validateBookingForm } from "@/features/bookings/date-utils";
 import type {
   BookingCreateFormErrors,
   BookingCreateFormState,
@@ -17,57 +18,6 @@ import type {
 import { getListingDetailById } from "@/features/listings/api";
 import { ApiError } from "@/lib/api-error";
 import { newIdempotencyKey } from "@/lib/idempotency";
-
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
-
-function getTodayIsoDate(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function validateBookingForm(form: BookingCreateFormState): BookingCreateFormErrors {
-  const errors: BookingCreateFormErrors = {};
-
-  if (!form.pickupDate) {
-    errors.pickupDate = "Vui lòng chọn ngày nhận xe.";
-  }
-
-  if (!form.returnDate) {
-    errors.returnDate = "Vui lòng chọn ngày trả xe.";
-  }
-
-  if (!form.pickupDate || !form.returnDate) {
-    return errors;
-  }
-
-  const pickupTime = Date.parse(`${form.pickupDate}T00:00:00`);
-  const returnTime = Date.parse(`${form.returnDate}T00:00:00`);
-  const todayTime = Date.parse(`${getTodayIsoDate()}T00:00:00`);
-
-  if (Number.isNaN(pickupTime) || Number.isNaN(returnTime)) {
-    errors.form = "Định dạng ngày không hợp lệ.";
-    return errors;
-  }
-
-  if (pickupTime < todayTime) {
-    errors.pickupDate = "Ngày nhận không thể ở quá khứ.";
-  }
-
-  if (returnTime <= pickupTime) {
-    errors.returnDate = "Ngày trả phải sau ngày nhận.";
-    return errors;
-  }
-
-  const rentalDays = (returnTime - pickupTime) / DAY_IN_MS;
-  if (rentalDays > 30) {
-    errors.returnDate = "Thời gian thuê tối đa 30 ngày.";
-  }
-
-  return errors;
-}
 
 type BookingCreatePageViewProps = {
   listingId: string;

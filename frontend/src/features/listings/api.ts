@@ -137,10 +137,12 @@ export async function searchListings(
   filters: ListingFilterState,
   page = 0,
   size = 20,
+  signal?: AbortSignal,
 ): Promise<ListingSearchPage> {
   const query = buildListingSearchQuery(filters, page, size);
   const raw = await api.get<RawPageResponse<RawListingSearchResponse>>(`/listings?${query}`, {
     skipAuth: true,
+    signal,
   });
   return {
     content: raw.content.map(mapListingSearchResponse),

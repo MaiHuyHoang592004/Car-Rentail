@@ -94,7 +94,7 @@ describe("BookingDetailPageView", () => {
     await screen.findByText("Toyota Vios 2022");
     const payButton = screen.getByRole("button", { name: "Pay now" });
     expect(payButton).toBeDisabled();
-    expect(payButton.getAttribute("title")).toContain("Phase 6");
+    expect(payButton.getAttribute("title")).toContain("Thanh toán sẽ sớm có mặt");
   });
 
   it("PATCH locations shows success toast and refetches", async () => {

@@ -19,7 +19,8 @@ export function BookingsListPageView() {
 
   const query = useQuery({
     queryKey: ["bookings", "me", statusFilter, page],
-    queryFn: () => listMyBookings({ status: statusFilter, page, size: PAGE_SIZE }),
+    queryFn: ({ signal }) =>
+      listMyBookings({ status: statusFilter, page, size: PAGE_SIZE }, signal),
     placeholderData: keepPreviousData,
   });
 

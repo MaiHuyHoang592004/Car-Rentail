@@ -166,4 +166,19 @@ describe("api-client", () => {
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect((init.headers as Headers).has("Authorization")).toBe(false);
   });
+
+  it("throws and skips fetch when signal is already aborted", async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    await expect(api.get("/x", { signal: ctrl.signal })).rejects.toBeInstanceOf(ApiError);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("forwards signal to fetch", async () => {
+    fetchSpy.mockResolvedValue(mockResponse(200, { ok: true }));
+    const ctrl = new AbortController();
+    await api.get("/x", { signal: ctrl.signal });
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBe(ctrl.signal);
+  });
 });
