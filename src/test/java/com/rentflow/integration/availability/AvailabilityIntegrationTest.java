@@ -181,15 +181,15 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("guest cannot access host availability view — returns 403")
-    void guestCannotAccessHostView_returns403() throws Exception {
+    @DisplayName("guest cannot access host availability view - returns 401")
+    void guestCannotAccessHostView_returns401() throws Exception {
         String listingId = createAndApproveListing();
 
         // No auth header
         mockMvc.perform(get("/api/v1/host/listings/{id}/availability", listingId)
                         .param("from", "2026-07-01")
                         .param("to", "2026-07-02"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────────

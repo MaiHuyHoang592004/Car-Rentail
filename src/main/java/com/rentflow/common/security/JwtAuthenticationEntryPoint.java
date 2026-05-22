@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rentflow.common.web.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
-@Slf4j
 @Component
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
@@ -30,31 +28,15 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         String code = "AUTH_INVALID_CREDENTIALS";
         String message = "Authentication required";
 
-        if (authException != null) {
-            if (authException.getMessage() != null
-                    && authException.getMessage().contains("Access token has expired")) {
-                code = "AUTH_TOKEN_EXPIRED";
-                message = "Access token has expired";
-            } else {
-                try {
-                    java.lang.reflect.Method m = authException.getClass().getMethod("getCode");
-                    Object result = m.invoke(authException);
-                    if (result instanceof String s) {
-                        code = s;
-                        message = authException.getMessage();
-                    }
-                } catch (Exception ignored) {
-                }
-            }
+        if (authException instanceof com.rentflow.common.exception.AuthenticationException rentFlowAuth) {
+            code = rentFlowAuth.getCode();
+            message = rentFlowAuth.getMessage();
         }
 
         Object correlationId = request.getAttribute("correlationId");
         ErrorResponse error = ErrorResponse.of(code, message, correlationId instanceof String s ? s : null);
 
-        HttpStatus status = request.getRequestURI().startsWith("/api/v1/host/")
-                ? HttpStatus.FORBIDDEN
-                : HttpStatus.UNAUTHORIZED;
-        response.setStatus(status.value());
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(), error);
     }

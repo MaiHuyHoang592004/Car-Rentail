@@ -41,28 +41,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        JwtTokenProvider.JwtClaims claims;
         try {
-            JwtTokenProvider.JwtClaims claims = tokenProvider.validateAccessToken(token);
-
-            UserPrincipal principal = new UserPrincipal(
-                    claims.userId(),
-                    claims.email(),
-                    claims.roles()
-            );
-
-            var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                    principal, null, principal.getAuthorities()
-            );
-            SecurityContextHolder.getContext().setAuthentication(auth);
-
-            filterChain.doFilter(request, response);
+            claims = tokenProvider.validateAccessToken(token);
         } catch (AuthenticationException e) {
             SecurityContextHolder.clearContext();
             entryPoint.commence(request, response, e);
+            return;
         } catch (Exception e) {
             SecurityContextHolder.clearContext();
             entryPoint.commence(request, response, null);
+            return;
         }
+
+        UserPrincipal principal = new UserPrincipal(
+                claims.userId(),
+                claims.email(),
+                claims.roles()
+        );
+
+        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                principal, null, principal.getAuthorities()
+        );
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
+        filterChain.doFilter(request, response);
     }
 
     private String extractToken(HttpServletRequest request) {

@@ -171,7 +171,7 @@ class VehicleLifecycleIntegrationTest {
         String vehicleId = createVehicle("SEDAN", "Mazda", "3", 2021, "DD-4", "AUTO", "PETROL", 5);
 
         mockMvc.perform(get("/api/v1/host/vehicles/" + vehicleId))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test

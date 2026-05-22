@@ -189,8 +189,8 @@ class UserIntegrationTest {
 
         mockMvc.perform(get("/api/v1/admin/users")
                 .header("Authorization", "Bearer " + customerToken))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test

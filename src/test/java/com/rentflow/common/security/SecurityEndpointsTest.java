@@ -13,6 +13,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
+import java.time.Duration;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -74,6 +75,49 @@ class SecurityEndpointsTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"))
                 .andExpect(jsonPath("$.correlationId").value("invalid-token-cid"));
+    }
+
+    @Test
+    void protectedEndpoint_withExpiredToken_returns401TokenExpired() throws Exception {
+        JwtTokenProvider expiredTokenProvider = new JwtTokenProvider(
+                "test-jwt-secret-key-for-unit-tests-only-minimum-60-bytes-required-for-hs512",
+                Duration.ofSeconds(-1),
+                Duration.ofDays(7));
+        String expiredToken = expiredTokenProvider.generateAccessToken(
+                UUID.randomUUID(),
+                "expired@example.com",
+                java.util.List.of(Role.CUSTOMER));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + expiredToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_TOKEN_EXPIRED"))
+                .andExpect(jsonPath("$.message").value("Access token has expired"));
+    }
+
+    @Test
+    void hostEndpoint_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/host/vehicles"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void customerToken_onRoleProtectedEndpoints_returns403() throws Exception {
+        String customerToken = tokenProvider.generateAccessToken(
+                UUID.randomUUID(),
+                "customer@example.com",
+                java.util.List.of(Role.CUSTOMER));
+
+        mockMvc.perform(get("/api/v1/host/vehicles")
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mockMvc.perform(get("/api/v1/admin/users")
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test

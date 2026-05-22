@@ -139,12 +139,12 @@ class SecurityIntegrationTest {
     @Test
     void unauthenticatedUser_cannotAccessVehicleEndpoints() throws Exception {
         mockMvc.perform(get("/api/v1/host/vehicles"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/api/v1/host/vehicles")
             .contentType(MediaType.APPLICATION_JSON)
             .content("{}"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -173,7 +173,7 @@ class SecurityIntegrationTest {
 
         mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/approve")
                 .header("Authorization", "Bearer " + hostAToken))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isForbidden());
     }
 
     // Helpers

@@ -204,7 +204,7 @@ class ListingLifecycleIntegrationTest {
 
         mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/approve")
                 .header("Authorization", "Bearer " + hostToken))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isForbidden());
     }
 
     @Test

@@ -11,6 +11,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -88,6 +89,15 @@ public class GlobalExceptionHandler {
         log.warn("Resource not found [{}]: {}", cid, ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(
+            NoResourceFoundException ex, HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        log.warn("Resource not found [{}]: {}", cid, ex.getResourcePath());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of("RESOURCE_NOT_FOUND", "Resource not found", cid));
     }
 
     @ExceptionHandler(BusinessRuleException.class)

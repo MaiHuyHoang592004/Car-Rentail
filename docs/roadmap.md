@@ -32,14 +32,13 @@ Frontend đã tồn tại trong `frontend/` với:
 - Auth BFF `/api/auth/*`.
 - `AuthProvider` + `api-client.ts`.
 - Listings/host/bookings UI.
-- Nhiều listing/host pages vẫn dùng mocks.
+- Public listing, host vehicle/listing/availability, booking-create, profile và host dashboard flows đã nối API.
 
-### Mock areas
+### Recent hardening completed
 
-Confirmed mock usage:
-
-- `frontend/src/features/listings/listings-page-view.tsx` dùng `@/mocks/listings` và filter client-side.
-- `frontend/src/features/host/listings/host-listing-detail-page-view.tsx` dùng `@/mocks/host-listings` và fake lifecycle transitions.
+- Critical refactor batch `C01-C07`: idempotency/auth hardening, production frontend API wiring, docs/code drift cleanup.
+- Important cleanup batch: not-found handling, SecurityContext annotation, vehicle archive update, phone validation, ADMIN role rejection, optimistic lock handling.
+- Security hardening batch: Swagger disabled in prod, explicit CORS origins, typed JWT auth errors, unauthenticated requests return 401 while wrong-role requests return 403.
 
 ### Docs/code drift
 

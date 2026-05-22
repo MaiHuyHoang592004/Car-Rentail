@@ -100,10 +100,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        List<String> origins = Arrays.stream(allowedOrigins.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
+        List<String> origins = explicitAllowedOrigins();
         config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of(
@@ -119,5 +116,20 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
         return source;
+    }
+
+    private List<String> explicitAllowedOrigins() {
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        if (origins.isEmpty()) {
+            throw new IllegalStateException("rentflow.cors.allowed-origins must include at least one explicit origin");
+        }
+        if (origins.contains("*")) {
+            throw new IllegalStateException(
+                    "rentflow.cors.allowed-origins must not contain '*' when CORS credentials are enabled");
+        }
+        return origins;
     }
 }

@@ -1,6 +1,6 @@
 package com.rentflow.common.exception;
 
-public class AuthenticationException extends RuntimeException {
+public class AuthenticationException extends org.springframework.security.core.AuthenticationException {
 
     private final String code;
 

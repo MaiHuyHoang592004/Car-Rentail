@@ -2,11 +2,13 @@
 
 > Mỗi issue có evidence từ code thật, risk assessment, fix direction, test strategy, effort estimate.
 >
-> Status: **Confirmed** (thấy trong code) | **Suspected** (hợp lý, cần verify) | **Spec-only** (chỉ ở docs)
+> Status: **Done** (đã đóng trong code) | **Confirmed** (thấy trong code) | **Suspected** (hợp lý, cần verify) | **Spec-only** (chỉ ở docs)
 >
 > Effort: **XS** (< 2h) | **S** (2-4h) | **M** (4-8h) | **L** (8-16h) | **XL** (> 16h)
 >
 > Last updated: 2026-05-22
+>
+> Completed: `C01-C07`, `I02`, `I05-I09`, `I12`, `I15`, `I22`, `I30`.
 
 ---
 
@@ -16,7 +18,7 @@
 
 ## C01 — Idempotency Failure Marker Chưa Tách Transaction
 
-**Status:** Confirmed | **Area:** Backend / Correctness | **Effort:** XS | **Depends:** None
+**Status:** Done | **Area:** Backend / Correctness | **Effort:** XS | **Depends:** None
 
 **Evidence:**
 - `src/main/java/com/rentflow/common/idempotency/service/IdempotencyService.java` — method `fail()` dùng `@Transactional` mặc định (REQUIRED propagation).
@@ -37,7 +39,7 @@
 
 ## C02 — Login Timing Enumeration Vulnerability
 
-**Status:** Confirmed | **Area:** Auth / Security | **Effort:** S | **Depends:** None
+**Status:** Done | **Area:** Auth / Security | **Effort:** S | **Depends:** None
 
 **Evidence:**
 - `src/main/java/com/rentflow/auth/service/AuthService.java` — method `login()`: email không tồn tại → throw ngay (~5ms). Email tồn tại password sai → BCrypt compare (~250ms).
@@ -61,7 +63,7 @@ if (userOpt.isEmpty()) {
 
 ## C03 — Refresh Token Reuse Detection Missing
 
-**Status:** Confirmed | **Area:** Auth / Security | **Effort:** M | **Depends:** None
+**Status:** Done | **Area:** Auth / Security | **Effort:** M | **Depends:** None
 
 **Evidence:**
 - DB schema V1: column `replaced_by_token_id` trên `refresh_tokens` table.
@@ -82,7 +84,7 @@ if (userOpt.isEmpty()) {
 
 ## C04 — Login/Booking Rate Limit Missing
 
-**Status:** Confirmed | **Area:** Auth + Booking / Security | **Effort:** M | **Depends:** C02
+**Status:** Done | **Area:** Auth + Booking / Security | **Effort:** M | **Depends:** C02
 
 **Evidence:**
 - Không có `@RateLimiter`, Bucket4j, hoặc custom filter.
@@ -98,7 +100,7 @@ if (userOpt.isEmpty()) {
 
 ## C05 — Frontend Listings Search Vẫn Mock
 
-**Status:** Confirmed | **Area:** Frontend / Integration | **Effort:** M | **Depends:** Backend API exist
+**Status:** Done | **Area:** Frontend / Integration | **Effort:** M | **Depends:** Backend API exist
 
 **Evidence:**
 - `frontend/src/features/listings/listings-page-view.tsx`: `import { LISTING_CARDS } from "@/mocks/listings"`
@@ -114,7 +116,7 @@ if (userOpt.isEmpty()) {
 
 ## C06 — Host Listing Lifecycle Fake (Client-Side State Machine)
 
-**Status:** Confirmed | **Area:** Frontend / Integration | **Effort:** L | **Depends:** C05
+**Status:** Done | **Area:** Frontend / Integration | **Effort:** L | **Depends:** C05
 
 **Evidence:**
 - `frontend/src/features/host/listings/host-listing-detail-page-view.tsx`: imports `archiveListingTransition`, `submitListingTransition`, `reactivateListingTransition` từ `@/mocks/host-listings`.
@@ -130,7 +132,7 @@ if (userOpt.isEmpty()) {
 
 ## C07 — Docs/Code Drift
 
-**Status:** Confirmed | **Area:** Docs | **Effort:** XS | **Depends:** None
+**Status:** Done | **Area:** Docs | **Effort:** XS | **Depends:** None
 
 **Evidence:**
 - `README.md` nói "Phase 1 Foundation" nhưng code Phase 5.
@@ -151,7 +153,7 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** `BookingService.cancelBooking()` check `status != HELD` → throw | **Effort:** XS | **Fix:** Document limitation, expand Phase 7.
 
 ## I02 — GlobalExceptionHandler Per-Entity Not Found
-**Status:** Confirmed | **Evidence:** `GlobalExceptionHandler.java` handlers riêng cho Vehicle/Listing/BookingNotFoundException — duplicate ResourceNotFoundException | **Effort:** M | **Fix:** Collapse thành 1 generic handler.
+**Status:** Done | **Evidence:** `GlobalExceptionHandler.java` handlers riêng cho Vehicle/Listing/BookingNotFoundException — duplicate ResourceNotFoundException | **Effort:** M | **Fix:** Collapse thành 1 generic handler.
 
 ## I03 — DataIntegrity String Matching
 **Status:** Confirmed | **Evidence:** `GlobalExceptionHandler.java`: `message.contains("uq_listings_one_active_per_vehicle")` | **Effort:** S | **Fix:** SQLState/constraint check. **Depends:** I02.
@@ -160,19 +162,19 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** `GlobalExceptionHandler.java`: string compare code → HTTP status | **Effort:** M | **Fix:** Typed exceptions. **Depends:** I02.
 
 ## I05 — SecurityContext Interface @Component
-**Status:** Confirmed | **Evidence:** `@Component public interface SecurityContext` | **Effort:** XS | **Fix:** Remove annotation.
+**Status:** Done | **Evidence:** `@Component public interface SecurityContext` | **Effort:** XS | **Fix:** Remove annotation.
 
 ## I06 — Swagger Exposed Without Profile Gate
-**Status:** Confirmed | **Evidence:** `SecurityConfig.java` permitAll swagger | **Effort:** S | **Fix:** Profile-gate prod.
+**Status:** Done | **Evidence:** `SecurityConfig.java` permitAll swagger | **Effort:** S | **Fix:** Profile-gate prod.
 
 ## I07 — CORS Credentials + Wildcard
-**Status:** Confirmed | **Evidence:** `CorsConfig.java` allowCredentials + potential wildcard | **Effort:** S | **Fix:** Validate allowlist.
+**Status:** Done | **Evidence:** `SecurityConfig.java` allowCredentials + potential wildcard | **Effort:** S | **Fix:** Validate allowlist.
 
 ## I08 — JwtAuthenticationEntryPoint Reflection
-**Status:** Confirmed | **Evidence:** `JwtAuthenticationEntryPoint.java` `getClass().getMethod("getCode")` | **Effort:** S | **Fix:** Type-cast.
+**Status:** Done | **Evidence:** `JwtAuthenticationEntryPoint.java` `getClass().getMethod("getCode")` | **Effort:** S | **Fix:** Type-cast.
 
 ## I09 — Unauthenticated /host/* → 403 (Should 401)
-**Status:** Confirmed | **Evidence:** `JwtAuthenticationEntryPoint.java` URI prefix check → FORBIDDEN | **Effort:** S | **Fix:** 401 unauthed, 403 wrong role.
+**Status:** Done | **Evidence:** `JwtAuthenticationEntryPoint.java` URI prefix check → FORBIDDEN | **Effort:** S | **Fix:** 401 unauthed, 403 wrong role.
 
 ## I10 — Listing Search Native SQL + Dead Specification
 **Status:** Confirmed | **Evidence:** `ListingSearchRepositoryCustomImpl.java` dual code path | **Effort:** M | **Fix:** Remove dead Specification.
@@ -181,7 +183,7 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** `AvailabilityService.generateForListing()` loop 365 × `existsBy...` | **Effort:** S | **Fix:** `INSERT ... SELECT generate_series(...) ON CONFLICT DO NOTHING`.
 
 ## I12 — Vehicle Archive Loop Save
-**Status:** Confirmed | **Evidence:** `VehicleService.archiveVehicle()` loop `save(listing)` | **Effort:** XS | **Fix:** Batch `@Modifying @Query UPDATE`.
+**Status:** Done | **Evidence:** `VehicleService.archiveVehicle()` loop `save(listing)` | **Effort:** XS | **Fix:** Batch `@Modifying @Query UPDATE`.
 
 ## I13 — Forgot/Reset/Change Password Missing
 **Status:** Confirmed | **Evidence:** No endpoint auth/forgot-password, reset-password, me/password | **Effort:** L | **Fix:** PasswordResetToken + 3 endpoints + email stub.
@@ -190,7 +192,7 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** `AuthUser.emailVerified` field, register=false, login no check | **Effort:** L | **Fix:** Token + gated actions. **Depends:** I13.
 
 ## I15 — Register Silent-Drop ADMIN Role
-**Status:** Confirmed | **Evidence:** `AuthService.resolveRoles()` filter ADMIN, default CUSTOMER | **Effort:** XS | **Fix:** Explicit error.
+**Status:** Done | **Evidence:** `AuthService.resolveRoles()` filter ADMIN, default CUSTOMER | **Effort:** XS | **Fix:** Explicit error.
 
 ## I17 — Account Lockout Missing
 **Status:** Confirmed | **Evidence:** No failed attempt tracking | **Effort:** M | **Fix:** Counter + lock_until. **Depends:** C04.
@@ -202,7 +204,7 @@ if (userOpt.isEmpty()) {
 **Status:** Suspected | **Evidence:** Stateless JWT 15m, no blacklist | **Effort:** M | **Fix:** Redis blacklist or user-version.
 
 ## I22 — Phone No Pattern Validation
-**Status:** Confirmed partial | **Evidence:** UpdateProfileRequest has `@Size` but no `@Pattern` | **Effort:** XS | **Fix:** `@Pattern(regexp = "^\\+?[0-9\\-\\s]{7,20}$")`.
+**Status:** Done | **Evidence:** UpdateProfileRequest has `@Size` but no `@Pattern` | **Effort:** XS | **Fix:** `@Pattern(regexp = "^\\+?[0-9\\-\\s]{7,20}$")`.
 
 ## I24 — BookingService God Method
 **Status:** Confirmed | **Evidence:** `BookingService.createBooking()` ~20 steps | **Effort:** L | **Fix:** Extract Validator/Factory/Reserver. **Depends:** C01.
@@ -220,7 +222,7 @@ if (userOpt.isEmpty()) {
 **Status:** Suspected | **Evidence:** Booking=PageResponse, others may be Spring Page | **Effort:** M | **Fix:** Normalize PageResponse.
 
 ## I30 — OptimisticLock No Handler
-**Status:** Suspected | **Evidence:** @Version on entities, no handler in GlobalExceptionHandler | **Effort:** S | **Fix:** Handler → 409.
+**Status:** Done | **Evidence:** @Version on entities, no handler in GlobalExceptionHandler | **Effort:** S | **Fix:** Handler → 409.
 
 ## I31 — Idempotency Cleanup Job Missing
 **Status:** Spec-only/Suspected | **Evidence:** `expires_at` field, no scheduler | **Effort:** S | **Fix:** Scheduled DELETE.
