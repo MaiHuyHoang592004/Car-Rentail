@@ -1,7 +1,6 @@
 package com.rentflow.listing.service;
 
 import com.rentflow.availability.repository.AvailabilityCalendarRepository;
-import com.rentflow.availability.service.AvailabilityService;
 import com.rentflow.auth.entity.AuthUser;
 import com.rentflow.auth.repository.AuthUserRepository;
 import com.rentflow.common.exception.BusinessRuleException;
@@ -13,6 +12,7 @@ import com.rentflow.listing.dto.ListingResponse;
 import com.rentflow.listing.dto.ListingSummaryResponse;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
+import com.rentflow.listing.event.ListingApprovedEvent;
 import com.rentflow.listing.mapper.ListingMapper;
 import com.rentflow.listing.repository.ExtraRepository;
 import com.rentflow.listing.repository.ListingRepository;
@@ -21,6 +21,7 @@ import com.rentflow.vehicle.entity.Vehicle;
 import com.rentflow.vehicle.entity.VehicleStatus;
 import com.rentflow.vehicle.repository.VehicleRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -36,7 +37,7 @@ public class AdminListingService {
     private final ListingRepository listingRepository;
     private final VehicleRepository vehicleRepository;
     private final AvailabilityCalendarRepository availabilityRepository;
-    private final AvailabilityService availabilityService;
+    private final ApplicationEventPublisher eventPublisher;
     private final ListingStateMachine stateMachine;
     private final ListingMapper mapper;
     private final ExtraRepository extraRepository;
@@ -46,7 +47,7 @@ public class AdminListingService {
     public AdminListingService(ListingRepository listingRepository,
                                VehicleRepository vehicleRepository,
                                AvailabilityCalendarRepository availabilityRepository,
-                               AvailabilityService availabilityService,
+                               ApplicationEventPublisher eventPublisher,
                                ListingStateMachine stateMachine,
                                ListingMapper mapper,
                                ExtraRepository extraRepository,
@@ -55,7 +56,7 @@ public class AdminListingService {
         this.listingRepository = listingRepository;
         this.vehicleRepository = vehicleRepository;
         this.availabilityRepository = availabilityRepository;
-        this.availabilityService = availabilityService;
+        this.eventPublisher = eventPublisher;
         this.stateMachine = stateMachine;
         this.mapper = mapper;
         this.extraRepository = extraRepository;
@@ -148,8 +149,7 @@ public class AdminListingService {
                     "Vehicle already has an active listing");
         }
 
-        // Generate 365 availability rows in the same transaction
-        availabilityService.generateForListing(listingId);
+        eventPublisher.publishEvent(new ListingApprovedEvent(listingId));
 
         // TODO (Phase 7/9): Insert outbox event for LISTING_APPROVED:
         //   INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, status, created_at, updated_at)

@@ -1,6 +1,5 @@
 package com.rentflow.auth.dto;
 
-import com.rentflow.user.dto.UserProfileResponse;
 import java.time.Instant;
 import java.util.List;
 
@@ -10,11 +9,11 @@ public record TokenResponse(
         String accessTokenExpiresAt,
         String refreshToken,
         String refreshTokenExpiresAt,
-        UserProfileResponse user
+        AuthUserProfileResponse user
 ) {
     public static TokenResponse of(String accessToken, Instant accessExpiry,
                                   String refreshToken, Instant refreshExpiry,
-                                  UserProfileResponse user) {
+                                  AuthUserProfileResponse user) {
         return new TokenResponse(
                 "Bearer",
                 accessToken,

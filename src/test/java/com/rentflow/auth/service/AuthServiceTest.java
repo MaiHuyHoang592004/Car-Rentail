@@ -5,7 +5,6 @@ import com.rentflow.auth.repository.AuthUserRepository;
 import com.rentflow.auth.repository.UserRoleRepository;
 import com.rentflow.common.exception.AuthenticationException;
 import com.rentflow.common.security.JwtTokenProvider;
-import com.rentflow.user.repository.UserProfileRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,7 +25,7 @@ class AuthServiceTest {
 
     @Mock private AuthUserRepository authUserRepository;
     @Mock private UserRoleRepository userRoleRepository;
-    @Mock private UserProfileRepository userProfileRepository;
+    @Mock private AuthUserProfilePort userProfilePort;
     @Mock private RefreshTokenService refreshTokenService;
     @Mock private JwtTokenProvider tokenProvider;
     @Mock private PasswordEncoder passwordEncoder;
@@ -37,7 +36,7 @@ class AuthServiceTest {
         AuthService service = new AuthService(
                 authUserRepository,
                 userRoleRepository,
-                userProfileRepository,
+                userProfilePort,
                 refreshTokenService,
                 tokenProvider,
                 passwordEncoder,

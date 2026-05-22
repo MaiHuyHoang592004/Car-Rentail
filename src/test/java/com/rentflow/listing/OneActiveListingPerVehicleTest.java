@@ -1,11 +1,11 @@
 package com.rentflow.listing;
 
 import com.rentflow.availability.repository.AvailabilityCalendarRepository;
-import com.rentflow.availability.service.AvailabilityService;
 import com.rentflow.auth.repository.AuthUserRepository;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
+import com.rentflow.listing.event.ListingApprovedEvent;
 import com.rentflow.listing.mapper.ListingMapper;
 import com.rentflow.listing.repository.ExtraRepository;
 import com.rentflow.listing.repository.ListingRepository;
@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -39,7 +40,7 @@ class OneActiveListingPerVehicleTest {
     @Mock private AuthUserRepository authUserRepository;
     @Spy private ListingStateMachine stateMachine = new ListingStateMachine();
     private ListingMapper listingMapper = new ListingMapper();
-    @Mock private AvailabilityService availabilityService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private AdminListingService adminListingService;
     private UUID listingId;
@@ -52,7 +53,7 @@ class OneActiveListingPerVehicleTest {
     void setUp() {
         adminListingService = new AdminListingService(
             listingRepository, vehicleRepository, availabilityRepository,
-            availabilityService, stateMachine, listingMapper,
+            eventPublisher, stateMachine, listingMapper,
             extraRepository, userProfileRepository, authUserRepository);
 
         listingId = UUID.randomUUID();
@@ -88,12 +89,10 @@ class OneActiveListingPerVehicleTest {
         when(vehicleRepository.findByIdForUpdate(vehicleId)).thenReturn(Optional.of(vehicle));
         when(listingRepository.existsByVehicleIdAndStatus(vehicleId, ListingStatus.ACTIVE)).thenReturn(false);
         when(listingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(availabilityService.generateForListing(listingId)).thenReturn(365);
-
         var result = adminListingService.approveListing(listingId);
 
         assertThat(result.status()).isEqualTo(ListingStatus.ACTIVE);
-        verify(availabilityService).generateForListing(listingId);
+        verify(eventPublisher).publishEvent(new ListingApprovedEvent(listingId));
     }
 
     @Test

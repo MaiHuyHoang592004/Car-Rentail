@@ -13,10 +13,6 @@ import com.rentflow.common.exception.AccountSuspendedException;
 import com.rentflow.common.exception.AuthenticationException;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.security.JwtTokenProvider;
-import com.rentflow.user.dto.RegisterResponse;
-import com.rentflow.user.dto.UserProfileResponse;
-import com.rentflow.user.entity.UserProfile;
-import com.rentflow.user.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,7 +37,7 @@ public class AuthService {
 
     private final AuthUserRepository authUserRepository;
     private final UserRoleRepository userRoleRepository;
-    private final UserProfileRepository userProfileRepository;
+    private final AuthUserProfilePort userProfilePort;
     private final RefreshTokenService refreshTokenService;
     private final JwtTokenProvider tokenProvider;
     private final PasswordEncoder passwordEncoder;
@@ -72,13 +68,9 @@ public class AuthService {
         }
         user = authUserRepository.save(user);
 
-        UserProfile profile = new UserProfile(request.fullName());
-        profile.setUser(user);
-        userProfileRepository.save(profile);
-
         log.info("User registered: {} with roles {}", user.getEmail(), roles);
 
-        return RegisterResponse.from(user, profile, roles);
+        return userProfilePort.createRegisteredProfile(user, request.fullName(), roles);
     }
 
     @Transactional
@@ -121,12 +113,10 @@ public class AuthService {
         RefreshTokenService.CreatedRefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
         Instant refreshExpiry = refreshToken.token().getExpiresAt();
 
-        UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElseThrow();
-        UserProfileResponse userResponse = UserProfileResponse.from(user.getId(), user.getEmail(), roles, profile);
-
         log.info("User logged in: {}", user.getEmail());
 
-        return TokenResponse.of(accessToken, accessExpiry, refreshToken.rawToken(), refreshExpiry, userResponse);
+        return TokenResponse.of(accessToken, accessExpiry, refreshToken.rawToken(), refreshExpiry,
+                userProfilePort.getProfile(user.getId(), user.getEmail(), roles));
     }
 
     @Transactional

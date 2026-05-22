@@ -4,11 +4,8 @@ import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.VehicleArchiveNotAllowedException;
 import com.rentflow.common.exception.VehicleNotFoundException;
 import com.rentflow.common.util.EncryptionUtil;
-import com.rentflow.booking.entity.BookingStatus;
-import com.rentflow.booking.repository.BookingRepository;
-import com.rentflow.listing.entity.Listing;
-import com.rentflow.listing.entity.ListingStatus;
-import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.booking.service.VehicleBookingPort;
+import com.rentflow.listing.service.VehicleListingPort;
 import com.rentflow.vehicle.dto.CreateVehicleRequest;
 import com.rentflow.vehicle.dto.UpdateVehicleRequest;
 import com.rentflow.vehicle.dto.VehicleResponse;
@@ -23,7 +20,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -32,8 +28,8 @@ import java.util.UUID;
 public class VehicleService {
 
     private final VehicleRepository vehicleRepository;
-    private final ListingRepository listingRepository;
-    private final BookingRepository bookingRepository;
+    private final VehicleListingPort listingPort;
+    private final VehicleBookingPort bookingPort;
     private final VehicleStateMachine stateMachine;
     private final VehicleMapper mapper;
     private final EncryptionUtil encryptionUtil;
@@ -112,8 +108,7 @@ public class VehicleService {
                 "Vehicle cannot be archived: active bookings exist for related listings");
         }
 
-        listingRepository.updateStatusByVehicleIdAndStatusNot(
-                vehicleId, ListingStatus.ARCHIVED, ListingStatus.ARCHIVED);
+        listingPort.archiveListings(vehicleId);
 
         vehicle.setStatus(VehicleStatus.ARCHIVED);
         vehicleRepository.save(vehicle);
@@ -122,9 +117,7 @@ public class VehicleService {
     }
 
     private boolean hasActiveBookings(UUID vehicleId) {
-        return bookingRepository.existsActiveBookingsForVehicle(
-                vehicleId,
-                List.of(BookingStatus.HELD, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS));
+        return bookingPort.hasActiveBookings(vehicleId);
     }
 
     private void propagateListingStateOnVehicleStatusChange(Vehicle vehicle,
@@ -134,8 +127,7 @@ public class VehicleService {
         boolean transitioningFromActive = fromStatus == VehicleStatus.ACTIVE;
 
         if (transitioningToMaintenanceOrSuspended && transitioningFromActive) {
-            int updated = listingRepository.updateStatusByVehicleIdAndStatusNot(
-                    vehicle.getId(), ListingStatus.SUSPENDED, ListingStatus.ARCHIVED);
+            int updated = listingPort.suspendListings(vehicle.getId());
             log.info("Auto-suspended {} listings for vehicle {} -> {}",
                     updated, vehicle.getId(), toStatus);
         }

@@ -1,10 +1,13 @@
 package com.rentflow.user.service;
 
+import com.rentflow.auth.dto.AuthUserProfileResponse;
+import com.rentflow.auth.dto.RegisterResponse;
 import com.rentflow.auth.entity.AuthUser;
 import com.rentflow.auth.entity.Role;
 import com.rentflow.auth.entity.UserStatus;
 import com.rentflow.auth.repository.AuthUserRepository;
 import com.rentflow.auth.repository.UserRoleRepository;
+import com.rentflow.auth.service.AuthUserProfilePort;
 import com.rentflow.common.exception.AccessDeniedException;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.user.dto.UpdateProfileRequest;
@@ -25,12 +28,43 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class UserService {
+public class UserService implements AuthUserProfilePort {
 
     private final AuthUserRepository authUserRepository;
     private final UserRoleRepository userRoleRepository;
     private final UserProfileRepository userProfileRepository;
     private final SecurityContext securityContext;
+
+    @Override
+    @Transactional
+    public RegisterResponse createRegisteredProfile(
+            AuthUser user, String fullName, List<Role> roles) {
+        UserProfile profile = new UserProfile(fullName);
+        profile.setUser(user);
+        userProfileRepository.save(profile);
+        return new RegisterResponse(
+                user.getId(),
+                user.getEmail(),
+                roles.stream().map(Role::name).toList(),
+                profile.getFullName(),
+                user.getStatus().name(),
+                profile.getDriverVerificationStatus().name());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AuthUserProfileResponse getProfile(UUID userId, String email, List<Role> roles) {
+        UserProfile profile = userProfileRepository.findByUserId(userId).orElseThrow();
+        return new AuthUserProfileResponse(
+                userId,
+                email,
+                roles.stream().map(Role::name).toList(),
+                profile.getFullName(),
+                profile.getPhone(),
+                profile.getDateOfBirth(),
+                profile.getAddressLine(),
+                profile.getDriverVerificationStatus().name());
+    }
 
     @Transactional(readOnly = true)
     public UserProfileResponse getCurrentUserProfile() {

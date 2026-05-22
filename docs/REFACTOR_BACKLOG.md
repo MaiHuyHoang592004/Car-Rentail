@@ -210,7 +210,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** `BookingService.createBooking()` ~20 steps | **Effort:** L | **Fix:** Extracted `BookingValidator` (date / listing / customer-overlap / driver-verification checks) and `AvailabilityReserver` (lock + hold + release). `BookingService` orchestration shrinks ~23% (537→415 LOC); behavior preserved. **Depends:** C01.
 
 ## I25 — Module Boundary Violations
-**Status:** Confirmed | **Evidence:** AuthService → user module; VehicleService → booking/listing repos; AdminListingService → AvailabilityService (service-to-service) | **Effort:** L | **Fix:** Domain events, ports/interfaces.
+**Status:** Done | **Evidence:** AuthService → user module; VehicleService → booking/listing repos; AdminListingService → AvailabilityService (service-to-service) | **Effort:** L | **Fix:** Listing approval publishes a synchronous `ListingApprovedEvent` consumed by availability; auth profile provisioning/lookup now crosses an auth-owned port implemented by user; vehicle active-booking and listing propagation checks now cross booking/listing ports instead of repositories.
 
 ## I26 — Entity Relationship 3 Styles
 **Status:** Confirmed/Suspected | **Evidence:** Listing=ManyToOne, Booking=UUID-only, Availability=composite | **Effort:** XL | **Fix:** Choose 1 pattern, document, migrate.

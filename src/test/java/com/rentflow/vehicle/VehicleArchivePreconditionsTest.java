@@ -3,10 +3,8 @@ package com.rentflow.vehicle;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.VehicleArchiveNotAllowedException;
 import com.rentflow.common.util.EncryptionUtil;
-import com.rentflow.booking.entity.BookingStatus;
-import com.rentflow.booking.repository.BookingRepository;
-import com.rentflow.listing.entity.ListingStatus;
-import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.booking.service.VehicleBookingPort;
+import com.rentflow.listing.service.VehicleListingPort;
 import com.rentflow.vehicle.dto.CreateVehicleRequest;
 import com.rentflow.vehicle.dto.VehicleResponse;
 import com.rentflow.vehicle.entity.*;
@@ -21,7 +19,6 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,10 +33,10 @@ class VehicleArchivePreconditionsTest {
     private VehicleRepository vehicleRepository;
 
     @Mock
-    private ListingRepository listingRepository;
+    private VehicleListingPort listingPort;
 
     @Mock
-    private BookingRepository bookingRepository;
+    private VehicleBookingPort bookingPort;
 
     @Spy
     private VehicleStateMachine stateMachine = new VehicleStateMachine();
@@ -59,7 +56,7 @@ class VehicleArchivePreconditionsTest {
     void setUp() {
         mapper = new VehicleMapper(encryptionUtil);
         vehicleService = new VehicleService(
-            vehicleRepository, listingRepository, bookingRepository, stateMachine, mapper, encryptionUtil);
+            vehicleRepository, listingPort, bookingPort, stateMachine, mapper, encryptionUtil);
 
         hostId = UUID.randomUUID();
         vehicleId = UUID.randomUUID();
@@ -80,13 +77,8 @@ class VehicleArchivePreconditionsTest {
     @Test
     void archiveVehicle_succeedsWhenNoActiveListings() {
         when(vehicleRepository.findByIdForUpdate(vehicleId)).thenReturn(Optional.of(vehicle));
-        when(bookingRepository.existsActiveBookingsForVehicle(
-                vehicleId,
-                List.of(BookingStatus.HELD, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS)))
-                .thenReturn(false);
-        when(listingRepository.updateStatusByVehicleIdAndStatusNot(
-                vehicleId, ListingStatus.ARCHIVED, ListingStatus.ARCHIVED))
-            .thenReturn(0);
+        when(bookingPort.hasActiveBookings(vehicleId)).thenReturn(false);
+        when(listingPort.archiveListings(vehicleId)).thenReturn(0);
         when(vehicleRepository.save(any())).thenReturn(vehicle);
 
         assertThatCode(() -> vehicleService.archiveVehicle(vehicleId, hostId))
@@ -98,10 +90,7 @@ class VehicleArchivePreconditionsTest {
     @Test
     void archiveVehicle_failsWhenActiveListingsExist() {
         when(vehicleRepository.findByIdForUpdate(vehicleId)).thenReturn(Optional.of(vehicle));
-        when(bookingRepository.existsActiveBookingsForVehicle(
-                vehicleId,
-                List.of(BookingStatus.HELD, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS)))
-                .thenReturn(true);
+        when(bookingPort.hasActiveBookings(vehicleId)).thenReturn(true);
 
         assertThatThrownBy(() -> vehicleService.archiveVehicle(vehicleId, hostId))
             .isInstanceOf(VehicleArchiveNotAllowedException.class);
