@@ -8,6 +8,7 @@ import com.rentflow.availability.entity.AvailabilityCalendar;
 import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingExtra;
 import com.rentflow.booking.entity.BookingStatus;
+import com.rentflow.booking.mapper.BookingMapper;
 import com.rentflow.booking.repository.BookingExtraRepository;
 import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.common.exception.BookingNotFoundException;
@@ -54,6 +55,7 @@ public class BookingService {
     private final AvailabilityReserver availabilityReserver;
     private final SecurityContext securityContext;
     private final ObjectMapper objectMapper;
+    private final BookingMapper bookingMapper;
     private final Clock clock;
     private final long holdDurationMinutes;
 
@@ -68,6 +70,7 @@ public class BookingService {
             AvailabilityReserver availabilityReserver,
             SecurityContext securityContext,
             ObjectMapper objectMapper,
+            BookingMapper bookingMapper,
             Clock clock,
             @Value("${rentflow.booking.hold-duration-minutes:15}") long holdDurationMinutes) {
         this.bookingRepository = bookingRepository;
@@ -80,6 +83,7 @@ public class BookingService {
         this.availabilityReserver = availabilityReserver;
         this.securityContext = securityContext;
         this.objectMapper = objectMapper;
+        this.bookingMapper = bookingMapper;
         this.clock = clock;
         this.holdDurationMinutes = holdDurationMinutes;
     }
@@ -118,12 +122,7 @@ public class BookingService {
                 ? bookingRepository.findByCustomerIdOrderByCreatedAtDesc(customerId, pageable)
                 : bookingRepository.findByCustomerIdAndStatusOrderByCreatedAtDesc(customerId, status, pageable);
 
-        return new PageResponse<>(
-                bookings.getContent().stream().map(this::toSummaryResponse).toList(),
-                bookings.getNumber(),
-                bookings.getSize(),
-                bookings.getTotalElements(),
-                bookings.getTotalPages());
+        return bookingMapper.toSummaryPage(bookings);
     }
 
     @Transactional(readOnly = true)
@@ -136,7 +135,7 @@ public class BookingService {
             throw new BookingNotFoundException(String.valueOf(id));
         }
 
-        return toBookingResponse(booking);
+        return bookingMapper.toResponse(booking);
     }
 
     @Transactional
@@ -161,7 +160,7 @@ public class BookingService {
             booking.setReturnLocation(request.returnLocation());
         }
 
-        return toBookingResponse(booking);
+        return bookingMapper.toResponse(booking);
     }
 
     // Phase 5 limitation: only HELD bookings can be cancelled. Cancellation of
@@ -356,58 +355,6 @@ public class BookingService {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Unable to read booking JSON", e);
         }
-    }
-
-    private BookingSummaryResponse toSummaryResponse(Booking booking) {
-        JsonNode priceSnapshot = readTree(booking.getPriceSnapshot());
-        return new BookingSummaryResponse(
-                booking.getId(),
-                booking.getStatus(),
-                booking.getListingId(),
-                findListingTitle(booking.getListingId()),
-                booking.getPickupDate(),
-                booking.getReturnDate(),
-                booking.getHoldExpiresAt(),
-                amountFromSnapshot(priceSnapshot, "totalAmount"),
-                textFromSnapshot(priceSnapshot, "currency"),
-                booking.getCreatedAt());
-    }
-
-    private BookingResponse toBookingResponse(Booking booking) {
-        JsonNode priceSnapshot = readTree(booking.getPriceSnapshot());
-        JsonNode policySnapshot = readTree(booking.getPolicySnapshot());
-        return new BookingResponse(
-                booking.getId(),
-                booking.getStatus(),
-                booking.getListingId(),
-                findListingTitle(booking.getListingId()),
-                booking.getCustomerId(),
-                booking.getHostId(),
-                booking.getPickupDate(),
-                booking.getReturnDate(),
-                booking.getPickupLocation(),
-                booking.getReturnLocation(),
-                booking.getHoldExpiresAt(),
-                amountFromSnapshot(priceSnapshot, "totalAmount"),
-                textFromSnapshot(priceSnapshot, "currency"),
-                priceSnapshot,
-                policySnapshot,
-                booking.getCreatedAt());
-    }
-
-    private String findListingTitle(UUID listingId) {
-        Optional<Listing> listing = listingRepository.findById(listingId);
-        return listing.map(Listing::getTitle).orElse(null);
-    }
-
-    private BigDecimal amountFromSnapshot(JsonNode snapshot, String field) {
-        JsonNode value = snapshot.get(field);
-        return value == null || value.isNull() ? null : value.decimalValue();
-    }
-
-    private String textFromSnapshot(JsonNode snapshot, String field) {
-        JsonNode value = snapshot.get(field);
-        return value == null || value.isNull() ? null : value.asText();
     }
 
     private record CancelHashInput(UUID bookingId, CancelBookingRequest request) {

@@ -107,6 +107,7 @@ class BookingServiceTest {
                 reserver,
                 securityContext,
                 objectMapper,
+                new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
                 fixedClock,
                 15);
     }
@@ -209,6 +210,7 @@ class BookingServiceTest {
                 reserver,
                 securityContext,
                 objectMapper,
+                new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
                 fixedClock,
                 15);
         mockProceed();

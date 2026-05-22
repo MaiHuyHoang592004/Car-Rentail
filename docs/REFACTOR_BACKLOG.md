@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-23
 >
-> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I42`, `I43`, `I44`, `I46`, `I47`.
+> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I27`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I42`, `I43`, `I44`, `I46`, `I47`.
 
 ---
 
@@ -216,7 +216,7 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed/Suspected | **Evidence:** Listing=ManyToOne, Booking=UUID-only, Availability=composite | **Effort:** XL | **Fix:** Choose 1 pattern, document, migrate.
 
 ## I27 — DTO Mapping 5 Ways
-**Status:** Confirmed/Suspected | **Evidence:** VehicleMapper, ListingResponse.from, BookingService.toResponse, RegisterResponse.from, ExtraResponse.from | **Effort:** L | **Fix:** Pick 1 convention.
+**Status:** Done | **Evidence:** VehicleMapper, ListingResponse.from, BookingService.toResponse, RegisterResponse.from, ExtraResponse.from | **Effort:** L | **Fix:** Convention chốt: mỗi module có Mapper class (`@Component`), service không build DTO trực tiếp. Đã extract `BookingMapper` (toResponse, toSummaryResponse, toSummaryPage) ra khỏi BookingService — giờ tất cả module dùng pattern Mapper class. Vehicle/Listing đã sẵn pattern; auth/user dùng static `.from()` thuần (DTO không depend service-layer state, OK giữ).
 
 ## I28 — Pagination Response Inconsistent
 **Status:** Done | **Evidence:** Booking=PageResponse, others returned Spring Page | **Effort:** M | **Fix:** Added `PageResponse.from(Page<T>)` static factory. Converted `VehicleController.listVehicles`, `ListingController.listListings` (host), `AdminListingController.listListings`, `AdminUserController.listUsers` from `Page<T>` → `PageResponse<T>`. All paginated endpoints now return identical shape `{ content, page, size, totalElements, totalPages }`.
