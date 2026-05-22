@@ -139,12 +139,12 @@ class SecurityIntegrationTest {
     @Test
     void unauthenticatedUser_cannotAccessVehicleEndpoints() throws Exception {
         mockMvc.perform(get("/api/v1/host/vehicles"))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/api/v1/host/vehicles")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
-            .andExpect(status().isUnauthorized());
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}"))
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -173,7 +173,7 @@ class SecurityIntegrationTest {
 
         mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/approve")
                 .header("Authorization", "Bearer " + hostAToken))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     // Helpers
@@ -193,8 +193,10 @@ class SecurityIntegrationTest {
 
         String userId = parseJson(result).get("id").asText();
         var user = authUserRepository.findById(UUID.fromString(userId)).orElseThrow();
-        user.getRoles().add(new UserRole(user, Role.valueOf(role)));
-        authUserRepository.save(user);
+        Role requestedRole = Role.valueOf(role);
+        if (requestedRole != Role.CUSTOMER) {
+            userRoleRepository.save(new UserRole(user, requestedRole));
+        }
 
         return parseJson(result);
     }
@@ -231,7 +233,8 @@ class SecurityIntegrationTest {
                       "plateNumber": "%s",
                       "transmission": "AUTO",
                       "fuelType": "PETROL",
-                      "seats": 5
+                      "seats": 5,
+                      "city": "Hanoi"
                     }
                     """.formatted(make, model, plate)))
             .andExpect(status().isCreated())

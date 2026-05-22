@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.List;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 @Slf4j
 @RestControllerAdvice
@@ -113,6 +114,16 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
     }
 
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLock(
+            ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        log.warn("Optimistic lock failure [{}]: {}", cid, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ErrorResponse.of("CONCURRENT_MODIFICATION",
+                        "The resource was modified by another request. Please retry.", cid));
+    }
+
     @ExceptionHandler(IdempotencyException.class)
     public ResponseEntity<ErrorResponse> handleIdempotency(IdempotencyException ex, HttpServletRequest request) {
         String cid = correlationIdHelper.getCorrelationId();
@@ -140,30 +151,6 @@ public class GlobalExceptionHandler {
         log.warn("Rate limit exceeded [{}]: retry after {}s", cid, retryAfterSeconds);
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds))
-                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
-    }
-
-    @ExceptionHandler(VehicleNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleVehicleNotFound(VehicleNotFoundException ex, HttpServletRequest request) {
-        String cid = correlationIdHelper.getCorrelationId();
-        log.warn("Vehicle not found [{}]: {}", cid, ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
-    }
-
-    @ExceptionHandler(ListingNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleListingNotFound(ListingNotFoundException ex, HttpServletRequest request) {
-        String cid = correlationIdHelper.getCorrelationId();
-        log.warn("Listing not found [{}]: {}", cid, ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
-    }
-
-    @ExceptionHandler(BookingNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleBookingNotFound(BookingNotFoundException ex, HttpServletRequest request) {
-        String cid = correlationIdHelper.getCorrelationId();
-        log.warn("Booking not found [{}]: {}", cid, ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
     }
 

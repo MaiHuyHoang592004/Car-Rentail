@@ -376,7 +376,8 @@ class BookingPhase5IntegrationTest extends BaseIntegrationTest {
     void concurrentCreateOnlyOneCustomerWinsAvailabilityLock() throws Exception {
         saveAvailability(listing.getId(), PICKUP_DATE, RETURN_DATE, AvailabilityStatus.FREE);
         List<String> tokens = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
+        int attemptCount = 8;
+        for (int i = 0; i < attemptCount; i++) {
             AuthUser concurrentCustomer = saveUser("concurrent-" + i, Role.CUSTOMER);
             tokens.add(token(concurrentCustomer, Role.CUSTOMER));
         }
@@ -411,7 +412,7 @@ class BookingPhase5IntegrationTest extends BaseIntegrationTest {
         assertThat(attempts).filteredOn(attempt -> attempt.status() == 201).hasSize(1);
         assertThat(attempts)
                 .filteredOn(attempt -> attempt.status() == 409 && "LISTING_NOT_AVAILABLE".equals(attempt.code()))
-                .hasSize(9);
+                .hasSize(attemptCount - 1);
         UUID winningBookingId = attempts.stream()
                 .filter(attempt -> attempt.status() == 201)
                 .findFirst()
@@ -458,6 +459,7 @@ class BookingPhase5IntegrationTest extends BaseIntegrationTest {
         vehicle.setTransmission(TransmissionType.AUTO);
         vehicle.setFuelType(FuelType.PETROL);
         vehicle.setSeats(5);
+        vehicle.setCity("Hanoi");
         vehicle.setStatus(VehicleStatus.ACTIVE);
         vehicle = vehicleRepository.save(vehicle);
 

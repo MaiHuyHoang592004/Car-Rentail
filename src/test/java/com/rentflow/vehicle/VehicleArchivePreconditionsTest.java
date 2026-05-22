@@ -57,7 +57,7 @@ class VehicleArchivePreconditionsTest {
 
     @BeforeEach
     void setUp() {
-        mapper = new VehicleMapper();
+        mapper = new VehicleMapper(encryptionUtil);
         vehicleService = new VehicleService(
             vehicleRepository, listingRepository, bookingRepository, stateMachine, mapper, encryptionUtil);
 
@@ -84,8 +84,9 @@ class VehicleArchivePreconditionsTest {
                 vehicleId,
                 List.of(BookingStatus.HELD, BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS)))
                 .thenReturn(false);
-        when(listingRepository.findAllByVehicleIdAndStatusNot(vehicleId, ListingStatus.ARCHIVED))
-            .thenReturn(List.of());
+        when(listingRepository.updateStatusByVehicleIdAndStatusNot(
+                vehicleId, ListingStatus.ARCHIVED, ListingStatus.ARCHIVED))
+            .thenReturn(0);
         when(vehicleRepository.save(any())).thenReturn(vehicle);
 
         assertThatCode(() -> vehicleService.archiveVehicle(vehicleId, hostId))

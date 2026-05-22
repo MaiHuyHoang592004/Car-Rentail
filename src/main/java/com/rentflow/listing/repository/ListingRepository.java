@@ -39,7 +39,7 @@ public interface ListingRepository extends
 
     long countByVehicleIdAndStatusIn(UUID vehicleId, Set<ListingStatus> statuses);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE Listing l SET l.status = :newStatus WHERE l.vehicleId = :vehicleId AND l.status = :currentStatus")
     int updateStatusByVehicleIdAndStatus(
         @Param("vehicleId") UUID vehicleId,
@@ -47,7 +47,7 @@ public interface ListingRepository extends
         @Param("newStatus") ListingStatus newStatus
     );
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE Listing l SET l.status = :newStatus WHERE l.vehicleId = :vehicleId AND l.status != :excludedStatus")
     int updateStatusByVehicleIdAndStatusNot(
         @Param("vehicleId") UUID vehicleId,
@@ -100,7 +100,7 @@ public interface ListingRepository extends
            "WHERE l.vehicleId = :vehicleId AND l.status != 'ARCHIVED' AND ac.status IS NOT NULL")
     boolean existsNonArchivedListingsWithActiveAvailability(@Param("vehicleId") UUID vehicleId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query(value = "UPDATE listings SET status = 'PENDING_APPROVAL', updated_at = NOW() " +
            "WHERE id = :listingId AND status = 'DRAFT'", nativeQuery = true)
     int atomicSubmitListing(@Param("listingId") UUID listingId);

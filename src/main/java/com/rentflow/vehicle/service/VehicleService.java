@@ -112,13 +112,8 @@ public class VehicleService {
                 "Vehicle cannot be archived: active bookings exist for related listings");
         }
 
-        List<Listing> listings = listingRepository.findAllByVehicleIdAndStatusNot(
-                vehicleId, ListingStatus.ARCHIVED);
-
-        for (Listing listing : listings) {
-            listing.setStatus(ListingStatus.ARCHIVED);
-            listingRepository.save(listing);
-        }
+        listingRepository.updateStatusByVehicleIdAndStatusNot(
+                vehicleId, ListingStatus.ARCHIVED, ListingStatus.ARCHIVED);
 
         vehicle.setStatus(VehicleStatus.ARCHIVED);
         vehicleRepository.save(vehicle);

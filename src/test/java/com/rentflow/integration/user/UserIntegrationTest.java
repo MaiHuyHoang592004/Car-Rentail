@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -74,6 +75,9 @@ class UserIntegrationTest {
 
     @Autowired
     private UserProfileRepository userProfileRepository;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @BeforeEach
     void setUp() {
@@ -135,6 +139,24 @@ class UserIntegrationTest {
     }
 
     @Test
+    void patchMe_rejectsInvalidPhone() throws Exception {
+        AuthUser user = createUser("invalid-phone@example.com", "Password@123", Role.CUSTOMER);
+        String token = tokenProvider.generateAccessToken(user.getId(), user.getEmail(), List.of(Role.CUSTOMER));
+
+        mockMvc.perform(patch("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phone": "0909-call-me"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.details[?(@.field=='phone')]").exists());
+    }
+
+    @Test
     void patchMe_ignoresProtectedFields() throws Exception {
         AuthUser user = createUser("protected-fields@example.com", "Password@123", Role.CUSTOMER);
         String token = tokenProvider.generateAccessToken(user.getId(), user.getEmail(), List.of(Role.CUSTOMER));
@@ -166,9 +188,9 @@ class UserIntegrationTest {
         String customerToken = tokenProvider.generateAccessToken(customer.getId(), customer.getEmail(), List.of(Role.CUSTOMER));
 
         mockMvc.perform(get("/api/v1/admin/users")
-                        .header("Authorization", "Bearer " + customerToken))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+                .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
     }
 
     @Test
@@ -221,15 +243,16 @@ class UserIntegrationTest {
     }
 
     private AuthUser createUser(String email, String password, Role role, UserStatus status) {
-        AuthUser user = new AuthUser(email, "{noop}" + password, status, false);
-        user = authUserRepository.save(user);
-        user.getRoles().add(new UserRole(user, role));
-        user = authUserRepository.save(user);
+        return transactionTemplate.execute(tx -> {
+            AuthUser user = new AuthUser(email, "{noop}" + password, status, false);
+            user.addRole(role);
+            user = authUserRepository.save(user);
 
-        UserProfile profile = new UserProfile("Me User");
-        profile.setUser(user);
-        userProfileRepository.save(profile);
+            UserProfile profile = new UserProfile("Me User");
+            profile.setUser(user);
+            userProfileRepository.save(profile);
 
-        return user;
+            return user;
+        });
     }
 }

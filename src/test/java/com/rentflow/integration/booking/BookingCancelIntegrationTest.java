@@ -201,6 +201,7 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
         vehicle.setTransmission(TransmissionType.AUTO);
         vehicle.setFuelType(FuelType.PETROL);
         vehicle.setSeats(5);
+        vehicle.setCity("Hanoi");
         vehicle.setStatus(VehicleStatus.ACTIVE);
         vehicle = vehicleRepository.save(vehicle);
 

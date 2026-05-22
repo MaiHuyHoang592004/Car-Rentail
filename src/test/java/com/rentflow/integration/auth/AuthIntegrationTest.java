@@ -142,7 +142,7 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void register_adminRoleRequest_doesNotAssignAdmin() throws Exception {
+    void register_adminRoleRequest_isRejected() throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -153,8 +153,8 @@ class AuthIntegrationTest {
                                   "roles": ["ADMIN"]
                                 }
                                 """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_ROLE"));
     }
 
     // ─── Login ─────────────────────────────────────────────────────────────────

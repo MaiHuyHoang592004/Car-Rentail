@@ -1,5 +1,6 @@
 package com.rentflow.vehicle.mapper;
 
+import com.rentflow.common.util.EncryptionUtil;
 import com.rentflow.vehicle.dto.CreateVehicleRequest;
 import com.rentflow.vehicle.dto.UpdateVehicleRequest;
 import com.rentflow.vehicle.dto.VehicleResponse;
@@ -8,6 +9,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class VehicleMapper {
+
+    private final EncryptionUtil encryptionUtil;
+
+    public VehicleMapper(EncryptionUtil encryptionUtil) {
+        this.encryptionUtil = encryptionUtil;
+    }
 
     public Vehicle toEntity(CreateVehicleRequest request, String encryptedPlate, String plateHash,
                             String encryptedVin, String vinHash) {
@@ -24,6 +31,7 @@ public class VehicleMapper {
         vehicle.setVinEncrypted(encryptedVin);
         vehicle.setVinHash(vinHash);
         vehicle.setStatus(request.status() != null ? request.status() : com.rentflow.vehicle.entity.VehicleStatus.ACTIVE);
+        vehicle.setCity(request.city());
         return vehicle;
     }
 
@@ -35,21 +43,15 @@ public class VehicleMapper {
         if (request.transmission() != null) vehicle.setTransmission(request.transmission());
         if (request.fuelType() != null) vehicle.setFuelType(request.fuelType());
         if (request.seats() != null) vehicle.setSeats(request.seats());
+        if (request.city() != null) vehicle.setCity(request.city());
+        if (request.status() != null) vehicle.setStatus(request.status());
     }
 
     public VehicleResponse toResponse(Vehicle vehicle) {
-        return new VehicleResponse(
-            vehicle.getId(),
-            vehicle.getCategory(),
-            vehicle.getMake(),
-            vehicle.getModel(),
-            vehicle.getManufactureYear(),
-            vehicle.getTransmission(),
-            vehicle.getFuelType(),
-            vehicle.getSeats(),
-            vehicle.getStatus(),
-            vehicle.getCreatedAt(),
-            vehicle.getUpdatedAt()
+        return VehicleResponse.from(
+            vehicle,
+            encryptionUtil.decrypt(vehicle.getPlateNumberEncrypted()),
+            encryptionUtil.decrypt(vehicle.getVinEncrypted())
         );
     }
 }

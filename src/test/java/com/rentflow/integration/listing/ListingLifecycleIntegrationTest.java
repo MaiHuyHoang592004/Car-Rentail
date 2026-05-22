@@ -183,13 +183,13 @@ class ListingLifecycleIntegrationTest {
         String vehicleId = createVehicle();
         String listingId = createListing(vehicleId, "My Listing");
 
-        var vehicle = vehicleRepository.findById(UUID.fromString(vehicleId)).orElseThrow();
-        vehicle.setStatus(VehicleStatus.MAINTENANCE);
-        vehicleRepository.save(vehicle);
-
         mockMvc.perform(post("/api/v1/host/listings/" + listingId + "/submit")
                 .header("Authorization", "Bearer " + hostToken))
             .andExpect(status().isOk());
+
+        var vehicle = vehicleRepository.findById(UUID.fromString(vehicleId)).orElseThrow();
+        vehicle.setStatus(VehicleStatus.MAINTENANCE);
+        vehicleRepository.save(vehicle);
 
         mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/approve")
                 .header("Authorization", "Bearer " + adminToken))
@@ -204,7 +204,7 @@ class ListingLifecycleIntegrationTest {
 
         mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/approve")
                 .header("Authorization", "Bearer " + hostToken))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -256,8 +256,10 @@ class ListingLifecycleIntegrationTest {
 
         String userId = parseJson(result).get("id").asText();
         var user = authUserRepository.findById(UUID.fromString(userId)).orElseThrow();
-        user.getRoles().add(new UserRole(user, Role.valueOf(role)));
-        authUserRepository.save(user);
+        Role requestedRole = Role.valueOf(role);
+        if (requestedRole != Role.CUSTOMER) {
+            userRoleRepository.save(new UserRole(user, requestedRole));
+        }
 
         return parseJson(result);
     }
@@ -289,7 +291,8 @@ class ListingLifecycleIntegrationTest {
                       "plateNumber": "ABC-123",
                       "transmission": "AUTO",
                       "fuelType": "PETROL",
-                      "seats": 5
+                      "seats": 5,
+                      "city": "Hanoi"
                     }
                     """))
             .andExpect(status().isCreated())

@@ -8,6 +8,8 @@ import com.rentflow.auth.repository.UserRoleRepository;
 import com.rentflow.availability.entity.AvailabilityCalendar;
 import com.rentflow.availability.entity.AvailabilityStatus;
 import com.rentflow.availability.repository.AvailabilityCalendarRepository;
+import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.common.idempotency.repository.IdempotencyKeyRepository;
 import com.rentflow.integration.BaseIntegrationTest;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
@@ -48,17 +50,25 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private AvailabilityCalendarRepository availabilityRepository;
 
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private IdempotencyKeyRepository idempotencyKeyRepository;
+
     private String hostToken;
     private String adminToken;
     private UUID hostUserId;
 
     @BeforeEach
     void setUp() throws Exception {
-        userRoleRepository.deleteAll();
-        authUserRepository.deleteAll();
+        bookingRepository.deleteAll();
+        idempotencyKeyRepository.deleteAll();
+        availabilityRepository.deleteAll();
         listingRepository.deleteAll();
         vehicleRepository.deleteAll();
-        availabilityRepository.deleteAll();
+        userRoleRepository.deleteAll();
+        authUserRepository.deleteAll();
 
         JsonNode hostReg = registerUser("host@example.com", "Password@123", "HOST");
         hostUserId = UUID.fromString(hostReg.get("id").asText());
@@ -199,8 +209,10 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
                 .andReturn();
         String userId = parseJson(result).get("id").asText();
         var user = authUserRepository.findById(UUID.fromString(userId)).orElseThrow();
-        user.getRoles().add(new UserRole(user, Role.valueOf(role)));
-        authUserRepository.save(user);
+        Role requestedRole = Role.valueOf(role);
+        if (requestedRole != Role.CUSTOMER) {
+            userRoleRepository.save(new UserRole(user, requestedRole));
+        }
         return parseJson(result);
     }
 
@@ -234,7 +246,8 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
                                       "plateNumber": "%s",
                                       "transmission": "AUTO",
                                       "fuelType": "PETROL",
-                                      "seats": 5
+                                      "seats": 5,
+                                      "city": "Hanoi"
                                     }
                                     """.formatted(UUID.randomUUID().toString().substring(0, 8))))
                 .andExpect(status().isCreated())

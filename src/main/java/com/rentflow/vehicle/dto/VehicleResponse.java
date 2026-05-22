@@ -19,10 +19,13 @@ public record VehicleResponse(
     FuelType fuelType,
     Integer seats,
     VehicleStatus status,
+    String city,
+    String plateNumber,
+    String vin,
     Instant createdAt,
     Instant updatedAt
 ) {
-    public static VehicleResponse from(Vehicle vehicle) {
+    public static VehicleResponse from(Vehicle vehicle, String decryptedPlate, String decryptedVin) {
         return new VehicleResponse(
             vehicle.getId(),
             vehicle.getCategory(),
@@ -33,6 +36,9 @@ public record VehicleResponse(
             vehicle.getFuelType(),
             vehicle.getSeats(),
             vehicle.getStatus(),
+            vehicle.getCity(),
+            decryptedPlate,
+            decryptedVin,
             vehicle.getCreatedAt(),
             vehicle.getUpdatedAt()
         );

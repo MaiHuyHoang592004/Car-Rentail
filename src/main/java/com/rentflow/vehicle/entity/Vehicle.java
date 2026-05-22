@@ -52,6 +52,9 @@ public class Vehicle extends BaseEntity {
     @Column(nullable = false, length = 20)
     private VehicleStatus status = VehicleStatus.ACTIVE;
 
+    @Column(name = "city", length = 100)
+    private String city;
+
     public Vehicle() {
         this.status = VehicleStatus.ACTIVE;
     }
@@ -94,4 +97,7 @@ public class Vehicle extends BaseEntity {
 
     public VehicleStatus getStatus() { return status; }
     public void setStatus(VehicleStatus status) { this.status = status; }
+
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
 }

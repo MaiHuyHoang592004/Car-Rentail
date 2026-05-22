@@ -104,15 +104,8 @@ class VehicleSuspendPropagationIntegrationTest {
         submitListing(listing1Id);
         approveListing(listing1Id);
 
-        // Create and submit listing 2
-        String listing2Id = createListing(vehicleId, "Listing Two");
-        submitListing(listing2Id);
-        approveListing(listing2Id);
-
-        // Both listings must be ACTIVE
+        // The one-active-listing rule allows a single ACTIVE listing per vehicle.
         assertThat(listingRepository.findById(UUID.fromString(listing1Id)).orElseThrow().getStatus())
-                .isEqualTo(ListingStatus.ACTIVE);
-        assertThat(listingRepository.findById(UUID.fromString(listing2Id)).orElseThrow().getStatus())
                 .isEqualTo(ListingStatus.ACTIVE);
 
         // Suspend the vehicle
@@ -125,10 +118,8 @@ class VehicleSuspendPropagationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUSPENDED"));
 
-        // Both listings must now be SUSPENDED
+        // The active listing must now be SUSPENDED
         assertThat(listingRepository.findById(UUID.fromString(listing1Id)).orElseThrow().getStatus())
-                .isEqualTo(ListingStatus.SUSPENDED);
-        assertThat(listingRepository.findById(UUID.fromString(listing2Id)).orElseThrow().getStatus())
                 .isEqualTo(ListingStatus.SUSPENDED);
     }
 
@@ -167,12 +158,7 @@ class VehicleSuspendPropagationIntegrationTest {
         submitListing(listing1Id);
         approveListing(listing1Id);
 
-        // Listing 2: will be suspended
-        String listing2Id = createListing(vehicleId, "Listing Suspended");
-        submitListing(listing2Id);
-        approveListing(listing2Id);
-
-        // Suspend vehicle -> both listings suspend
+        // Suspend vehicle -> active listing suspends
         mockMvc.perform(patch("/api/v1/host/vehicles/" + vehicleId)
                         .header("Authorization", "Bearer " + hostToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -182,8 +168,6 @@ class VehicleSuspendPropagationIntegrationTest {
                 .andExpect(status().isOk());
 
         assertThat(listingRepository.findById(UUID.fromString(listing1Id)).orElseThrow().getStatus())
-                .isEqualTo(ListingStatus.SUSPENDED);
-        assertThat(listingRepository.findById(UUID.fromString(listing2Id)).orElseThrow().getStatus())
                 .isEqualTo(ListingStatus.SUSPENDED);
 
         // Bring vehicle back to ACTIVE
@@ -196,10 +180,8 @@ class VehicleSuspendPropagationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
 
-        // Both listings must remain SUSPENDED (not resurrected)
+        // The listing must remain SUSPENDED (not resurrected)
         assertThat(listingRepository.findById(UUID.fromString(listing1Id)).orElseThrow().getStatus())
-                .isEqualTo(ListingStatus.SUSPENDED);
-        assertThat(listingRepository.findById(UUID.fromString(listing2Id)).orElseThrow().getStatus())
                 .isEqualTo(ListingStatus.SUSPENDED);
     }
 
@@ -220,8 +202,10 @@ class VehicleSuspendPropagationIntegrationTest {
 
         String userId = parseJson(result).get("id").asText();
         var user = authUserRepository.findById(UUID.fromString(userId)).orElseThrow();
-        user.getRoles().add(new UserRole(user, Role.valueOf(role)));
-        authUserRepository.save(user);
+        Role requestedRole = Role.valueOf(role);
+        if (requestedRole != Role.CUSTOMER) {
+            userRoleRepository.save(new UserRole(user, requestedRole));
+        }
 
         return parseJson(result);
     }
@@ -253,7 +237,8 @@ class VehicleSuspendPropagationIntegrationTest {
                               "plateNumber": "ABC-123",
                               "transmission": "AUTO",
                               "fuelType": "PETROL",
-                              "seats": 5
+                              "seats": 5,
+                              "city": "Hanoi"
                             }
                             """))
                 .andExpect(status().isCreated())

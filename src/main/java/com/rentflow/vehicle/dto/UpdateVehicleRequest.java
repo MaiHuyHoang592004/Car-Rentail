@@ -29,5 +29,8 @@ public record UpdateVehicleRequest(
     @Max(value = 30, message = "Seats must be at most 30")
     Integer seats,
 
-    VehicleStatus status
+    VehicleStatus status,
+
+    @Size(max = 100, message = "City must be at most 100 characters")
+    String city
 ) {}

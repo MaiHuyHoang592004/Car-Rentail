@@ -222,8 +222,10 @@ class AdminListingConcurrentApprovalTest {
 
         String userId = parseJson(result).get("id").asText();
         var user = authUserRepository.findById(UUID.fromString(userId)).orElseThrow();
-        user.getRoles().add(new UserRole(user, Role.valueOf(role)));
-        authUserRepository.save(user);
+        Role requestedRole = Role.valueOf(role);
+        if (requestedRole != Role.CUSTOMER) {
+            userRoleRepository.save(new UserRole(user, requestedRole));
+        }
 
         return parseJson(result);
     }
@@ -255,7 +257,8 @@ class AdminListingConcurrentApprovalTest {
                               "plateNumber": "ABC-123",
                               "transmission": "AUTO",
                               "fuelType": "PETROL",
-                              "seats": 5
+                              "seats": 5,
+                              "city": "Hanoi"
                             }
                             """))
                 .andExpect(status().isCreated())

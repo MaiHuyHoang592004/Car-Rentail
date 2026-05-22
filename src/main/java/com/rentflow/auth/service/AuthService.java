@@ -147,6 +147,16 @@ public class AuthService {
             return List.of(Role.CUSTOMER);
         }
 
+        if (requestedRoles.stream().anyMatch(name -> {
+            try {
+                return Role.valueOf(name.toUpperCase()) == Role.ADMIN;
+            } catch (IllegalArgumentException e) {
+                return false;
+            }
+        })) {
+            throw new BusinessRuleException("INVALID_ROLE", "Cannot register with ADMIN role");
+        }
+
         List<Role> roles = requestedRoles.stream()
                 .map(name -> {
                     try {
@@ -155,7 +165,7 @@ public class AuthService {
                         return null;
                     }
                 })
-                .filter(r -> r != null && r != Role.ADMIN)
+                .filter(java.util.Objects::nonNull)
                 .toList();
 
         return roles.isEmpty() ? List.of(Role.CUSTOMER) : roles;

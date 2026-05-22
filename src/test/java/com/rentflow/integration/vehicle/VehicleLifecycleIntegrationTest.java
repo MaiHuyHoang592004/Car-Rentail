@@ -91,7 +91,8 @@ class VehicleLifecycleIntegrationTest {
                       "vin": "1HGBH41JXMN109186",
                       "transmission": "AUTO",
                       "fuelType": "PETROL",
-                      "seats": 5
+                      "seats": 5,
+                      "city": "Hanoi"
                     }
                     """))
             .andExpect(status().isCreated())
@@ -115,7 +116,8 @@ class VehicleLifecycleIntegrationTest {
                       "transmission": "AUTO",
                       "fuelType": "HYBRID",
                       "seats": 5,
-                      "status": "DRAFT"
+                      "status": "DRAFT",
+                      "city": "Hanoi"
                     }
                     """))
             .andExpect(status().isCreated())
@@ -169,7 +171,7 @@ class VehicleLifecycleIntegrationTest {
         String vehicleId = createVehicle("SEDAN", "Mazda", "3", 2021, "DD-4", "AUTO", "PETROL", 5);
 
         mockMvc.perform(get("/api/v1/host/vehicles/" + vehicleId))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -213,8 +215,10 @@ class VehicleLifecycleIntegrationTest {
 
         String userId = parseJson(result).get("id").asText();
         var user = authUserRepository.findById(UUID.fromString(userId)).orElseThrow();
-        user.getRoles().add(new UserRole(user, Role.valueOf(role)));
-        authUserRepository.save(user);
+        Role requestedRole = Role.valueOf(role);
+        if (requestedRole != Role.CUSTOMER) {
+            userRoleRepository.save(new UserRole(user, requestedRole));
+        }
 
         return parseJson(result);
     }
@@ -247,7 +251,8 @@ class VehicleLifecycleIntegrationTest {
                       "plateNumber": "%s",
                       "transmission": "%s",
                       "fuelType": "%s",
-                      "seats": %d
+                      "seats": %d,
+                      "city": "Hanoi"
                     }
                     """.formatted(category, make, model, year, plate, transmission, fuel, seats)))
             .andExpect(status().isCreated())
