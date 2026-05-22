@@ -24,6 +24,7 @@
 | AUTH_TOKEN_EXPIRED | 401 | Access token expired |
 | AUTH_ACCOUNT_SUSPENDED | 403 | Account is suspended (returned only after credential check passes) |
 | AUTH_ACCOUNT_LOCKED | 423 | Account locked due to too many failed login attempts; `Retry-After` header included |
+| INVALID_TOKEN | 409 | Reset/verification token is missing, expired, or already used |
 | ACCESS_DENIED | 403 | User lacks permission |
 | USER_EMAIL_EXISTS | 409 | Email already registered |
 | DRIVER_LICENSE_NOT_APPROVED | 403 | Customer is not eligible to book |

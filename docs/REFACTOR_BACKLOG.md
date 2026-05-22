@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I01-I12`, `I15`, `I17`, `I18`, `I19`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
+> Completed: `C01-C07`, `I01-I13`, `I15`, `I17`, `I18`, `I19`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
 
 ---
 
@@ -186,7 +186,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** `VehicleService.archiveVehicle()` loop `save(listing)` | **Effort:** XS | **Fix:** Batch `@Modifying @Query UPDATE`.
 
 ## I13 — Forgot/Reset/Change Password Missing
-**Status:** Confirmed | **Evidence:** No endpoint auth/forgot-password, reset-password, me/password | **Effort:** L | **Fix:** PasswordResetToken + 3 endpoints + email stub.
+**Status:** Done | **Evidence:** No endpoint auth/forgot-password, reset-password, me/password | **Effort:** L | **Fix:** V10 migration adds `password_reset_tokens`; `PasswordService` (forgot=silent on unknown email, reset, change) hashes raw tokens with SHA-256; 30-min lifetime; reset/change revoke all refresh tokens for user. Endpoints `POST /api/v1/auth/forgot-password`, `POST /api/v1/auth/reset-password`, `PATCH /api/v1/users/me/password`. Email delivery stubbed (logs link).
 
 ## I14 — Email Verification Not Enforced
 **Status:** Confirmed | **Evidence:** `AuthUser.emailVerified` field, register=false, login no check | **Effort:** L | **Fix:** Token + gated actions. **Depends:** I13.
