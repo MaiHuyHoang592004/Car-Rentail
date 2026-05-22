@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/rentflow/app-shell";
 import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
 import { PageHeader } from "@/components/rentflow/page-header";
-import { RoleGuard } from "@/features/auth/role-guard";
 import { createBooking, type CreateBookingInput } from "@/features/bookings/api";
 import type {
   BookingCreateFormErrors,
@@ -75,15 +74,7 @@ type BookingCreatePageViewProps = {
   isGuest: boolean;
 };
 
-export function BookingCreatePageView(props: BookingCreatePageViewProps) {
-  return (
-    <RoleGuard requiredRoles={["CUSTOMER"]}>
-      <BookingCreateContent {...props} />
-    </RoleGuard>
-  );
-}
-
-function BookingCreateContent({ listingId, isGuest }: BookingCreatePageViewProps) {
+export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageViewProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: listing } = useQuery({

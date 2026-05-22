@@ -8,21 +8,12 @@ import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { BOOKING_STATUS_FILTERS, listMyBookings } from "@/features/bookings/api";
 import { BookingSummaryCard } from "@/features/bookings/booking-summary-card";
-import { RoleGuard } from "@/features/auth/role-guard";
 import type { BookingListFilterValue } from "@/features/bookings/types";
 import { ApiError } from "@/lib/api-error";
 
 const PAGE_SIZE = 20;
 
 export function BookingsListPageView() {
-  return (
-    <RoleGuard requiredRoles={["CUSTOMER"]}>
-      <BookingsListContent />
-    </RoleGuard>
-  );
-}
-
-function BookingsListContent() {
   const [statusFilter, setStatusFilter] = useState<BookingListFilterValue>("ALL");
   const [page, setPage] = useState<number>(0);
 

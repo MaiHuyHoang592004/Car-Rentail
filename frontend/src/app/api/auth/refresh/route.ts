@@ -5,6 +5,7 @@ import { callBackend, forwardBackendError } from "@/lib/server/backend";
 import {
   REFRESH_COOKIE_NAME,
   clearRefreshCookie,
+  clearRoleCookie,
   setRefreshCookie,
 } from "@/lib/server/session-cookie";
 
@@ -35,6 +36,7 @@ export async function POST() {
   if (!response.ok) {
     const errorResponse = await forwardBackendError(response);
     clearRefreshCookie(errorResponse);
+    clearRoleCookie(errorResponse);
     return errorResponse;
   }
 

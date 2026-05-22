@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { callBackend } from "@/lib/server/backend";
-import { REFRESH_COOKIE_NAME, clearRefreshCookie } from "@/lib/server/session-cookie";
+import { REFRESH_COOKIE_NAME, clearRefreshCookie, clearRoleCookie } from "@/lib/server/session-cookie";
 
 export async function POST() {
   const cookieStore = await cookies();
@@ -17,5 +17,6 @@ export async function POST() {
 
   const response = new NextResponse(null, { status: 204 });
   clearRefreshCookie(response);
+  clearRoleCookie(response);
   return response;
 }

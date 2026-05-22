@@ -6,9 +6,9 @@
 >
 > Effort: **XS** (< 2h) | **S** (2-4h) | **M** (4-8h) | **L** (8-16h) | **XL** (> 16h)
 >
-> Last updated: 2026-05-22
+> Last updated: 2026-05-23
 >
-> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
+> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I30`, `I31`, `I32`, `I34`, `I36`, `I37`, `I38`, `I39`, `I43`.
 
 ---
 
@@ -237,10 +237,10 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** Auth via BFF, others via rewrite | **Effort:** XS | **Fix:** Document.
 
 ## I36 — Middleware No Role Check
-**Status:** Confirmed | **Evidence:** `middleware.ts`: `if (refreshCookie) next()` | **Effort:** M | **Fix:** Read role from cookie.
+**Status:** Done | **Evidence:** `middleware.ts` previously only checked `refreshCookie` presence | **Effort:** M | **Fix:** Added companion httpOnly cookie `rentflow_role` set by BFF login/register/session (cleared on logout + refresh/session error). Middleware now matches per-prefix role requirements (`/admin`→ADMIN, `/host`→HOST, `/bookings` & `/listings/:id/book` & `/me/bookings`→CUSTOMER, `/me`→any authed) and redirects to `/forbidden` on role mismatch. `parseRoles` + cookie names live in Edge-safe `src/lib/session-cookie-shared.ts`.
 
 ## I37 — RoleGuard Flash Content
-**Status:** Confirmed | **Evidence:** `role-guard.tsx` useEffect redirect | **Effort:** M | **Fix:** Layout-based protection. **Depends:** I36.
+**Status:** Done | **Evidence:** `role-guard.tsx` previously used useEffect for redirect → flash | **Effort:** M | **Fix:** Converted `app/host/layout.tsx` and `app/admin/layout.tsx` to server components that read the role cookie and `redirect()` server-side before render. Removed `RoleGuard` wrappers from booking page views (middleware enforces CUSTOMER). Deleted `src/features/auth/role-guard.tsx`. **Depends:** I36.
 
 ## I38 — Mobile Nav Missing
 **Status:** Done | **Evidence:** `app-shell.tsx`: `hidden md:flex` on nav, no mobile replacement | **Effort:** M | **Fix:** Hamburger + left slide-in drawer (no new deps); closes on link click, overlay, Escape, route change.

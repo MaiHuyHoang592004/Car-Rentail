@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
-import { RoleGuard } from "@/features/auth/role-guard";
 import {
   cancelBooking,
   getBookingById,
@@ -51,14 +50,6 @@ type BookingDetailPageViewProps = {
 };
 
 export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps) {
-  return (
-    <RoleGuard requiredRoles={["CUSTOMER"]}>
-      <BookingDetailContent bookingId={bookingId} />
-    </RoleGuard>
-  );
-}
-
-function BookingDetailContent({ bookingId }: BookingDetailPageViewProps) {
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState<boolean>(false);
   const [cancelOpen, setCancelOpen] = useState<boolean>(false);

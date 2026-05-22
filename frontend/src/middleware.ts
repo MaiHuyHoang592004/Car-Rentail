@@ -1,35 +1,78 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { REFRESH_COOKIE_NAME } from "@/lib/server/session-cookie";
+import {
+  REFRESH_COOKIE_NAME,
+  ROLE_COOKIE_NAME,
+  parseRoles,
+} from "@/lib/session-cookie-shared";
 
-const PROTECTED_PREFIXES = ["/me", "/host", "/admin", "/bookings"];
+type Requirement = {
+  test: (pathname: string) => boolean;
+  roles: string[] | null;
+};
 
-function needsAuth(pathname: string): boolean {
-  if (PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    return true;
-  }
-  if (/^\/listings\/[^/]+\/book\/?$/.test(pathname)) {
-    return true;
-  }
-  return false;
+const REQUIREMENTS: Requirement[] = [
+  { test: (p) => p.startsWith("/admin"), roles: ["ADMIN"] },
+  { test: (p) => p.startsWith("/host"), roles: ["HOST"] },
+  { test: (p) => p.startsWith("/me/bookings"), roles: ["CUSTOMER"] },
+  { test: (p) => p.startsWith("/me"), roles: null },
+  { test: (p) => p.startsWith("/bookings"), roles: ["CUSTOMER"] },
+  { test: (p) => /^\/listings\/[^/]+\/book\/?$/.test(p), roles: ["CUSTOMER"] },
+];
+
+function matchRequirement(pathname: string): Requirement | null {
+  return REQUIREMENTS.find((r) => r.test(pathname)) ?? null;
 }
 
-export function middleware(request: NextRequest) {
+function redirectToLogin(request: NextRequest, clearCookies: boolean) {
   const { pathname, search } = request.nextUrl;
-  if (!needsAuth(pathname)) {
-    return NextResponse.next();
-  }
-
-  const refreshCookie = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
-  if (refreshCookie) {
-    return NextResponse.next();
-  }
-
   const loginUrl = request.nextUrl.clone();
   loginUrl.pathname = "/login";
   loginUrl.search = "";
   loginUrl.searchParams.set("next", `${pathname}${search}`);
-  return NextResponse.redirect(loginUrl);
+  const response = NextResponse.redirect(loginUrl);
+  if (clearCookies) {
+    response.cookies.delete(REFRESH_COOKIE_NAME);
+    response.cookies.delete(ROLE_COOKIE_NAME);
+  }
+  return response;
+}
+
+function redirectToForbidden(request: NextRequest) {
+  const forbiddenUrl = request.nextUrl.clone();
+  forbiddenUrl.pathname = "/forbidden";
+  forbiddenUrl.search = "";
+  return NextResponse.redirect(forbiddenUrl);
+}
+
+export function middleware(request: NextRequest) {
+  const requirement = matchRequirement(request.nextUrl.pathname);
+  if (!requirement) {
+    return NextResponse.next();
+  }
+
+  const refreshCookie = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+  if (!refreshCookie) {
+    return redirectToLogin(request, false);
+  }
+
+  const roleCookie = request.cookies.get(ROLE_COOKIE_NAME)?.value;
+  const roles = parseRoles(roleCookie);
+
+  if (requirement.roles === null) {
+    return NextResponse.next();
+  }
+
+  if (roles.length === 0) {
+    return redirectToLogin(request, true);
+  }
+
+  const allowed = requirement.roles.some((r) => roles.includes(r));
+  if (!allowed) {
+    return redirectToForbidden(request);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

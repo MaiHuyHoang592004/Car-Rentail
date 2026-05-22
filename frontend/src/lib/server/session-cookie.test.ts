@@ -5,8 +5,11 @@ vi.stubEnv("NODE_ENV", "test");
 const { NextResponse } = await import("next/server");
 const {
   REFRESH_COOKIE_NAME,
+  ROLE_COOKIE_NAME,
   clearRefreshCookie,
+  clearRoleCookie,
   setRefreshCookie,
+  setRoleCookie,
 } = await import("./session-cookie");
 
 describe("session-cookie helpers", () => {
@@ -35,5 +38,25 @@ describe("session-cookie helpers", () => {
     setRefreshCookie(res, "token");
     const sc = res.headers.get("set-cookie") ?? "";
     expect(sc.toLowerCase()).not.toContain("secure");
+  });
+
+  it("setRoleCookie joins roles with comma and sets httpOnly 7-day cookie", () => {
+    const res = NextResponse.json({});
+    setRoleCookie(res, ["HOST", "CUSTOMER"]);
+    const cookie = res.cookies.get(ROLE_COOKIE_NAME);
+    expect(cookie?.value).toBe("HOST,CUSTOMER");
+    const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc).toContain("HttpOnly");
+    expect(sc.toLowerCase()).toContain("samesite=lax");
+    expect(sc).toContain("Path=/");
+    expect(sc).toContain("Max-Age=604800");
+  });
+
+  it("clearRoleCookie sets maxAge=0", () => {
+    const res = NextResponse.json({});
+    clearRoleCookie(res);
+    const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc).toContain("Max-Age=0");
+    expect(sc).toContain("HttpOnly");
   });
 });

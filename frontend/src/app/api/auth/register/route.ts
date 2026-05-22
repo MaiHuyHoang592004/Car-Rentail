@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { callBackend, forwardBackendError } from "@/lib/server/backend";
 import {
   setRefreshCookie,
+  setRoleCookie,
   type SessionPayload,
   type SessionUser,
 } from "@/lib/server/session-cookie";
@@ -65,5 +66,6 @@ export async function POST(request: Request) {
 
   const response = NextResponse.json(payload, { status: 201 });
   setRefreshCookie(response, tokens.refreshToken);
+  setRoleCookie(response, tokens.user.roles);
   return response;
 }

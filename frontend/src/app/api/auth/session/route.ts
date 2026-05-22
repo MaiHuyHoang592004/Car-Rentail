@@ -5,7 +5,9 @@ import { callBackend } from "@/lib/server/backend";
 import {
   REFRESH_COOKIE_NAME,
   clearRefreshCookie,
+  clearRoleCookie,
   setRefreshCookie,
+  setRoleCookie,
   type SessionPayload,
   type SessionUser,
 } from "@/lib/server/session-cookie";
@@ -33,6 +35,7 @@ export async function GET() {
   if (!refreshResponse.ok) {
     const response = new NextResponse(null, { status: 204 });
     clearRefreshCookie(response);
+    clearRoleCookie(response);
     return response;
   }
 
@@ -48,6 +51,7 @@ export async function GET() {
   if (!meResponse.ok) {
     const response = new NextResponse(null, { status: 204 });
     clearRefreshCookie(response);
+    clearRoleCookie(response);
     return response;
   }
 
@@ -60,5 +64,6 @@ export async function GET() {
 
   const response = NextResponse.json(payload, { status: 200 });
   setRefreshCookie(response, tokens.refreshToken);
+  setRoleCookie(response, user.roles);
   return response;
 }
