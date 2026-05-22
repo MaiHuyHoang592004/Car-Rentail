@@ -2,6 +2,7 @@ package com.rentflow.auth.controller;
 
 import com.rentflow.auth.dto.*;
 import com.rentflow.auth.service.AuthService;
+import com.rentflow.auth.service.EmailVerificationService;
 import com.rentflow.auth.service.PasswordService;
 import com.rentflow.common.exception.AuthenticationException;
 import com.rentflow.common.ratelimit.RateLimitService;
@@ -22,6 +23,7 @@ public class AuthController {
     private final AuthService authService;
     private final RateLimitService rateLimitService;
     private final PasswordService passwordService;
+    private final EmailVerificationService emailVerificationService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
@@ -66,6 +68,12 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        emailVerificationService.verify(request.token());
         return ResponseEntity.noContent().build();
     }
 

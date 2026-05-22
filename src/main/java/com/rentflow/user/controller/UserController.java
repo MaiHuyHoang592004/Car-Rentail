@@ -3,6 +3,7 @@ package com.rentflow.user.controller;
 import com.rentflow.auth.dto.ChangePasswordRequest;
 import com.rentflow.auth.entity.Role;
 import com.rentflow.auth.entity.UserStatus;
+import com.rentflow.auth.service.EmailVerificationService;
 import com.rentflow.auth.service.PasswordService;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.user.dto.UpdateProfileRequest;
@@ -26,6 +27,7 @@ public class UserController {
 
     private final UserService userService;
     private final PasswordService passwordService;
+    private final EmailVerificationService emailVerificationService;
     private final SecurityContext securityContext;
 
     @GetMapping("/me")
@@ -45,6 +47,12 @@ public class UserController {
                 securityContext.currentUserId(),
                 request.currentPassword(),
                 request.newPassword());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/me/resend-verification")
+    public ResponseEntity<Void> resendVerification() {
+        emailVerificationService.sendVerification(securityContext.currentUserId());
         return ResponseEntity.noContent().build();
     }
 }

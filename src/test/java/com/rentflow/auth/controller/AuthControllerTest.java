@@ -43,7 +43,8 @@ class AuthControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(
                         authService,
                         rateLimitService,
-                        mock(com.rentflow.auth.service.PasswordService.class)))
+                        mock(com.rentflow.auth.service.PasswordService.class),
+                        mock(com.rentflow.auth.service.EmailVerificationService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(new CorrelationIdHelper()))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
