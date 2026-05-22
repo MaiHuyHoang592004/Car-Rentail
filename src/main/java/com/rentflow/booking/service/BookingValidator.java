@@ -13,6 +13,7 @@ import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.user.entity.UserProfile;
 import com.rentflow.user.repository.UserProfileRepository;
 import com.rentflow.vehicle.entity.VehicleStatus;
+import com.rentflow.vehicle.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -37,6 +38,7 @@ public class BookingValidator {
     private final ListingRepository listingRepository;
     private final BookingRepository bookingRepository;
     private final UserProfileRepository userProfileRepository;
+    private final VehicleRepository vehicleRepository;
     private final Clock clock;
     private final boolean requireDriverVerification;
 
@@ -44,18 +46,20 @@ public class BookingValidator {
             ListingRepository listingRepository,
             BookingRepository bookingRepository,
             UserProfileRepository userProfileRepository,
+            VehicleRepository vehicleRepository,
             Clock clock,
             @Value("${rentflow.booking.require-driver-verification:false}") boolean requireDriverVerification) {
         this.listingRepository = listingRepository;
         this.bookingRepository = bookingRepository;
         this.userProfileRepository = userProfileRepository;
+        this.vehicleRepository = vehicleRepository;
         this.clock = clock;
         this.requireDriverVerification = requireDriverVerification;
     }
 
     public Listing resolveListingForBooking(UUID listingId, UUID customerId) {
         Listing listing = listingRepository
-                .findByIdAndStatusWithVehicleAndExtras(listingId, ListingStatus.ACTIVE)
+                .findByIdAndStatusWithExtras(listingId, ListingStatus.ACTIVE)
                 .filter(this::vehicleIsActive)
                 .orElseThrow(() -> new ListingNotFoundException(String.valueOf(listingId)));
         if (listing.getHostId().equals(customerId)) {
@@ -103,6 +107,8 @@ public class BookingValidator {
     }
 
     private boolean vehicleIsActive(Listing listing) {
-        return listing.getVehicle() != null && listing.getVehicle().getStatus() == VehicleStatus.ACTIVE;
+        return vehicleRepository.findById(listing.getVehicleId())
+                .map(vehicle -> vehicle.getStatus() == VehicleStatus.ACTIVE)
+                .orElse(false);
     }
 }

@@ -92,6 +92,8 @@ policy
 - Module may depend on `common/*`.
 - Module may NOT depend on another business module's service directly.
 - If booking needs listing data: go through listing's repository, not service.
+- Cross-module aggregate references are stored as UUID fields and loaded with explicit repository queries or projections, not JPA entity associations.
+- JPA associations are reserved for entities with clear ownership inside the same aggregate/module, such as a listing and its extras.
 
 ## Tech Stack
 

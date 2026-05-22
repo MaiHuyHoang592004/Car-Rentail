@@ -4,9 +4,9 @@ import com.rentflow.common.web.PageResponse;
 import com.rentflow.listing.dto.ListingSearchCriteria;
 import com.rentflow.listing.dto.ListingSearchRequest;
 import com.rentflow.listing.dto.ListingSearchResponse;
-import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.listing.service.ListingSearchService;
+import com.rentflow.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -36,21 +36,20 @@ class ListingSearchServiceTest {
     @Mock
     private ListingRepository listingRepository;
 
+    @Mock
+    private VehicleRepository vehicleRepository;
+
     private ListingSearchService searchService;
 
     @BeforeEach
     void setUp() {
-        searchService = new ListingSearchService(listingRepository);
+        searchService = new ListingSearchService(listingRepository, vehicleRepository);
     }
 
-    private Listing aListing(UUID id, String city) {
-        Listing listing = new Listing();
-        listing.setId(id);
-        listing.setTitle("Test Listing");
-        listing.setCity(city);
-        listing.setBasePricePerDay(BigDecimal.valueOf(500));
-        listing.setCurrency("VND");
-        return listing;
+    private ListingSearchResponse aListing(UUID id, String city) {
+        return new ListingSearchResponse(
+                id, "Test Listing", city, null, BigDecimal.valueOf(500), "VND",
+                null, null, null, null, null);
     }
 
     @Nested
@@ -121,7 +120,7 @@ class ListingSearchServiceTest {
         @Test
         @DisplayName("with no dates — returns listings without date filter")
         void search_withNoDates_returnsActiveListings() {
-            Listing listing = aListing(UUID.randomUUID(), "Hanoi");
+            ListingSearchResponse listing = aListing(UUID.randomUUID(), "Hanoi");
 
             when(listingRepository.search(any(), any()))
                     .thenReturn(new PageImpl<>(List.of(listing), PageRequest.of(0, 20), 1));

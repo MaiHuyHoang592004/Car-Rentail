@@ -1,7 +1,10 @@
 package com.rentflow.listing.repository;
 
 import com.rentflow.listing.dto.ListingSearchCriteria;
-import com.rentflow.listing.entity.Listing;
+import com.rentflow.listing.dto.ListingSearchResponse;
+import com.rentflow.vehicle.entity.FuelType;
+import com.rentflow.vehicle.entity.TransmissionType;
+import com.rentflow.vehicle.entity.VehicleCategory;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
@@ -13,6 +16,8 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.math.BigDecimal;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -25,16 +30,18 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Listing> search(ListingSearchCriteria criteria, Pageable pageable) {
+    public Page<ListingSearchResponse> search(ListingSearchCriteria criteria, Pageable pageable) {
         if (criteria.pickupDate() != null && criteria.returnDate() != null) {
             return searchWithDates(criteria, pageable);
         }
         return searchWithoutDates(criteria, pageable);
     }
 
-    private Page<Listing> searchWithoutDates(ListingSearchCriteria criteria, Pageable pageable) {
+    private Page<ListingSearchResponse> searchWithoutDates(ListingSearchCriteria criteria, Pageable pageable) {
         String baseSelect = """
-            SELECT DISTINCT l.* FROM listings l
+            SELECT l.id, l.title, l.city, v.category, l.base_price_per_day,
+                l.currency, v.seats, v.transmission, v.fuel_type
+            FROM listings l
             JOIN vehicles v ON l.vehicle_id = v.id
             WHERE l.status = 'ACTIVE'
             """;
@@ -44,7 +51,7 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
         String dataSql = baseSelect + dynamic + orderBy;
         String countSql = "SELECT COUNT(*) FROM (" + baseSelect + dynamic + ") AS t";
 
-        Query dataQuery = em.createNativeQuery(dataSql, Listing.class);
+        Query dataQuery = em.createNativeQuery(dataSql);
         dataQuery.setFirstResult((int) pageable.getOffset());
         dataQuery.setMaxResults(pageable.getPageSize());
         bindCommonParams(dataQuery, criteria, false);
@@ -54,14 +61,14 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
 
         List<?> data = dataQuery.getResultList();
         Number total = (Number) countQuery.getSingleResult();
-        @SuppressWarnings("unchecked")
-        List<Listing> results = (List<Listing>) data;
-        return new PageImpl<>(results, pageable, total.longValue());
+        return new PageImpl<>(toSearchResponses(data), pageable, total.longValue());
     }
 
-    private Page<Listing> searchWithDates(ListingSearchCriteria criteria, Pageable pageable) {
+    private Page<ListingSearchResponse> searchWithDates(ListingSearchCriteria criteria, Pageable pageable) {
         String baseSelect = """
-            SELECT DISTINCT l.* FROM listings l
+            SELECT l.id, l.title, l.city, v.category, l.base_price_per_day,
+                l.currency, v.seats, v.transmission, v.fuel_type
+            FROM listings l
             JOIN vehicles v ON l.vehicle_id = v.id
             WHERE l.status = 'ACTIVE'
             """;
@@ -92,7 +99,7 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
         String dataSql = baseSelect + availabilityFilter + dynamic + orderBy;
         String countSql = "SELECT COUNT(*) FROM (" + baseSelect + availabilityFilter + dynamic + ") AS t";
 
-        Query dataQuery = em.createNativeQuery(dataSql, Listing.class);
+        Query dataQuery = em.createNativeQuery(dataSql);
         dataQuery.setFirstResult((int) pageable.getOffset());
         dataQuery.setMaxResults(pageable.getPageSize());
         bindCommonParams(dataQuery, criteria, true);
@@ -102,9 +109,32 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
 
         List<?> data = dataQuery.getResultList();
         Number total = (Number) countQuery.getSingleResult();
-        @SuppressWarnings("unchecked")
-        List<Listing> results = (List<Listing>) data;
-        return new PageImpl<>(results, pageable, total.longValue());
+        return new PageImpl<>(toSearchResponses(data), pageable, total.longValue());
+    }
+
+    private List<ListingSearchResponse> toSearchResponses(List<?> rows) {
+        return rows.stream()
+            .map(row -> {
+                Object[] columns = (Object[]) row;
+                return new ListingSearchResponse(
+                    (UUID) columns[0],
+                    (String) columns[1],
+                    (String) columns[2],
+                    enumValue(VehicleCategory.class, columns[3]),
+                    (BigDecimal) columns[4],
+                    (String) columns[5],
+                    ((Number) columns[6]).intValue(),
+                    enumValue(TransmissionType.class, columns[7]),
+                    enumValue(FuelType.class, columns[8]),
+                    null,
+                    null
+                );
+            })
+            .toList();
+    }
+
+    private <T extends Enum<T>> T enumValue(Class<T> enumType, Object value) {
+        return value == null ? null : Enum.valueOf(enumType, value.toString());
     }
 
     private StringBuilder buildDynamicFilters(ListingSearchCriteria criteria) {

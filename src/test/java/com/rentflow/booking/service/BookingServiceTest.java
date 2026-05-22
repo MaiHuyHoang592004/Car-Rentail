@@ -33,6 +33,7 @@ import com.rentflow.user.entity.UserProfile;
 import com.rentflow.user.repository.UserProfileRepository;
 import com.rentflow.vehicle.entity.Vehicle;
 import com.rentflow.vehicle.entity.VehicleStatus;
+import com.rentflow.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -59,6 +60,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -80,6 +82,7 @@ class BookingServiceTest {
     @Mock private ListingRepository listingRepository;
     @Mock private AvailabilityCalendarRepository availabilityRepository;
     @Mock private UserProfileRepository userProfileRepository;
+    @Mock private VehicleRepository vehicleRepository;
     @Mock private IdempotencyService idempotencyService;
     @Mock private IdempotencyFailureMarker idempotencyFailureMarker;
     @Mock private SecurityContext securityContext;
@@ -92,9 +95,11 @@ class BookingServiceTest {
         objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        lenient().when(vehicleRepository.findById(VEHICLE_ID))
+                .thenReturn(Optional.of(vehicle(VehicleStatus.ACTIVE)));
         Clock fixedClock = Clock.fixed(NOW, ZoneOffset.UTC);
         BookingValidator validator = new BookingValidator(
-                listingRepository, bookingRepository, userProfileRepository, fixedClock, false);
+                listingRepository, bookingRepository, userProfileRepository, vehicleRepository, fixedClock, false);
         AvailabilityReserver reserver = new AvailabilityReserver(availabilityRepository);
         bookingService = new BookingService(
                 bookingRepository,
@@ -135,7 +140,7 @@ class BookingServiceTest {
         listing.setExtras(List.of(extra));
         List<AvailabilityCalendar> rows = availabilityRows(AvailabilityStatus.FREE, AvailabilityStatus.FREE);
         mockProceed();
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(listing));
         when(bookingRepository.existsOverlappingActiveBooking(eq(CUSTOMER_ID), any(), any(), any()))
                 .thenReturn(false);
@@ -189,7 +194,7 @@ class BookingServiceTest {
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request()))
                 .isInstanceOf(AccessDeniedException.class);
-        verify(listingRepository, never()).findByIdAndStatusWithVehicleAndExtras(any(), any());
+        verify(listingRepository, never()).findByIdAndStatusWithExtras(any(), any());
         verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_ID);
     }
 
@@ -197,7 +202,7 @@ class BookingServiceTest {
     void driverGateThrowsWhenProfileNotApproved() {
         Clock fixedClock = Clock.fixed(NOW, ZoneOffset.UTC);
         BookingValidator validator = new BookingValidator(
-                listingRepository, bookingRepository, userProfileRepository, fixedClock, true);
+                listingRepository, bookingRepository, userProfileRepository, vehicleRepository, fixedClock, true);
         AvailabilityReserver reserver = new AvailabilityReserver(availabilityRepository);
         bookingService = new BookingService(
                 bookingRepository,
@@ -226,7 +231,7 @@ class BookingServiceTest {
     @Test
     void invalidListingThrowsListingNotFound() {
         mockProceed();
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request()))
@@ -238,8 +243,8 @@ class BookingServiceTest {
     void inactiveVehicleThrowsListingNotFound() {
         mockProceed();
         Listing listing = activeListing();
-        listing.getVehicle().setStatus(VehicleStatus.SUSPENDED);
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(vehicleRepository.findById(VEHICLE_ID)).thenReturn(Optional.of(vehicle(VehicleStatus.SUSPENDED)));
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(listing));
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request()))
@@ -252,7 +257,7 @@ class BookingServiceTest {
         mockProceed();
         Listing listing = activeListing();
         listing.setHostId(CUSTOMER_ID);
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(listing));
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request()))
@@ -269,7 +274,7 @@ class BookingServiceTest {
                 "Hanoi",
                 List.of());
         mockProceed(request);
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(activeListing()));
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request))
@@ -287,7 +292,7 @@ class BookingServiceTest {
                 "Hanoi",
                 List.of());
         mockProceed(request);
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(activeListing()));
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request))
@@ -305,7 +310,7 @@ class BookingServiceTest {
                 "Hanoi",
                 List.of());
         mockProceed(request);
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(activeListing()));
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request))
@@ -364,7 +369,7 @@ class BookingServiceTest {
                 "Hanoi",
                 List.of());
         mockProceed(request);
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(activeListing()));
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request))
@@ -375,7 +380,7 @@ class BookingServiceTest {
     @Test
     void overlapThrowsBookingOverlapCustomer() {
         mockProceed();
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(activeListing()));
         when(bookingRepository.existsOverlappingActiveBooking(eq(CUSTOMER_ID), any(), any(), any()))
                 .thenReturn(true);
@@ -388,7 +393,7 @@ class BookingServiceTest {
     @Test
     void missingAvailabilityThrowsListingNotAvailable() {
         mockProceed();
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(activeListing()));
         when(bookingRepository.existsOverlappingActiveBooking(eq(CUSTOMER_ID), any(), any(), any()))
                 .thenReturn(false);
@@ -403,7 +408,7 @@ class BookingServiceTest {
     @Test
     void nonFreeAvailabilityThrowsListingNotAvailable() {
         mockProceed();
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(activeListing()));
         when(bookingRepository.existsOverlappingActiveBooking(eq(CUSTOMER_ID), any(), any(), any()))
                 .thenReturn(false);
@@ -690,7 +695,7 @@ class BookingServiceTest {
         mockProceed(request);
         Listing listing = activeListing();
         listing.setExtras(List.of());
-        when(listingRepository.findByIdAndStatusWithVehicleAndExtras(LISTING_ID, ListingStatus.ACTIVE))
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
                 .thenReturn(Optional.of(listing));
         when(bookingRepository.existsOverlappingActiveBooking(eq(CUSTOMER_ID), any(), any(), any()))
                 .thenReturn(false);
@@ -753,12 +758,15 @@ class BookingServiceTest {
         listing.setDailyKmLimit(200);
         listing.setCancellationPolicy(CancellationPolicy.FLEXIBLE);
         listing.setStatus(ListingStatus.ACTIVE);
-        Vehicle vehicle = new Vehicle();
-        vehicle.setId(VEHICLE_ID);
-        vehicle.setStatus(VehicleStatus.ACTIVE);
-        listing.setVehicle(vehicle);
         listing.setExtras(List.of());
         return listing;
+    }
+
+    private Vehicle vehicle(VehicleStatus status) {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(VEHICLE_ID);
+        vehicle.setStatus(status);
+        return vehicle;
     }
 
     private Extra extra(Listing listing) {

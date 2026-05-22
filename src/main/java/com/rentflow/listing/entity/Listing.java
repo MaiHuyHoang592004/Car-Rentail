@@ -1,7 +1,6 @@
 package com.rentflow.listing.entity;
 
 import com.rentflow.common.BaseEntity;
-import com.rentflow.vehicle.entity.Vehicle;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,11 +18,6 @@ public class Listing extends BaseEntity {
 
     @Column(name = "vehicle_id", nullable = false)
     private UUID vehicleId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "vehicle_id", referencedColumnName = "id",
-                insertable = false, updatable = false)
-    private Vehicle vehicle;
 
     @Column(name = "host_id", nullable = false)
     private UUID hostId;

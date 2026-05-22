@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-23
 >
-> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I27`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I40`, `I41`, `I42`, `I43`, `I44`, `I46`, `I47`.
+> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I26`, `I27`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I40`, `I41`, `I42`, `I43`, `I44`, `I46`, `I47`.
 
 ---
 
@@ -213,7 +213,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** AuthService → user module; VehicleService → booking/listing repos; AdminListingService → AvailabilityService (service-to-service) | **Effort:** L | **Fix:** Listing approval publishes a synchronous `ListingApprovedEvent` consumed by availability; auth profile provisioning/lookup now crosses an auth-owned port implemented by user; vehicle active-booking and listing propagation checks now cross booking/listing ports instead of repositories.
 
 ## I26 — Entity Relationship 3 Styles
-**Status:** Confirmed/Suspected | **Evidence:** Listing=ManyToOne, Booking=UUID-only, Availability=composite | **Effort:** XL | **Fix:** Choose 1 pattern, document, migrate.
+**Status:** Done | **Evidence:** Listing=ManyToOne, Booking=UUID-only, Availability=composite | **Effort:** XL | **Fix:** Standardized cross-module aggregate references on UUID-only fields; listing-to-vehicle reads now use explicit lookup/search projection, while same-aggregate listing extras keep JPA ownership mapping.
 
 ## I27 — DTO Mapping 5 Ways
 **Status:** Done | **Evidence:** VehicleMapper, ListingResponse.from, BookingService.toResponse, RegisterResponse.from, ExtraResponse.from | **Effort:** L | **Fix:** Convention chốt: mỗi module có Mapper class (`@Component`), service không build DTO trực tiếp. Đã extract `BookingMapper` (toResponse, toSummaryResponse, toSummaryPage) ra khỏi BookingService — giờ tất cả module dùng pattern Mapper class. Vehicle/Listing đã sẵn pattern; auth/user dùng static `.from()` thuần (DTO không depend service-layer state, OK giữ).

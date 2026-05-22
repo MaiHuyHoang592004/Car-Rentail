@@ -6,6 +6,7 @@ import com.rentflow.listing.dto.*;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.vehicle.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class ListingSearchService {
 
     private final ListingRepository listingRepository;
+    private final VehicleRepository vehicleRepository;
 
     public PageResponse<ListingSearchResponse> search(ListingSearchRequest request) {
         validateDateRange(request);
@@ -38,14 +40,10 @@ public class ListingSearchService {
         );
 
         Pageable pageable = PageRequest.of(request.page(), request.size());
-        Page<Listing> page = listingRepository.search(criteria, pageable);
-
-        var content = page.getContent().stream()
-            .map(ListingSearchResponse::from)
-            .toList();
+        Page<ListingSearchResponse> page = listingRepository.search(criteria, pageable);
 
         return new PageResponse<>(
-            content,
+            page.getContent(),
             page.getNumber(),
             page.getSize(),
             page.getTotalElements(),
@@ -55,12 +53,12 @@ public class ListingSearchService {
 
     public ListingDetailResponse getListingDetail(UUID listingId) {
         Listing listing = listingRepository
-            .findByIdAndStatusWithVehicleAndExtras(listingId, ListingStatus.ACTIVE)
+            .findByIdAndStatusWithExtras(listingId, ListingStatus.ACTIVE)
             .orElseThrow(() -> new ListingNotFoundException(listingId.toString()));
 
         return ListingDetailResponse.from(
             listing,
-            listing.getVehicle(),
+            vehicleRepository.findById(listing.getVehicleId()).orElse(null),
             listing.getExtras()
         );
     }
