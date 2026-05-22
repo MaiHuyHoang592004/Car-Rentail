@@ -53,4 +53,17 @@ public interface IdempotencyKeyRepository extends JpaRepository<IdempotencyKey, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT ik FROM IdempotencyKey ik WHERE ik.id = :id")
     Optional<IdempotencyKey> findByIdForUpdate(@Param("id") UUID id);
+
+    @Modifying
+    @Query(value = """
+            DELETE FROM idempotency_keys
+            WHERE id IN (
+                SELECT id FROM idempotency_keys
+                WHERE expires_at < :cutoff
+                ORDER BY expires_at ASC
+                LIMIT :batchSize
+                FOR UPDATE SKIP LOCKED
+            )
+            """, nativeQuery = true)
+    int deleteExpiredKeys(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
 }

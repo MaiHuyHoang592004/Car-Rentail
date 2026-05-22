@@ -342,10 +342,11 @@ Remaining:
 
 Remaining:
 
-- Idempotency failure marker.
+- Idempotency failure marker. _(Done — C01)_
 - Verify concurrent booking test.
-- Verify HELD expiry job.
-- Document cancel limitation.
+- Verify HELD expiry job. _(Done — I32)_
+- Document cancel limitation. _(Done — I01)_
+- Idempotency cleanup scheduler. _(Done — I31)_
 
 ### Phase 6 — Payment Stub
 

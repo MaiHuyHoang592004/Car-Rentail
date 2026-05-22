@@ -629,7 +629,10 @@ Response `200`:
 }
 ```
 
-Current code only allows cancellation when status is `HELD`.
+**Phase 5 limitation:** cancellation is only allowed when status is `HELD`.
+Any other status (e.g. `PENDING_HOST_APPROVAL`, `CONFIRMED`) returns
+`409 BOOKING_INVALID_STATUS`. Cancellation of approved/confirmed bookings
+— including refund/void/penalty behavior — is delivered in Phase 7.
 
 ## Error Codes Important For Frontend
 

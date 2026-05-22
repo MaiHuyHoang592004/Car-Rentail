@@ -181,6 +181,9 @@ public class BookingService {
         return toBookingResponse(booking);
     }
 
+    // Phase 5 limitation: only HELD bookings can be cancelled. Cancellation of
+    // PENDING_HOST_APPROVAL and CONFIRMED bookings (with refund/void/penalty
+    // behavior) is deferred to Phase 7 per docs/roadmap.md.
     @Transactional
     public CancelBookingResponse cancelBooking(UUID id, String idempotencyKey, CancelBookingRequest request) {
         CancelBookingRequest cancelRequest = request == null ? new CancelBookingRequest(null) : request;

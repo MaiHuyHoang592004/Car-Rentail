@@ -27,3 +27,5 @@ rentflow:
   scheduler:
     expire-held-bookings:
       enabled: false
+    idempotency-cleanup:
+      enabled: false

@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I02`, `I04`, `I05-I12`, `I15`, `I18`, `I22`, `I30`.
+> Completed: `C01-C07`, `I01`, `I02`, `I04`, `I05-I12`, `I15`, `I18`, `I22`, `I30`, `I31`, `I32`.
 
 ---
 
@@ -150,7 +150,7 @@ if (userOpt.isEmpty()) {
 ---
 
 ## I01 — Cancel Booking Chỉ Cho HELD
-**Status:** Confirmed | **Evidence:** `BookingService.cancelBooking()` check `status != HELD` → throw | **Effort:** XS | **Fix:** Document limitation, expand Phase 7.
+**Status:** Done | **Evidence:** `BookingService.cancelBooking()` check `status != HELD` → throw | **Effort:** XS | **Fix:** Documented in `api-contracts.md` and `BookingService.cancelBooking` Javadoc; expansion deferred to Phase 7.
 
 ## I02 — GlobalExceptionHandler Per-Entity Not Found
 **Status:** Done | **Evidence:** `GlobalExceptionHandler.java` handlers riêng cho Vehicle/Listing/BookingNotFoundException — duplicate ResourceNotFoundException | **Effort:** M | **Fix:** Collapse thành 1 generic handler.
@@ -225,10 +225,10 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** @Version on entities, no handler in GlobalExceptionHandler | **Effort:** S | **Fix:** Handler → 409.
 
 ## I31 — Idempotency Cleanup Job Missing
-**Status:** Spec-only/Suspected | **Evidence:** `expires_at` field, no scheduler | **Effort:** S | **Fix:** Scheduled DELETE.
+**Status:** Done | **Evidence:** `expires_at` field, no scheduler | **Effort:** S | **Fix:** Added `IdempotencyCleanupJob` + `IdempotencyCleanupProcessor` with batched `DELETE ... WHERE id IN (... FOR UPDATE SKIP LOCKED LIMIT :batch)`; configurable enable/batch/interval; default hourly.
 
 ## I32 — HELD Expiry Scheduler Verify
-**Status:** Suspected | **Evidence:** Roadmap requires, need verify code | **Effort:** M | **Fix:** Verify or implement.
+**Status:** Done | **Evidence:** Roadmap requires, need verify code | **Effort:** M | **Fix:** Verified — `BookingRepository.findExpiredHeldBookingsForUpdate` uses bounded `LIMIT :batchSize` + `FOR UPDATE SKIP LOCKED` + `ORDER BY id`; processor handles race-condition skip and matching-token availability release; covered by 5 processor + 2 job unit tests.
 
 ## I34 — Frontend API Client Singleton
 **Status:** Confirmed | **Evidence:** `api-client.ts` module-level mutable `let accessTokenGetter` | **Effort:** M | **Fix:** Context-based or test reset.
