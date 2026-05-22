@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I01-I12`, `I15`, `I18`, `I19`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
+> Completed: `C01-C07`, `I01-I12`, `I15`, `I17`, `I18`, `I19`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
 
 ---
 
@@ -195,7 +195,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** `AuthService.resolveRoles()` filter ADMIN, default CUSTOMER | **Effort:** XS | **Fix:** Explicit error.
 
 ## I17 — Account Lockout Missing
-**Status:** Confirmed | **Evidence:** No failed attempt tracking | **Effort:** M | **Fix:** Counter + lock_until. **Depends:** C04.
+**Status:** Done | **Evidence:** No failed attempt tracking | **Effort:** M | **Fix:** Added `failed_login_attempts` + `lock_until` columns (V9 migration); `LoginAttemptTracker` (REQUIRES_NEW) persists counter across the outer login rollback; threshold 3 (below rate-limit 5 so per-account lockout survives IP rotation); 15-min lock returning 423 `AUTH_ACCOUNT_LOCKED` with `Retry-After`. **Depends:** C04.
 
 ## I18 — Suspended User Error Generic
 **Status:** Done | **Evidence:** `AuthService.login()` throw same error for wrong pwd + suspended | **Effort:** S | **Fix:** Specific `AccountSuspendedException` (403, code `AUTH_ACCOUNT_SUSPENDED`) thrown only after password validation to avoid enumeration leakage.

@@ -30,6 +30,7 @@ class AuthServiceTest {
     @Mock private RefreshTokenService refreshTokenService;
     @Mock private JwtTokenProvider tokenProvider;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private LoginAttemptTracker loginAttemptTracker;
 
     @Test
     void loginUnknownEmailStillRunsPasswordHashCheck() {
@@ -39,7 +40,8 @@ class AuthServiceTest {
                 userProfileRepository,
                 refreshTokenService,
                 tokenProvider,
-                passwordEncoder);
+                passwordEncoder,
+                loginAttemptTracker);
         LoginRequest request = new LoginRequest("missing@example.com", "Password@123");
         when(authUserRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
 

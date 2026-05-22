@@ -80,12 +80,18 @@ class AuthIntegrationTest {
     @Autowired
     private UserProfileRepository userProfileRepository;
 
+    @Autowired(required = false)
+    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+
     @BeforeEach
     void setUp() {
         refreshTokenRepository.deleteAll();
         userRoleRepository.deleteAll();
         userProfileRepository.deleteAllInBatch();
         authUserRepository.deleteAll();
+        if (redisTemplate != null) {
+            redisTemplate.getConnectionFactory().getConnection().serverCommands().flushAll();
+        }
     }
 
     // ─── Register ─────────────────────────────────────────────────────────────
@@ -215,6 +221,48 @@ class AuthIntegrationTest {
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void login_afterThresholdFailedAttempts_accountLocks_returns423() throws Exception {
+        registerUser("lockme@example.com", "Password@123");
+
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "email": "lockme@example.com",
+                                      "password": "WrongPassword"
+                                    }
+                                    """))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+        }
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "lockme@example.com",
+                                  "password": "WrongPassword"
+                                }
+                                """))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_LOCKED"))
+                .andExpect(header().exists("Retry-After"));
+
+        // Even correct password is rejected while locked.
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "lockme@example.com",
+                                  "password": "Password@123"
+                                }
+                                """))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_LOCKED"));
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.rentflow.auth.entity.UserStatus;
 import com.rentflow.auth.entity.UserRole;
 import com.rentflow.auth.repository.AuthUserRepository;
 import com.rentflow.auth.repository.UserRoleRepository;
+import com.rentflow.common.exception.AccountLockedException;
 import com.rentflow.common.exception.AccountSuspendedException;
 import com.rentflow.common.exception.AuthenticationException;
 import com.rentflow.common.exception.BusinessRuleException;
@@ -33,6 +34,10 @@ public class AuthService {
 
     private static final String DUMMY_PASSWORD_HASH =
             "$2a$12$lK6tMiUUcbddgmGqvuIrNO7KjBgKplGHbP1wLjTvj2GTl2zQLTlI.";
+    // Threshold sits below the per-IP rate limit (5) so the per-account lock
+    // kicks in even when an attacker rotates source IPs to bypass rate-limiting.
+    private static final int LOCKOUT_THRESHOLD = 3;
+    private static final java.time.Duration LOCKOUT_DURATION = java.time.Duration.ofMinutes(15);
 
     private final AuthUserRepository authUserRepository;
     private final UserRoleRepository userRoleRepository;
@@ -40,6 +45,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final JwtTokenProvider tokenProvider;
     private final PasswordEncoder passwordEncoder;
+    private final LoginAttemptTracker loginAttemptTracker;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
@@ -83,7 +89,18 @@ public class AuthService {
             throw AuthenticationException.invalidCredentials();
         }
 
+        Instant now = Instant.now();
+        if (user.getLockUntil() != null && user.getLockUntil().isAfter(now)) {
+            throw new AccountLockedException(user.getLockUntil());
+        }
+
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            LoginAttemptTracker.Outcome outcome = loginAttemptTracker.recordFailure(
+                    user.getId(), LOCKOUT_THRESHOLD, LOCKOUT_DURATION);
+            if (outcome.lockUntil() != null) {
+                log.warn("Account locked for user {} until {}", user.getEmail(), outcome.lockUntil());
+                throw new AccountLockedException(outcome.lockUntil());
+            }
             throw AuthenticationException.invalidCredentials();
         }
 
@@ -91,7 +108,8 @@ public class AuthService {
             throw new AccountSuspendedException();
         }
 
-        user.setLastLoginAt(Instant.now());
+        loginAttemptTracker.recordSuccess(user.getId());
+        user.setLastLoginAt(now);
         authUserRepository.save(user);
 
         List<Role> roles = userRoleRepository.findByUserId(user.getId())

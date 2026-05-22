@@ -65,6 +65,18 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
     }
 
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ErrorResponse> handleAccountLocked(
+            AccountLockedException ex, HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        long retryAfter = Math.max(1L,
+                java.time.Duration.between(java.time.Instant.now(), ex.getLockedUntil()).getSeconds());
+        log.warn("Account locked [{}] until {} (retry-after {}s)", cid, ex.getLockedUntil(), retryAfter);
+        return ResponseEntity.status(HttpStatus.LOCKED)
+                .header("Retry-After", String.valueOf(retryAfter))
+                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         String cid = correlationIdHelper.getCorrelationId();
