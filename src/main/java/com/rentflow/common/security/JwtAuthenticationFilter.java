@@ -1,18 +1,21 @@
 package com.rentflow.common.security;
 
+import com.rentflow.auth.entity.UserStatus;
+import com.rentflow.auth.repository.AuthUserRepository;
+import com.rentflow.common.exception.AuthenticationException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -23,11 +26,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
     private final JwtAuthenticationEntryPoint entryPoint;
+    private final AuthUserRepository authUserRepository;
 
     public JwtAuthenticationFilter(JwtTokenProvider tokenProvider,
-                                  JwtAuthenticationEntryPoint entryPoint) {
+                                  JwtAuthenticationEntryPoint entryPoint,
+                                  AuthUserRepository authUserRepository) {
         this.tokenProvider = tokenProvider;
         this.entryPoint = entryPoint;
+        this.authUserRepository = authUserRepository;
     }
 
     @Override
@@ -44,13 +50,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         JwtTokenProvider.JwtClaims claims;
         try {
             claims = tokenProvider.validateAccessToken(token);
-        } catch (AuthenticationException e) {
+        } catch (org.springframework.security.core.AuthenticationException e) {
             SecurityContextHolder.clearContext();
             entryPoint.commence(request, response, e);
             return;
         } catch (Exception e) {
             SecurityContextHolder.clearContext();
             entryPoint.commence(request, response, null);
+            return;
+        }
+
+        // I19: reject tokens belonging to non-ACTIVE users (e.g. suspended after issue).
+        // Missing user falls through to the role-based access checks downstream.
+        Optional<UserStatus> status = authUserRepository.findStatusById(claims.userId());
+        if (status.isPresent() && status.get() != UserStatus.ACTIVE) {
+            SecurityContextHolder.clearContext();
+            entryPoint.commence(request, response,
+                    new AuthenticationException("AUTH_ACCOUNT_SUSPENDED", "Account is suspended"));
             return;
         }
 

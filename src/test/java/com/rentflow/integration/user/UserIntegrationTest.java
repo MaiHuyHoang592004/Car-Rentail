@@ -115,6 +115,20 @@ class UserIntegrationTest {
                 .andExpect(jsonPath("$.correlationId").value("get-me-unauthenticated"));
     }
 
+    @Test
+    void getMe_suspendedUserWithValidJwt_returns401() throws Exception {
+        AuthUser user = createUser("suspended-jwt@example.com", "Password@123", Role.CUSTOMER);
+        String token = tokenProvider.generateAccessToken(user.getId(), user.getEmail(), List.of(Role.CUSTOMER));
+
+        user.setStatus(UserStatus.SUSPENDED);
+        authUserRepository.save(user);
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_SUSPENDED"));
+    }
+
     // ─── PATCH /users/me ──────────────────────────────────────────────────────
 
     @Test

@@ -58,9 +58,11 @@ class HealthControllerTest {
         }
 
         @Bean
-        public JwtAuthenticationFilter jwtAuthenticationFilter(JwtTokenProvider tokenProvider,
-                                                             JwtAuthenticationEntryPoint entryPoint) {
-            return new JwtAuthenticationFilter(tokenProvider, entryPoint);
+        public JwtAuthenticationFilter jwtAuthenticationFilter(
+                JwtTokenProvider tokenProvider,
+                JwtAuthenticationEntryPoint entryPoint,
+                com.rentflow.auth.repository.AuthUserRepository authUserRepository) {
+            return new JwtAuthenticationFilter(tokenProvider, entryPoint, authUserRepository);
         }
 
         @Bean
@@ -68,6 +70,9 @@ class HealthControllerTest {
             return new SecurityContextImpl();
         }
     }
+
+    @MockBean
+    private com.rentflow.auth.repository.AuthUserRepository authUserRepository;
 
     @Autowired
     private MockMvc mockMvc;

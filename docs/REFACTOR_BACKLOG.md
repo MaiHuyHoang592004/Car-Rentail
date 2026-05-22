@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I01-I12`, `I15`, `I18`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
+> Completed: `C01-C07`, `I01-I12`, `I15`, `I18`, `I19`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
 
 ---
 
@@ -201,7 +201,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** `AuthService.login()` throw same error for wrong pwd + suspended | **Effort:** S | **Fix:** Specific `AccountSuspendedException` (403, code `AUTH_ACCOUNT_SUSPENDED`) thrown only after password validation to avoid enumeration leakage.
 
 ## I19 — JWT Valid After Suspend
-**Status:** Suspected | **Evidence:** Stateless JWT 15m, no blacklist | **Effort:** M | **Fix:** Redis blacklist or user-version.
+**Status:** Done | **Evidence:** Stateless JWT 15m, no blacklist | **Effort:** M | **Fix:** `JwtAuthenticationFilter` re-checks `auth_users.status` via projection query (`findStatusById`) and rejects non-ACTIVE users with 401 `AUTH_ACCOUNT_SUSPENDED`. Missing-user falls through to role-based check (back-compat).
 
 ## I22 — Phone No Pattern Validation
 **Status:** Done | **Evidence:** UpdateProfileRequest has `@Size` but no `@Pattern` | **Effort:** XS | **Fix:** `@Pattern(regexp = "^\\+?[0-9\\-\\s]{7,20}$")`.

@@ -26,4 +26,7 @@ public interface AuthUserRepository extends JpaRepository<AuthUser, UUID> {
             @Param("status") UserStatus status,
             @Param("hasRole") com.rentflow.auth.entity.Role hasRole,
             Pageable pageable);
+
+    @Query("SELECT u.status FROM AuthUser u WHERE u.id = :id")
+    Optional<UserStatus> findStatusById(@Param("id") UUID id);
 }
