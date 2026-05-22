@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I02`, `I05-I09`, `I11`, `I12`, `I15`, `I18`, `I22`, `I30`.
+> Completed: `C01-C07`, `I02`, `I05-I09`, `I10`, `I11`, `I12`, `I15`, `I18`, `I22`, `I30`.
 
 ---
 
@@ -177,7 +177,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** `JwtAuthenticationEntryPoint.java` URI prefix check → FORBIDDEN | **Effort:** S | **Fix:** 401 unauthed, 403 wrong role.
 
 ## I10 — Listing Search Native SQL + Dead Specification
-**Status:** Confirmed | **Evidence:** `ListingSearchRepositoryCustomImpl.java` dual code path | **Effort:** M | **Fix:** Remove dead Specification.
+**Status:** Done | **Evidence:** `ListingSearchRepositoryCustomImpl.java` dual code path | **Effort:** M | **Fix:** Removed unused `buildSpecification(...)` and its JPA Criteria imports; native SQL is the sole path.
 
 ## I11 — Availability Generation N+1
 **Status:** Done | **Evidence:** `AvailabilityService.generateForListing()` loop 365 × `existsBy...` | **Effort:** S | **Fix:** `INSERT ... SELECT generate_series(...) ON CONFLICT DO NOTHING`.

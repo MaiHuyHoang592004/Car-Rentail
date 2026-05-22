@@ -2,21 +2,16 @@ package com.rentflow.listing.repository;
 
 import com.rentflow.listing.dto.ListingSearchCriteria;
 import com.rentflow.listing.entity.Listing;
-import com.rentflow.listing.entity.ListingStatus;
-import com.rentflow.vehicle.entity.Vehicle;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
-import jakarta.persistence.criteria.Join;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -62,48 +57,6 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
         @SuppressWarnings("unchecked")
         List<Listing> results = (List<Listing>) data;
         return new PageImpl<>(results, pageable, total.longValue());
-    }
-
-    private Specification<Listing> buildSpecification(ListingSearchCriteria c) {
-        return (root, cq, cb) -> {
-            Join<Listing, Vehicle> vehicle = root.join("vehicle");
-
-            var predicates = new ArrayList<jakarta.persistence.criteria.Predicate>();
-
-            predicates.add(cb.equal(root.get("status"), ListingStatus.ACTIVE));
-
-            if (c.city() != null) {
-                predicates.add(cb.like(cb.upper(root.get("city")), c.city().toUpperCase() + "%"));
-            }
-
-            if (c.categories() != null && !c.categories().isEmpty()) {
-                predicates.add(vehicle.get("category").in(c.categories()));
-            }
-
-            if (c.minPrice() != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("basePricePerDay"), c.minPrice()));
-            }
-
-            if (c.maxPrice() != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("basePricePerDay"), c.maxPrice()));
-            }
-
-            if (c.seats() != null) {
-                predicates.add(cb.greaterThanOrEqualTo(vehicle.get("seats"), c.seats()));
-            }
-
-            if (c.transmission() != null) {
-                predicates.add(cb.equal(vehicle.get("transmission"), c.transmission()));
-            }
-
-            if (c.fuelType() != null) {
-                predicates.add(cb.equal(vehicle.get("fuelType"), c.fuelType()));
-            }
-
-            cq.distinct(true);
-            cq.orderBy(cb.desc(root.get("createdAt")));
-            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
-        };
     }
 
     private Page<Listing> searchWithDates(ListingSearchCriteria criteria, Pageable pageable) {
