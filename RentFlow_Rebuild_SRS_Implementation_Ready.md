@@ -14,7 +14,7 @@
 | Project | RentFlow — Car Rental Booking System |
 | Version | 5.1 |
 | Target architecture | Modular monolith REST API |
-| Primary stack | Java 21, Spring Boot, PostgreSQL, Redis, MinIO, Testcontainers |
+| Primary stack | Java 17, Spring Boot, PostgreSQL, Redis, MinIO, Testcontainers |
 | Optional extension | Kafka / outbox publisher |
 | Database | PostgreSQL |
 | API style | REST + JSON |

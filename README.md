@@ -4,7 +4,12 @@ Car rental booking system backend — modular monolith REST API.
 
 ## Current Phase
 
-**Phase 1: Foundation** — Spring Boot skeleton, Docker Compose, Flyway, OpenAPI, Testcontainers.
+**Phase 1-5 partially implemented; Phase 6+ planned.**
+
+The codebase is no longer a foundation-only skeleton. Backend auth/user, vehicle/listing,
+availability, and booking core are implemented, with hardening/refactor work tracked in
+[`docs/roadmap.md`](docs/roadmap.md). Frontend exists under `frontend/` and is partially
+integrated with the API, but some public/host listing flows still use mocks.
 
 ## Tech Stack
 
@@ -23,12 +28,12 @@ Car rental booking system backend — modular monolith REST API.
 
 ```
 com.rentflow
-├── auth          # Authentication (future)
-├── user          # User profile (future)
-├── vehicle       # Vehicle management (future)
-├── listing       # Listing management (future)
-├── availability  # Availability calendar (future)
-├── booking       # Booking creation (future)
+├── auth          # Register, login, refresh token, logout, JWT/RBAC basics
+├── user          # User profile
+├── vehicle       # Vehicle management and lifecycle
+├── listing       # Listing lifecycle, search, admin approval
+├── availability  # Availability calendar and host block/unblock
+├── booking       # Booking hold creation, cancellation, idempotency, locking
 ├── payment       # Payment stub (future)
 ├── notification  # Notifications (future)
 ├── audit         # Audit logging (future)
@@ -149,20 +154,16 @@ Migrations are in `src/main/resources/db/migration/`. Flyway runs automatically 
 }
 ```
 
-## Implemented in Phase 1
+## Implemented So Far
 
-- [x] Spring Boot project structure
-- [x] Modular package skeleton (12 module packages)
-- [x] Docker Compose (PostgreSQL 16 + Redis 7)
-- [x] Flyway V1: auth/user tables only
-- [x] Global exception handler
-- [x] Standard error response format
-- [x] Correlation ID filter
-- [x] Swagger/OpenAPI configuration
-- [x] Health endpoint at `/api/v1/health`
-- [x] Testcontainers smoke test
+- [x] Foundation: Spring Boot, Docker Compose, Flyway, OpenAPI, health, Testcontainers.
+- [x] Auth/user basics: register, login, refresh rotation, logout, JWT, RBAC, profile.
+- [x] Vehicle/listing lifecycle: host CRUD, state machines, admin listing approval.
+- [x] Search/availability: public listing search, availability calendar, host block/unblock.
+- [x] Booking core: HELD booking creation, idempotency, overlap prevention, availability locking, cancel HELD booking, hold expiry scheduler.
+- [x] Frontend shell: Next.js app, auth BFF, auth provider, API client, bookings and host/listing pages.
 
-**Phase 1 does NOT include Spring Security. All endpoints are public (for smoke testing). SecurityConfig is introduced in Phase 2.**
+Current priority: harden Phase 1-5 correctness/security/frontend integration before building Phase 6 payment.
 
 ## Troubleshooting
 
@@ -206,13 +207,10 @@ mvn spring-boot:run
 | Port 5432/5433 in use | Stop local PostgreSQL or change Docker external port |
 | Old data persists | Use `docker compose down -v` to remove volumes |
 
-## Upcoming (Phase 2+)
+## Upcoming
 
-- Phase 2: Auth — Register, login, JWT, refresh token, RBAC, SecurityConfig
-- Phase 3: Vehicle + Listing — CRUD, state machine, admin approval
-- Phase 4: Search + Availability — listing search, availability calendar
-- Phase 5: Booking Core — create booking, idempotency, pessimistic locking
-- Phase 6: Payment — authorize, capture, void, refund
+- Phase 1-5 hardening: idempotency transaction boundaries, auth security baseline, frontend API integration, docs/source-of-truth cleanup.
+- Phase 6: Payment — authorize, capture, void, refund.
 - Phase 7: Cancellation + Audit + Timeline
 - Phase 8A: Driver Verification
 - Phase 8B: Hardening + Notifications + Rate Limiting
