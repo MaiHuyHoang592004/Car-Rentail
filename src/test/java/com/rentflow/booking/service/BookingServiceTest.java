@@ -92,19 +92,22 @@ class BookingServiceTest {
         objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        Clock fixedClock = Clock.fixed(NOW, ZoneOffset.UTC);
+        BookingValidator validator = new BookingValidator(
+                listingRepository, bookingRepository, userProfileRepository, fixedClock, false);
+        AvailabilityReserver reserver = new AvailabilityReserver(availabilityRepository);
         bookingService = new BookingService(
                 bookingRepository,
                 bookingExtraRepository,
                 listingRepository,
-                availabilityRepository,
-                userProfileRepository,
                 idempotencyService,
                 idempotencyFailureMarker,
                 new BookingPriceCalculator(),
+                validator,
+                reserver,
                 securityContext,
                 objectMapper,
-                Clock.fixed(NOW, ZoneOffset.UTC),
-                false,
+                fixedClock,
                 15);
     }
 
@@ -191,19 +194,22 @@ class BookingServiceTest {
 
     @Test
     void driverGateThrowsWhenProfileNotApproved() {
+        Clock fixedClock = Clock.fixed(NOW, ZoneOffset.UTC);
+        BookingValidator validator = new BookingValidator(
+                listingRepository, bookingRepository, userProfileRepository, fixedClock, true);
+        AvailabilityReserver reserver = new AvailabilityReserver(availabilityRepository);
         bookingService = new BookingService(
                 bookingRepository,
                 bookingExtraRepository,
                 listingRepository,
-                availabilityRepository,
-                userProfileRepository,
                 idempotencyService,
                 idempotencyFailureMarker,
                 new BookingPriceCalculator(),
+                validator,
+                reserver,
                 securityContext,
                 objectMapper,
-                Clock.fixed(NOW, ZoneOffset.UTC),
-                true,
+                fixedClock,
                 15);
         mockProceed();
         UserProfile profile = new UserProfile();

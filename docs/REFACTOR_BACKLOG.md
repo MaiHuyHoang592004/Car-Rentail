@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17`, `I18`, `I19`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
+> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
 
 ---
 
@@ -207,7 +207,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** UpdateProfileRequest has `@Size` but no `@Pattern` | **Effort:** XS | **Fix:** `@Pattern(regexp = "^\\+?[0-9\\-\\s]{7,20}$")`.
 
 ## I24 — BookingService God Method
-**Status:** Confirmed | **Evidence:** `BookingService.createBooking()` ~20 steps | **Effort:** L | **Fix:** Extract Validator/Factory/Reserver. **Depends:** C01.
+**Status:** Done | **Evidence:** `BookingService.createBooking()` ~20 steps | **Effort:** L | **Fix:** Extracted `BookingValidator` (date / listing / customer-overlap / driver-verification checks) and `AvailabilityReserver` (lock + hold + release). `BookingService` orchestration shrinks ~23% (537→415 LOC); behavior preserved. **Depends:** C01.
 
 ## I25 — Module Boundary Violations
 **Status:** Confirmed | **Evidence:** AuthService → user module; VehicleService → booking/listing repos; AdminListingService → AvailabilityService (service-to-service) | **Effort:** L | **Fix:** Domain events, ports/interfaces.

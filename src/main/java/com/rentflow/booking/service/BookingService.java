@@ -5,19 +5,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rentflow.auth.entity.Role;
 import com.rentflow.availability.entity.AvailabilityCalendar;
-import com.rentflow.availability.entity.AvailabilityStatus;
-import com.rentflow.availability.repository.AvailabilityCalendarRepository;
 import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingExtra;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingExtraRepository;
 import com.rentflow.booking.repository.BookingRepository;
-import com.rentflow.common.exception.AccessDeniedException;
 import com.rentflow.common.exception.BookingNotFoundException;
 import com.rentflow.common.exception.BusinessRuleException;
-import com.rentflow.common.exception.DriverLicenseNotApprovedException;
-import com.rentflow.common.exception.ListingNotFoundException;
-import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.idempotency.service.IdempotencyResolution;
 import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
@@ -25,11 +19,7 @@ import com.rentflow.common.idempotency.service.IdempotencyService;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.listing.entity.Extra;
 import com.rentflow.listing.entity.Listing;
-import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
-import com.rentflow.user.entity.UserProfile;
-import com.rentflow.user.repository.UserProfileRepository;
-import com.rentflow.vehicle.entity.VehicleStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -49,10 +39,6 @@ import com.rentflow.common.web.PageResponse;
 @Service
 public class BookingService {
 
-    private static final List<BookingStatus> CUSTOMER_OVERLAP_STATUSES = List.of(
-            BookingStatus.HELD,
-            BookingStatus.PENDING_HOST_APPROVAL,
-            BookingStatus.CONFIRMED);
     private static final List<BookingStatus> PATCHABLE_STATUSES = List.of(
             BookingStatus.HELD,
             BookingStatus.PENDING_HOST_APPROVAL,
@@ -61,43 +47,40 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final BookingExtraRepository bookingExtraRepository;
     private final ListingRepository listingRepository;
-    private final AvailabilityCalendarRepository availabilityCalendarRepository;
-    private final UserProfileRepository userProfileRepository;
     private final IdempotencyService idempotencyService;
     private final IdempotencyFailureMarker idempotencyFailureMarker;
     private final BookingPriceCalculator bookingPriceCalculator;
+    private final BookingValidator bookingValidator;
+    private final AvailabilityReserver availabilityReserver;
     private final SecurityContext securityContext;
     private final ObjectMapper objectMapper;
     private final Clock clock;
-    private final boolean requireDriverVerification;
     private final long holdDurationMinutes;
 
     public BookingService(
             BookingRepository bookingRepository,
             BookingExtraRepository bookingExtraRepository,
             ListingRepository listingRepository,
-            AvailabilityCalendarRepository availabilityCalendarRepository,
-            UserProfileRepository userProfileRepository,
             IdempotencyService idempotencyService,
             IdempotencyFailureMarker idempotencyFailureMarker,
             BookingPriceCalculator bookingPriceCalculator,
+            BookingValidator bookingValidator,
+            AvailabilityReserver availabilityReserver,
             SecurityContext securityContext,
             ObjectMapper objectMapper,
             Clock clock,
-            @Value("${rentflow.booking.require-driver-verification:false}") boolean requireDriverVerification,
             @Value("${rentflow.booking.hold-duration-minutes:15}") long holdDurationMinutes) {
         this.bookingRepository = bookingRepository;
         this.bookingExtraRepository = bookingExtraRepository;
         this.listingRepository = listingRepository;
-        this.availabilityCalendarRepository = availabilityCalendarRepository;
-        this.userProfileRepository = userProfileRepository;
         this.idempotencyService = idempotencyService;
         this.idempotencyFailureMarker = idempotencyFailureMarker;
         this.bookingPriceCalculator = bookingPriceCalculator;
+        this.bookingValidator = bookingValidator;
+        this.availabilityReserver = availabilityReserver;
         this.securityContext = securityContext;
         this.objectMapper = objectMapper;
         this.clock = clock;
-        this.requireDriverVerification = requireDriverVerification;
         this.holdDurationMinutes = holdDurationMinutes;
     }
 
@@ -212,19 +195,13 @@ public class BookingService {
                         "Booking cannot be cancelled in its current status");
             }
 
-            List<AvailabilityCalendar> availabilityRows = availabilityCalendarRepository.findForBookingRangeForUpdate(
-                    booking.getListingId(),
-                    booking.getPickupDate(),
-                    booking.getReturnDate());
+            List<AvailabilityCalendar> availabilityRows = availabilityReserver.lockForBooking(booking);
             String cancellationReason = sanitizeCancellationReason(cancelRequest.reason());
             booking.setStatus(BookingStatus.CANCELLED);
             booking.setCancellationReason(cancellationReason);
             bookingRepository.save(booking);
 
-            List<AvailabilityCalendar> releasedRows = releaseHeldAvailability(availabilityRows, booking);
-            if (!releasedRows.isEmpty()) {
-                availabilityCalendarRepository.saveAll(releasedRows);
-            }
+            availabilityReserver.releaseHeld(availabilityRows, booking);
 
             CancelBookingResponse response = new CancelBookingResponse(
                     booking.getId(),
@@ -240,24 +217,13 @@ public class BookingService {
 
     private BookingResponse createBookingAfterIdempotency(UUID customerId, CreateBookingRequest request) {
         securityContext.requireRole(Role.CUSTOMER);
-        validateDriverVerification(customerId);
+        bookingValidator.validateDriverVerification(customerId);
 
-        Listing listing = listingRepository
-                .findByIdAndStatusWithVehicleAndExtras(request.listingId(), ListingStatus.ACTIVE)
-                .filter(this::vehicleIsActive)
-                .orElseThrow(() -> new ListingNotFoundException(String.valueOf(request.listingId())));
-
-        if (listing.getHostId().equals(customerId)) {
-            throw new AccessDeniedException();
-        }
-
-        long rentalDays = validateDates(request.pickupDate(), request.returnDate());
-        validateCustomerOverlap(customerId, request.pickupDate(), request.returnDate());
-        List<AvailabilityCalendar> lockedAvailability = lockAndValidateAvailability(
-                request.listingId(),
-                request.pickupDate(),
-                request.returnDate(),
-                rentalDays);
+        Listing listing = bookingValidator.resolveListingForBooking(request.listingId(), customerId);
+        long rentalDays = bookingValidator.validateDates(request.pickupDate(), request.returnDate());
+        bookingValidator.validateCustomerOverlap(customerId, request.pickupDate(), request.returnDate());
+        List<AvailabilityCalendar> lockedAvailability = availabilityReserver.lockAndValidate(
+                request.listingId(), request.pickupDate(), request.returnDate(), rentalDays);
 
         PriceCalculationResult price = bookingPriceCalculator.calculate(
                 listing,
@@ -279,7 +245,7 @@ public class BookingService {
                 priceSnapshotJson, policySnapshotJson);
 
         saveBookingExtras(booking.getId(), price.extras());
-        holdAvailability(lockedAvailability, booking.getId(), holdToken, holdExpiresAt);
+        availabilityReserver.hold(lockedAvailability, booking.getId(), holdToken, holdExpiresAt);
 
         JsonNode priceSnapshotNode = readTree(priceSnapshotJson);
         JsonNode policySnapshotNode = readTree(policySnapshotJson);
@@ -302,70 +268,10 @@ public class BookingService {
                 booking.getCreatedAt() == null ? now : booking.getCreatedAt());
     }
 
-    private void validateDriverVerification(UUID customerId) {
-        if (!requireDriverVerification) {
-            return;
-        }
-        UserProfile profile = userProfileRepository.findByUserId(customerId)
-                .orElseThrow(DriverLicenseNotApprovedException::new);
-        if (profile.getDriverVerificationStatus() != UserProfile.DriverVerificationStatus.APPROVED) {
-            throw new DriverLicenseNotApprovedException();
-        }
-    }
-
     private boolean canViewBooking(Booking booking, UUID currentUserId) {
         return booking.getCustomerId().equals(currentUserId)
                 || booking.getHostId().equals(currentUserId)
                 || securityContext.hasRole(Role.ADMIN);
-    }
-
-    private boolean vehicleIsActive(Listing listing) {
-        return listing.getVehicle() != null && listing.getVehicle().getStatus() == VehicleStatus.ACTIVE;
-    }
-
-    private long validateDates(LocalDate pickupDate, LocalDate returnDate) {
-        if (pickupDate == null || returnDate == null) {
-            throw new ValidationException("pickupDate and returnDate are required");
-        }
-        if (pickupDate.isBefore(LocalDate.now(clock))) {
-            throw new ValidationException("pickupDate must not be in the past");
-        }
-        if (!pickupDate.isBefore(returnDate)) {
-            throw new ValidationException("pickupDate must be before returnDate");
-        }
-        long rentalDays = ChronoUnit.DAYS.between(pickupDate, returnDate);
-        if (rentalDays < 1 || rentalDays > 30) {
-            throw new ValidationException("rentalDays must be between 1 and 30");
-        }
-        return rentalDays;
-    }
-
-    private void validateCustomerOverlap(UUID customerId, LocalDate pickupDate, LocalDate returnDate) {
-        boolean overlaps = bookingRepository.existsOverlappingActiveBooking(
-                customerId,
-                pickupDate,
-                returnDate,
-                CUSTOMER_OVERLAP_STATUSES);
-        if (overlaps) {
-            throw new BusinessRuleException(
-                    "BOOKING_OVERLAP_CUSTOMER",
-                    "Customer already has an active overlapping booking");
-        }
-    }
-
-    private List<AvailabilityCalendar> lockAndValidateAvailability(
-            UUID listingId,
-            LocalDate pickupDate,
-            LocalDate returnDate,
-            long rentalDays) {
-        List<AvailabilityCalendar> rows = availabilityCalendarRepository.findForBookingRangeForUpdate(
-                listingId,
-                pickupDate,
-                returnDate);
-        if (rows.size() != rentalDays || rows.stream().anyMatch(row -> row.getStatus() != AvailabilityStatus.FREE)) {
-            throw new BusinessRuleException("LISTING_NOT_AVAILABLE", "Listing is not available for selected dates");
-        }
-        return rows;
     }
 
     private Booking saveBooking(
@@ -409,20 +315,6 @@ public class BookingService {
         }
     }
 
-    private void holdAvailability(
-            List<AvailabilityCalendar> rows,
-            UUID bookingId,
-            UUID holdToken,
-            Instant holdExpiresAt) {
-        rows.forEach(row -> {
-            row.setStatus(AvailabilityStatus.HOLD);
-            row.setBookingId(bookingId);
-            row.setHoldToken(holdToken);
-            row.setHoldExpiresAt(holdExpiresAt);
-        });
-        availabilityCalendarRepository.saveAll(rows);
-    }
-
     private String serialize(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -456,20 +348,6 @@ public class BookingService {
             return null;
         }
         return sanitized.length() > 500 ? sanitized.substring(0, 500) : sanitized;
-    }
-
-    private List<AvailabilityCalendar> releaseHeldAvailability(List<AvailabilityCalendar> rows, Booking booking) {
-        return rows.stream()
-                .filter(row -> row.getStatus() == AvailabilityStatus.HOLD)
-                .filter(row -> booking.getId().equals(row.getBookingId()))
-                .filter(row -> booking.getHoldToken() == null || booking.getHoldToken().equals(row.getHoldToken()))
-                .peek(row -> {
-                    row.setStatus(AvailabilityStatus.FREE);
-                    row.setBookingId(null);
-                    row.setHoldToken(null);
-                    row.setHoldExpiresAt(null);
-                })
-                .toList();
     }
 
     private JsonNode readTree(String json) {
