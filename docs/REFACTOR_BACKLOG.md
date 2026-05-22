@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-23
 >
-> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I42`, `I43`, `I44`, `I46`, `I47`.
+> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I42`, `I43`, `I44`, `I46`, `I47`.
 
 ---
 
@@ -219,7 +219,7 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed/Suspected | **Evidence:** VehicleMapper, ListingResponse.from, BookingService.toResponse, RegisterResponse.from, ExtraResponse.from | **Effort:** L | **Fix:** Pick 1 convention.
 
 ## I28 — Pagination Response Inconsistent
-**Status:** Suspected | **Evidence:** Booking=PageResponse, others may be Spring Page | **Effort:** M | **Fix:** Normalize PageResponse.
+**Status:** Done | **Evidence:** Booking=PageResponse, others returned Spring Page | **Effort:** M | **Fix:** Added `PageResponse.from(Page<T>)` static factory. Converted `VehicleController.listVehicles`, `ListingController.listListings` (host), `AdminListingController.listListings`, `AdminUserController.listUsers` from `Page<T>` → `PageResponse<T>`. All paginated endpoints now return identical shape `{ content, page, size, totalElements, totalPages }`.
 
 ## I30 — OptimisticLock No Handler
 **Status:** Done | **Evidence:** @Version on entities, no handler in GlobalExceptionHandler | **Effort:** S | **Fix:** Handler → 409.

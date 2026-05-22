@@ -2,6 +2,7 @@ package com.rentflow.auth.controller;
 
 import com.rentflow.auth.entity.Role;
 import com.rentflow.auth.entity.UserStatus;
+import com.rentflow.common.web.PageResponse;
 import com.rentflow.user.dto.UserSummaryResponse;
 import com.rentflow.user.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class AdminUserController {
     private final UserService userService;
 
     @GetMapping
-    public ResponseEntity<Page<UserSummaryResponse>> listUsers(
+    public ResponseEntity<PageResponse<UserSummaryResponse>> listUsers(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String role,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -36,6 +37,6 @@ public class AdminUserController {
         }
 
         Page<UserSummaryResponse> page = userService.listUsers(statusEnum, role, pageable);
-        return ResponseEntity.ok(page);
+        return ResponseEntity.ok(PageResponse.from(page));
     }
 }

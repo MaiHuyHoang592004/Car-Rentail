@@ -1,5 +1,6 @@
 package com.rentflow.listing.controller;
 
+import com.rentflow.common.web.PageResponse;
 import com.rentflow.common.web.PageableValidation;
 import com.rentflow.listing.dto.AdminListingDetailResponse;
 import com.rentflow.listing.dto.ListingResponse;
@@ -28,7 +29,7 @@ public class AdminListingController {
     private final AdminListingService adminListingService;
 
     @GetMapping
-    public ResponseEntity<Page<ListingSummaryResponse>> listListings(
+    public ResponseEntity<PageResponse<ListingSummaryResponse>> listListings(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) UUID hostId,
             @RequestParam(required = false) String city,
@@ -48,7 +49,7 @@ public class AdminListingController {
 
         Page<ListingSummaryResponse> listings = adminListingService.listListings(
                 statusEnum, hostId, city, pageable);
-        return ResponseEntity.ok(listings);
+        return ResponseEntity.ok(PageResponse.from(listings));
     }
 
     @GetMapping("/{id}")

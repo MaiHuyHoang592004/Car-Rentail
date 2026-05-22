@@ -1,5 +1,6 @@
 package com.rentflow.vehicle.controller;
 
+import com.rentflow.common.web.PageResponse;
 import com.rentflow.common.web.PageableValidation;
 import com.rentflow.common.security.UserPrincipal;
 import com.rentflow.vehicle.dto.CreateVehicleRequest;
@@ -40,7 +41,7 @@ public class VehicleController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<VehicleResponse>> listVehicles(
+    public ResponseEntity<PageResponse<VehicleResponse>> listVehicles(
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -59,7 +60,7 @@ public class VehicleController {
 
         Page<VehicleResponse> vehicles = vehicleService.listVehicles(
                 principal.getUserId(), statusEnum, pageable);
-        return ResponseEntity.ok(vehicles);
+        return ResponseEntity.ok(PageResponse.from(vehicles));
     }
 
     @GetMapping("/{id}")
