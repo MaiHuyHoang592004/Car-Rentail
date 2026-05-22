@@ -17,6 +17,7 @@ import type {
 } from "@/features/bookings/types";
 import { getListingDetailById } from "@/features/listings/api";
 import { ApiError } from "@/lib/api-error";
+import { handleApiError } from "@/lib/handle-api-error";
 import { newIdempotencyKey } from "@/lib/idempotency";
 
 type BookingCreatePageViewProps = {
@@ -55,40 +56,34 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
       queryClient.setQueryData(["bookings", booking.id], booking);
       router.push(`/bookings/${booking.id}`);
     },
-    onError: (err: unknown) => {
-      if (!(err instanceof ApiError)) {
-        setSubmitError(ApiError.network());
-        return;
-      }
-      if (err.status === 409 && err.code === "BOOKING_OVERLAP_CUSTOMER") {
-        setOverlap(err.message || "Bạn đã có booking trùng thời gian.");
-        return;
-      }
-      if (err.status === 409 && err.code === "LISTING_NOT_AVAILABLE") {
-        setErrors((prev) => ({ ...prev, form: err.message || "Xe không khả dụng cho ngày đã chọn." }));
-        return;
-      }
-      if (err.status === 409 && err.code === "IDEMPOTENCY_KEY_CONFLICT") {
-        idempotencyKeyRef.current = newIdempotencyKey();
-        toast.error("Yêu cầu đã thay đổi, vui lòng submit lại");
-        return;
-      }
-      if (err.status === 400 && err.code === "VALIDATION_ERROR") {
-        const fieldErrors: BookingCreateFormErrors = {};
-        for (const detail of err.details) {
-          if (detail.field === "pickupDate" || detail.field === "returnDate" ||
-              detail.field === "pickupLocation" || detail.field === "returnLocation") {
-            fieldErrors[detail.field] = detail.message;
+    onError: (err: unknown) =>
+      handleApiError(err, {
+        onCode: {
+          BOOKING_OVERLAP_CUSTOMER: (e) =>
+            setOverlap(e.message || "Bạn đã có booking trùng thời gian."),
+          LISTING_NOT_AVAILABLE: (e) =>
+            setErrors((prev) => ({
+              ...prev,
+              form: e.message || "Xe không khả dụng cho ngày đã chọn.",
+            })),
+          IDEMPOTENCY_KEY_CONFLICT: () => {
+            idempotencyKeyRef.current = newIdempotencyKey();
+            toast.error("Yêu cầu đã thay đổi, vui lòng submit lại");
+          },
+        },
+        onFieldError: (field, message) => {
+          if (
+            field === "pickupDate" ||
+            field === "returnDate" ||
+            field === "pickupLocation" ||
+            field === "returnLocation"
+          ) {
+            setErrors((prev) => ({ ...prev, [field]: message }));
           }
-        }
-        if (Object.keys(fieldErrors).length === 0) {
-          fieldErrors.form = err.message;
-        }
-        setErrors(fieldErrors);
-        return;
-      }
-      setSubmitError(err);
-    },
+        },
+        onUnknown: (e) => setSubmitError(e),
+        onNetwork: () => setSubmitError(ApiError.network()),
+      }),
   });
 
   if (!listing) {

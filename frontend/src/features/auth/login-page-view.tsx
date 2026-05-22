@@ -15,6 +15,7 @@ import { AuthFormLayout } from "@/features/auth/auth-form-layout";
 import { useAuth, type AuthUser } from "@/features/auth/auth-context";
 import type { GuestIntentRedirect } from "@/features/auth/types";
 import { ApiError } from "@/lib/api-error";
+import { handleApiError } from "@/lib/handle-api-error";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Vui lòng nhập email.").email("Email không hợp lệ."),
@@ -57,20 +58,25 @@ export function LoginPageView({ redirectIntent }: LoginPageViewProps) {
       router.replace(target);
       router.refresh();
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.status === 400 && err.details.length > 0) {
-          err.details.forEach((detail) => {
-            if (detail.field === "email" || detail.field === "password") {
-              form.setError(detail.field as keyof LoginForm, { message: detail.message });
-            }
-          });
-          if (err.details.every((d) => d.field === "email" || d.field === "password")) {
-            return;
+      let allFieldsHandled = false;
+      handleApiError(err, {
+        onFieldError: (field, message) => {
+          if (field === "email" || field === "password") {
+            form.setError(field as keyof LoginForm, { message });
+            allFieldsHandled = true;
+          } else {
+            allFieldsHandled = false;
           }
-        }
+        },
+        onUnknown: (e) => setSubmitError(e),
+        onNetwork: () =>
+          setSubmitError(
+            new ApiError(0, { code: "UNKNOWN_ERROR", message: "Lỗi không xác định." }),
+          ),
+      });
+      // VALIDATION_ERROR with non-form field → also surface in banner.
+      if (err instanceof ApiError && err.code === "VALIDATION_ERROR" && !allFieldsHandled) {
         setSubmitError(err);
-      } else {
-        setSubmitError(new ApiError(0, { code: "UNKNOWN_ERROR", message: "Lỗi không xác định." }));
       }
     }
   }

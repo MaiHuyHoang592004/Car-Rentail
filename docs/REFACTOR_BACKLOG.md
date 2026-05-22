@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-23
 >
-> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I27`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I42`, `I43`, `I44`, `I46`, `I47`.
+> Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I27`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I41`, `I42`, `I43`, `I44`, `I46`, `I47`.
 
 ---
 
@@ -252,7 +252,7 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** Auth=Zod+RHF, host/booking=useState+manual, filter=no schema | **Effort:** L | **Fix:** Standardize Zod+RHF.
 
 ## I41 — Error Handling Per-Page
-**Status:** Confirmed | **Evidence:** `booking-create-page-view.tsx` if-else chain by error code | **Effort:** M | **Fix:** Central handler. **Depends:** I40.
+**Status:** Done | **Evidence:** `booking-create-page-view.tsx` if-else chain by error code | **Effort:** M | **Fix:** Added `lib/handle-api-error.ts` dispatcher: `onCode` map for specific codes, `onFieldError` per-detail for VALIDATION_ERROR, `onUnknown` + `onNetwork` fallbacks. Refactored `booking-create-page-view.tsx` and `login-page-view.tsx` to use it. Pattern can be adopted incrementally by remaining pages (host/availability flows kept inline for now).
 
 ## I42 — Date Timezone Risk
 **Status:** Done | **Evidence:** `Date.parse(\`${date}T00:00:00\`)` in booking-create | **Effort:** S | **Fix:** Extracted `validateBookingForm` to `bookings/date-utils.ts`; date ordering uses string compare (safe for `YYYY-MM-DD` format), rentalDays uses `Date.UTC(y, m-1, d)` math. Timezone-agnostic.
