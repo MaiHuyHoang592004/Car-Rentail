@@ -21,7 +21,7 @@ export function ListingDetailPageView({ listingId }: ListingDetailPageViewProps)
     return (
       <AppShell activePath="/listings">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">Loading listing...</p>
+          <p className="text-sm text-muted-foreground">Đang tải thông tin xe...</p>
         </section>
       </AppShell>
     );
@@ -31,9 +31,9 @@ export function ListingDetailPageView({ listingId }: ListingDetailPageViewProps)
     return (
       <AppShell activePath="/listings">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <h1 className="text-3xl font-bold text-foreground">Listing not found</h1>
+          <h1 className="text-3xl font-bold text-foreground">Không tìm thấy xe</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This listing does not exist or is no longer available.
+            Xe này không tồn tại hoặc không còn khả dụng.
           </p>
         </section>
       </AppShell>
@@ -51,7 +51,7 @@ export function ListingDetailPageView({ listingId }: ListingDetailPageViewProps)
         </div>
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-xl font-bold text-foreground">Photo Gallery</h2>
+          <h2 className="text-xl font-bold text-foreground">Thư viện ảnh</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {listing.galleryImageUrls.map((imageUrl) => (
               <img

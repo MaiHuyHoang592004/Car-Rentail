@@ -21,14 +21,14 @@ export function HostVehiclesPageView() {
     <AppShell activePath="/host/vehicles">
       <div className="space-y-6">
         <PageHeader
-          title="Host Vehicles"
-          description="Manage fleet inventory with static status filters and action states."
+          title="Xe của tôi"
+          description="Quản lý đội xe theo trạng thái và thao tác."
           actions={
             <Link
               href="/host/vehicles/new"
               className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Add vehicle
+              Thêm xe
             </Link>
           }
         />
@@ -58,13 +58,13 @@ export function HostVehiclesPageView() {
 
         {isLoading ? (
           <section className="rounded-xl border border-border bg-card p-10 text-center">
-            <p className="text-sm text-muted-foreground">Loading vehicles...</p>
+            <p className="text-sm text-muted-foreground">Đang tải danh sách xe...</p>
           </section>
         ) : vehicles.length === 0 ? (
           <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <h2 className="text-xl font-bold text-foreground">No vehicles in this status</h2>
+            <h2 className="text-xl font-bold text-foreground">Không có xe nào ở trạng thái này</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Change filter or add a new vehicle to continue.
+              Đổi bộ lọc hoặc thêm xe mới để tiếp tục.
             </p>
           </section>
         ) : (

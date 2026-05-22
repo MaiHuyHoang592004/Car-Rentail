@@ -31,10 +31,10 @@ export function ListingDetailHeader({ listing }: ListingDetailHeaderProps) {
 
       <div className="flex flex-col gap-4 border-t border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Base price</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Giá thuê</p>
           <p className="text-2xl font-bold text-foreground">
-            {listing.basePricePerDay.toLocaleString("en-US")} {listing.currency}
-            <span className="ml-1 text-sm font-medium text-muted-foreground">/ day</span>
+            {listing.basePricePerDay.toLocaleString("vi-VN")} {listing.currency}
+            <span className="ml-1 text-sm font-medium text-muted-foreground">/ ngày</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -42,13 +42,13 @@ export function ListingDetailHeader({ listing }: ListingDetailHeaderProps) {
             href="/listings"
             className="rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
           >
-            Back to listings
+            Quay lại danh sách
           </Link>
           <Link
             href={`/login?next=/listings/${listing.id}/book`}
             className="rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90"
           >
-            Book now
+            Đặt ngay
           </Link>
         </div>
       </div>

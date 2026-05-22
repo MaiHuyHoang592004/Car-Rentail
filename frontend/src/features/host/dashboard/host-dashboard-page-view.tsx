@@ -42,37 +42,37 @@ export function HostDashboardPageView() {
     <AppShell activePath="/host/dashboard">
       <div className="space-y-6">
         <PageHeader
-          title="Host Dashboard"
-          description="Overview of your fleet, listings, and pending actions."
+          title="Bảng điều khiển Chủ xe"
+          description="Tổng quan đội xe, tin đăng và các thao tác đang chờ xử lý."
         />
 
         <HostMetricStrip metrics={metrics} />
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-foreground">Quick Actions</h2>
+          <h2 className="text-lg font-bold text-foreground">Thao tác nhanh</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               href="/host/vehicles/new"
               className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Add vehicle
+              Thêm xe
             </Link>
             <Link
               href="/host/listings/new"
               className="rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90"
             >
-              Create listing
+              Tạo tin đăng
             </Link>
           </div>
         </section>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-foreground">Vehicle Attention Queue</h2>
+            <h2 className="text-lg font-bold text-foreground">Xe cần xử lý</h2>
             {loadingVehicles ? (
-              <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
+              <p className="mt-3 text-sm text-muted-foreground">Đang tải...</p>
             ) : vehicleAttention.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">No vehicles need attention.</p>
+              <p className="mt-3 text-sm text-muted-foreground">Không có xe nào cần xử lý.</p>
             ) : (
               <div className="mt-3 space-y-2">
                 {vehicleAttention.map((vehicle) => (
@@ -93,11 +93,11 @@ export function HostDashboardPageView() {
           </section>
 
           <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-foreground">Listing Attention Queue</h2>
+            <h2 className="text-lg font-bold text-foreground">Tin đăng cần xử lý</h2>
             {loadingListings ? (
-              <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
+              <p className="mt-3 text-sm text-muted-foreground">Đang tải...</p>
             ) : listingAttention.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">No listings need attention.</p>
+              <p className="mt-3 text-sm text-muted-foreground">Không có tin đăng nào cần xử lý.</p>
             ) : (
               <div className="mt-3 space-y-2">
                 {listingAttention.map((listing) => (

@@ -32,7 +32,7 @@ export function ListingCard({ listing }: ListingCardProps) {
 
         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
           <p>{listing.category}</p>
-          <p>{listing.seats} seats</p>
+          <p>{listing.seats} chỗ</p>
           <p>{listing.transmission}</p>
           <p>{listing.fuelType}</p>
         </div>
@@ -40,15 +40,15 @@ export function ListingCard({ listing }: ListingCardProps) {
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             <span className="text-base font-bold text-foreground">
-              {listing.basePricePerDay.toLocaleString("en-US")} {listing.currency}
+              {listing.basePricePerDay.toLocaleString("vi-VN")} {listing.currency}
             </span>{" "}
-            / day
+            / ngày
           </p>
           <Link
             href={`/listings/${listing.id}`}
             className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
-            View
+            Xem
           </Link>
         </div>
       </div>

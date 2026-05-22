@@ -76,8 +76,8 @@ describe("ListingsPageView", () => {
     wrap(<ListingsPageView />);
 
     await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
-    await userEvent.type(screen.getByPlaceholderText("City"), "Hanoi");
-    await userEvent.selectOptions(screen.getByDisplayValue("All categories"), "SUV");
+    await userEvent.type(screen.getByPlaceholderText("Thành phố"), "Hanoi");
+    await userEvent.selectOptions(screen.getByDisplayValue("Tất cả phân loại"), "SUV");
 
     await waitFor(() => {
       const call = fetchSpy.mock.calls.find(
@@ -100,7 +100,7 @@ describe("ListingsPageView", () => {
     await userEvent.type(dateInputs[0], "2026-07-03");
     await userEvent.type(dateInputs[1], "2026-07-01");
 
-    expect(await screen.findByText("Return date must be later than pickup date.")).toBeInTheDocument();
+    expect(await screen.findByText("Ngày trả xe phải sau ngày nhận xe.")).toBeInTheDocument();
     const invalidDateCall = fetchSpy.mock.calls.find(
       ([url]) =>
         typeof url === "string" &&

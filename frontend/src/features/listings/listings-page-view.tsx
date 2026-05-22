@@ -46,8 +46,8 @@ export function ListingsPageView() {
     <AppShell activePath="/listings">
       <div className="space-y-6">
         <PageHeader
-          title="Search Listings"
-          description="Browse active vehicles by city, price range, and specs."
+          title="Tìm xe"
+          description="Duyệt xe đang hoạt động theo thành phố, khoảng giá và thông số."
         />
 
         <ListingFiltersPanel
@@ -58,13 +58,13 @@ export function ListingsPageView() {
 
         {dateRangeInvalid ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Return date must be later than pickup date.
+            Ngày trả xe phải sau ngày nhận xe.
           </div>
         ) : null}
 
         {query.isLoading ? (
           <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <p className="text-sm text-muted-foreground">Loading listings...</p>
+            <p className="text-sm text-muted-foreground">Đang tải danh sách xe...</p>
           </section>
         ) : null}
 
@@ -75,8 +75,8 @@ export function ListingsPageView() {
         {!query.isLoading && !query.isError ? (
           <ListingGrid
             listings={dateRangeInvalid ? [] : listings}
-            emptyTitle="No cars match your filters"
-            emptyDescription="Change city, dates, or price settings and try again."
+            emptyTitle="Không có xe nào phù hợp"
+            emptyDescription="Thay đổi thành phố, ngày hoặc khoảng giá rồi thử lại."
           />
         ) : null}
 
@@ -88,10 +88,10 @@ export function ListingsPageView() {
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               className="rounded-full border border-border bg-background px-4 py-1.5 font-semibold disabled:opacity-50 hover:enabled:bg-accent"
             >
-              Previous
+              Trang trước
             </button>
             <span className="text-muted-foreground">
-              Page {page + 1} / {totalPages}
+              Trang {page + 1} / {totalPages}
             </span>
             <button
               type="button"
@@ -99,7 +99,7 @@ export function ListingsPageView() {
               onClick={() => setPage((p) => p + 1)}
               className="rounded-full border border-border bg-background px-4 py-1.5 font-semibold disabled:opacity-50 hover:enabled:bg-accent"
             >
-              Next
+              Trang sau
             </button>
           </div>
         ) : null}

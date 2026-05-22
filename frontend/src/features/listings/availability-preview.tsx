@@ -9,7 +9,7 @@ export function AvailabilityPreview({ listing }: AvailabilityPreviewProps) {
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-foreground">Availability Preview</h2>
+        <h2 className="text-xl font-bold text-foreground">Lịch khả dụng</h2>
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
           {listing.availability.from} - {listing.availability.to}
         </p>
@@ -27,7 +27,7 @@ export function AvailabilityPreview({ listing }: AvailabilityPreviewProps) {
       </div>
 
       <p className="mt-4 text-sm text-muted-foreground">
-        Guest booking action routes to login with a preserved `next` destination.
+        Khách chưa đăng nhập sẽ được chuyển sang trang đăng nhập và giữ nguyên điểm đến.
       </p>
     </section>
   );

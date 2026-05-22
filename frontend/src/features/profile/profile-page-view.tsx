@@ -14,20 +14,20 @@ function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
   const errors: ProfileFormErrors = {};
 
   if (!form.fullName.trim()) {
-    errors.fullName = "Full name is required.";
+    errors.fullName = "Họ và tên là bắt buộc.";
   }
 
   if (form.phone.trim() && !/^\+?[0-9\-\s]{7,20}$/.test(form.phone.trim())) {
-    errors.phone = "Enter a valid phone number.";
+    errors.phone = "Vui lòng nhập số điện thoại hợp lệ.";
   }
 
   if (form.dateOfBirth) {
     const dob = Date.parse(`${form.dateOfBirth}T00:00:00`);
     const now = Date.now();
     if (Number.isNaN(dob)) {
-      errors.dateOfBirth = "Invalid date of birth.";
+      errors.dateOfBirth = "Ngày sinh không hợp lệ.";
     } else if (dob > now) {
-      errors.dateOfBirth = "Date of birth cannot be in the future.";
+      errors.dateOfBirth = "Ngày sinh không được nằm trong tương lai.";
     }
   }
 
@@ -46,10 +46,10 @@ export function ProfilePageView() {
     mutationFn: updateProfile,
     onSuccess: (updated) => {
       queryClient.setQueryData(["profile"], updated);
-      setBanner("Profile saved.");
+      setBanner("Đã lưu hồ sơ.");
     },
     onError: () => {
-      toast.error("Failed to save profile. Please try again.");
+      toast.error("Không thể lưu hồ sơ. Vui lòng thử lại.");
     },
   });
 
@@ -66,7 +66,7 @@ export function ProfilePageView() {
     return (
       <AppShell activePath="/me/profile">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">Loading profile...</p>
+          <p className="text-sm text-muted-foreground">Đang tải hồ sơ...</p>
         </section>
       </AppShell>
     );
@@ -76,7 +76,7 @@ export function ProfilePageView() {
     return (
       <AppShell activePath="/me/profile">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">Unable to load profile.</p>
+          <p className="text-sm text-muted-foreground">Không tải được hồ sơ.</p>
         </section>
       </AppShell>
     );
@@ -119,8 +119,8 @@ export function ProfilePageView() {
     <AppShell activePath="/me/profile">
       <div className="space-y-6">
         <PageHeader
-          title="Profile Settings"
-          description="Edit personal fields. Email, roles, and verification remain read-only."
+          title="Hồ sơ cá nhân"
+          description="Cập nhật thông tin cá nhân. Email, vai trò và xác minh chỉ hiển thị, không sửa được."
         />
 
         {banner ? (
@@ -130,21 +130,21 @@ export function ProfilePageView() {
         ) : null}
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-foreground">Account Snapshot</h2>
+          <h2 className="text-lg font-bold text-foreground">Tổng quan tài khoản</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-border bg-background px-3 py-2">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Email</p>
               <p className="mt-1 text-sm font-semibold text-foreground">{profile.email}</p>
             </div>
             <div className="rounded-lg border border-border bg-background px-3 py-2">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Driver verification</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Xác minh GPLX</p>
               <div className="mt-1">
                 <StatusBadge status={profile.driverVerificationStatus} />
               </div>
             </div>
           </div>
           <div className="mt-3">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Roles</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Vai trò</p>
             <div className="mt-1 flex flex-wrap gap-2">
               {profile.roles.map((role) => (
                 <span
@@ -159,11 +159,11 @@ export function ProfilePageView() {
         </section>
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-foreground">Editable Fields</h2>
+          <h2 className="text-lg font-bold text-foreground">Thông tin có thể chỉnh sửa</h2>
           <form onSubmit={handleSave} noValidate className="mt-4 space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Full name</label>
+                <label className="mb-1 block text-sm font-semibold text-foreground">Họ và tên</label>
                 <input
                   type="text"
                   value={form.fullName}
@@ -176,7 +176,7 @@ export function ProfilePageView() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Phone</label>
+                <label className="mb-1 block text-sm font-semibold text-foreground">Số điện thoại</label>
                 <input
                   type="tel"
                   value={form.phone}
@@ -189,7 +189,7 @@ export function ProfilePageView() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Date of birth</label>
+                <label className="mb-1 block text-sm font-semibold text-foreground">Ngày sinh</label>
                 <input
                   type="date"
                   value={form.dateOfBirth}
@@ -202,7 +202,7 @@ export function ProfilePageView() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Address</label>
+                <label className="mb-1 block text-sm font-semibold text-foreground">Địa chỉ</label>
                 <input
                   type="text"
                   value={form.addressLine}
@@ -217,7 +217,7 @@ export function ProfilePageView() {
               disabled={saving}
               className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Save profile"}
+              {saving ? "Đang lưu..." : "Lưu hồ sơ"}
             </button>
           </form>
         </section>

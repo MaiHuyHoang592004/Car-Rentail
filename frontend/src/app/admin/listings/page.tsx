@@ -3,8 +3,8 @@ import { RoutePlaceholder } from "@/components/rentflow/route-placeholder";
 export default function AdminListingsPage() {
   return (
     <RoutePlaceholder
-      title="Listing Approval Queue"
-      description="Static queue shell for approve/reject/suspend/re-activate listing actions."
+      title="Hàng chờ duyệt tin đăng"
+      description="Giao diện tĩnh để duyệt/từ chối/tạm ngưng/kích hoạt lại tin đăng."
       activePath="/admin/listings"
     />
   );

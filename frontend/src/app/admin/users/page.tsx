@@ -3,8 +3,8 @@ import { RoutePlaceholder } from "@/components/rentflow/route-placeholder";
 export default function AdminUsersPage() {
   return (
     <RoutePlaceholder
-      title="Admin Users"
-      description="Static user management table shell with status/role filters."
+      title="Người dùng"
+      description="Giao diện quản lý người dùng tĩnh với bộ lọc theo trạng thái/vai trò."
       activePath="/admin/users"
     />
   );

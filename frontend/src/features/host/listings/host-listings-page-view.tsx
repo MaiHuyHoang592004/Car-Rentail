@@ -27,14 +27,14 @@ export function HostListingsPageView() {
     <AppShell activePath="/host/listings">
       <div className="space-y-6">
         <PageHeader
-          title="Host Listings"
-          description="Manage your vehicle listings across their lifecycle."
+          title="Tin đăng của tôi"
+          description="Quản lý tin đăng xe theo trạng thái vòng đời."
           actions={
             <Link
               href="/host/listings/new"
               className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Create listing
+              Tạo tin đăng
             </Link>
           }
         />
@@ -64,17 +64,17 @@ export function HostListingsPageView() {
 
         {isLoading ? (
           <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <p className="text-sm text-muted-foreground">Loading listings...</p>
+            <p className="text-sm text-muted-foreground">Đang tải tin đăng...</p>
           </section>
         ) : isError ? (
           <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-            Failed to load listings. Please try again.
+            Không tải được danh sách tin đăng. Vui lòng thử lại.
           </section>
         ) : listings.length === 0 ? (
           <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <h2 className="text-xl font-bold text-foreground">No listings found</h2>
+            <h2 className="text-xl font-bold text-foreground">Chưa có tin đăng nào</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Switch filter or create a new listing to continue.
+              Đổi bộ lọc hoặc tạo tin đăng mới để tiếp tục.
             </p>
           </section>
         ) : (

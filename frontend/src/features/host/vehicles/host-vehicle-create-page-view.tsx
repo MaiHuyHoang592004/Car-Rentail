@@ -45,7 +45,7 @@ export function HostVehicleCreatePageView() {
     }
 
     setSuccessMessage(
-      `Static vehicle created: ${form.make} ${form.model} (${form.year}) with status ${form.status}.`,
+      `Đã tạo xe (chế độ tĩnh): ${form.make} ${form.model} (${form.year}) trạng thái ${form.status}.`,
     );
     setForm(INITIAL_FORM);
   }
@@ -54,14 +54,14 @@ export function HostVehicleCreatePageView() {
     <AppShell activePath="/host/vehicles">
       <div className="space-y-6">
         <PageHeader
-          title="Add Vehicle"
-          description="Create a new vehicle with local validation. Data is static and not persisted."
+          title="Thêm xe"
+          description="Tạo xe mới với kiểm tra local. Dữ liệu chỉ là tĩnh, chưa lưu lên server."
           actions={
             <Link
               href="/host/vehicles"
               className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
             >
-              Back to vehicles
+              Quay lại danh sách xe
             </Link>
           }
         />
@@ -80,7 +80,7 @@ export function HostVehicleCreatePageView() {
                 type="submit"
                 className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
               >
-                Save vehicle
+                Lưu xe
               </button>
               <button
                 type="button"
@@ -91,7 +91,7 @@ export function HostVehicleCreatePageView() {
                 }}
                 className="rounded-full border border-border bg-background px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-accent"
               >
-                Reset
+                Đặt lại
               </button>
             </div>
           </form>
