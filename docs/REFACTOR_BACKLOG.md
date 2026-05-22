@@ -8,7 +8,7 @@
 >
 > Last updated: 2026-05-22
 >
-> Completed: `C01-C07`, `I01`, `I02`, `I04`, `I05-I12`, `I15`, `I18`, `I22`, `I30`, `I31`, `I32`.
+> Completed: `C01-C07`, `I01`, `I02`, `I04`, `I05-I12`, `I15`, `I18`, `I22`, `I30`, `I31`, `I32`, `I34`, `I38`, `I39`, `I43`.
 
 ---
 
@@ -231,7 +231,7 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** Roadmap requires, need verify code | **Effort:** M | **Fix:** Verified — `BookingRepository.findExpiredHeldBookingsForUpdate` uses bounded `LIMIT :batchSize` + `FOR UPDATE SKIP LOCKED` + `ORDER BY id`; processor handles race-condition skip and matching-token availability release; covered by 5 processor + 2 job unit tests.
 
 ## I34 — Frontend API Client Singleton
-**Status:** Confirmed | **Evidence:** `api-client.ts` module-level mutable `let accessTokenGetter` | **Effort:** M | **Fix:** Context-based or test reset.
+**Status:** Done | **Evidence:** `api-client.ts` module-level mutable `let accessTokenGetter` | **Effort:** M | **Fix:** Added `createApiClient()` factory (isolated instances) and `resetApiClient()` for test isolation; default singleton preserved for back-compat.
 
 ## I35 — BFF vs Direct API Undocumented
 **Status:** Confirmed | **Evidence:** Auth via BFF, others via rewrite | **Effort:** XS | **Fix:** Document.
@@ -243,10 +243,10 @@ if (userOpt.isEmpty()) {
 **Status:** Confirmed | **Evidence:** `role-guard.tsx` useEffect redirect | **Effort:** M | **Fix:** Layout-based protection. **Depends:** I36.
 
 ## I38 — Mobile Nav Missing
-**Status:** Confirmed | **Evidence:** `app-shell.tsx`: `hidden md:flex` on nav, no mobile replacement | **Effort:** M | **Fix:** Hamburger + Sheet.
+**Status:** Done | **Evidence:** `app-shell.tsx`: `hidden md:flex` on nav, no mobile replacement | **Effort:** M | **Fix:** Hamburger + left slide-in drawer (no new deps); closes on link click, overlay, Escape, route change.
 
 ## I39 — UI Mix Vietnamese/English
-**Status:** Confirmed | **Evidence:** Auth=VN, listings/host=EN | **Effort:** S | **Fix:** VN primary.
+**Status:** Done | **Evidence:** Auth=VN, listings/host=EN | **Effort:** S | **Fix:** Translated listings/host/profile/admin scaffold copy to Vietnamese; currency formatter switched to vi-VN. No i18n framework added (deferred to N04).
 
 ## I40 — Form Handling 3 Patterns
 **Status:** Confirmed | **Evidence:** Auth=Zod+RHF, host/booking=useState+manual, filter=no schema | **Effort:** L | **Fix:** Standardize Zod+RHF.
@@ -258,7 +258,7 @@ if (userOpt.isEmpty()) {
 **Status:** Suspected | **Evidence:** `Date.parse(\`${date}T00:00:00\`)` in booking-create | **Effort:** S | **Fix:** String compare or date-fns.
 
 ## I43 — Loading/Empty/Error Inconsistent
-**Status:** Confirmed | **Evidence:** 3+ loading styles, 3+ error styles | **Effort:** M | **Fix:** Shared components.
+**Status:** Done | **Evidence:** 3+ loading styles, 3+ error styles | **Effort:** M | **Fix:** Added `PageSkeleton`, `EmptyState`, `FormError` under `components/rentflow/*`; migrated 5 high-visibility pages. Remaining callsites can adopt incrementally.
 
 ## I44 — Pay Now Exposes Phase 6 Language
 **Status:** Suspected | **Evidence:** `PAY_NOW_TOOLTIP = "...Phase 6 (sắp ra mắt)"` | **Effort:** XS | **Fix:** Remove phase mention.

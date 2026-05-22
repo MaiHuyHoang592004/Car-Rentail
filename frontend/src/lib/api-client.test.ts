@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   api,
   apiFetch,
+  createApiClient,
   registerAccessTokenGetter,
   registerAuthFailedHandler,
   registerRefreshHandler,
+  resetApiClient,
 } from "./api-client";
 import { ApiError } from "./api-error";
 
@@ -29,13 +31,13 @@ describe("api-client", () => {
   beforeEach(() => {
     fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    registerAccessTokenGetter(() => null);
+    resetApiClient();
     registerRefreshHandler(async () => false);
-    registerAuthFailedHandler(() => undefined);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    resetApiClient();
   });
 
   it("prefixes path with /api/v1", async () => {
@@ -135,5 +137,33 @@ describe("api-client", () => {
     fetchSpy.mockResolvedValue(mockResponse(204));
     const result = await api.delete("/x");
     expect(result).toBeUndefined();
+  });
+
+  it("createApiClient returns isolated instances (no shared mutable state)", async () => {
+    const clientA = createApiClient();
+    const clientB = createApiClient();
+    clientA.setAccessTokenGetter(() => "tok-A");
+    clientB.setAccessTokenGetter(() => "tok-B");
+
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse(200, { ok: true }))
+      .mockResolvedValueOnce(mockResponse(200, { ok: true }));
+
+    await clientA.api.get("/me");
+    await clientB.api.get("/me");
+
+    const initA = fetchSpy.mock.calls[0][1] as RequestInit;
+    const initB = fetchSpy.mock.calls[1][1] as RequestInit;
+    expect((initA.headers as Headers).get("Authorization")).toBe("Bearer tok-A");
+    expect((initB.headers as Headers).get("Authorization")).toBe("Bearer tok-B");
+  });
+
+  it("resetApiClient clears the default client's token getter", async () => {
+    registerAccessTokenGetter(() => "tok-X");
+    resetApiClient();
+    fetchSpy.mockResolvedValue(mockResponse(200, { ok: true }));
+    await api.get("/me");
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Headers).has("Authorization")).toBe(false);
   });
 });
