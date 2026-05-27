@@ -29,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+        "rentflow.rate-limit.enabled=false",
+        "management.health.redis.enabled=false",
         "jwt.secret=test-jwt-secret-key-for-unit-tests-only-minimum-60-bytes-required-for-hs512",
         "jwt.access-token-expiry=PT15M",
         "jwt.refresh-token-expiry=P7D"
@@ -98,6 +100,13 @@ class SecurityEndpointsTest {
     @Test
     void hostEndpoint_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/host/vehicles"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void paymentBanksEndpoint_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/payment-banks"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
     }

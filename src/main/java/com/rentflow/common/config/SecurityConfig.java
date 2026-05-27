@@ -76,6 +76,8 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/listings").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/listings/{id}").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/listings/{id}/availability").permitAll()
+                    // Payment bank catalog is used inside authenticated checkout flow in Slice 6A
+                    .requestMatchers(HttpMethod.GET, "/api/v1/payment-banks").authenticated()
                     // Booking endpoints require authentication; service layer enforces roles and ownership
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/cancel").authenticated()
