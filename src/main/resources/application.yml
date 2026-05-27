@@ -45,6 +45,16 @@ jwt:
 rentflow:
   cors:
     allowed-origins: ${RENTFLOW_CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  payment:
+    bank-transfer:
+      account-number: ${RENTFLOW_BANK_TRANSFER_ACCOUNT_NUMBER:1234567890}
+      account-name: ${RENTFLOW_BANK_TRANSFER_ACCOUNT_NAME:RENTFLOW ESCROW}
+      transfer-content-prefix: ${RENTFLOW_BANK_TRANSFER_CONTENT_PREFIX:RENTFLOW}
+    corebank:
+      base-url: ${RENTFLOW_COREBANK_BASE_URL:http://localhost:8081}
+      connect-timeout: ${RENTFLOW_COREBANK_CONNECT_TIMEOUT:PT3S}
+      read-timeout: ${RENTFLOW_COREBANK_READ_TIMEOUT:PT5S}
+      payee-account-id: ${RENTFLOW_COREBANK_PAYEE_ACCOUNT_ID:rentflow-escrow-corebank-account-id}
   scheduler:
     expire-held-bookings:
       enabled: ${EXPIRE_HELD_BOOKINGS_ENABLED:true}
