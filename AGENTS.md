@@ -32,6 +32,7 @@ Current source-of-truth docs:
 - `docs/architecture.md`
 - `docs/roadmap.md`
 - `docs/srs.md`
+- `docs/payment-provider-architecture.md`
 
 Historical or archived docs must not be treated as current implementation instructions unless the user explicitly asks.
 If docs conflict with code, prefer code and report the drift.
@@ -43,6 +44,11 @@ Read these before doing non-trivial work:
 - `docs/roadmap.md`
 - `docs/srs.md`
 - Relevant feature docs only when they match the current task.
+
+For payment work, always read:
+- `docs/payment-provider-architecture.md`
+- `docs/phase-06-payment.md`
+- `docs/context/payment-rules.md`
 
 ## Package structure
 
@@ -144,6 +150,19 @@ Never commit real secrets.
 - Keep migrations deterministic and backward-readable.
 - Be careful with booking, availability, payment, audit, and outbox transaction boundaries.
 
+## Payment provider rules
+
+- RentFlow does not own financial truth for external providers.
+- RentFlow owns booking lifecycle, local payment aggregate, provider routing, idempotency mapping, and reconciliation state.
+- CoreBank is the first real demo provider and owns money correctness for the demo path.
+- Generic Vietnamese banks are selected from a backend bank catalog and may initially route to bank-transfer/QR instruction flow.
+- Do not hardcode bank lists in frontend code.
+- Do not put provider-specific HTTP/client logic inside controllers or booking services.
+- Provider-specific logic belongs behind `PaymentProvider` implementations.
+- For external providers, store provider references and provider response/error metadata for audit and reconciliation.
+- Use `externalOrderRef = rentflow:booking:{bookingId}` for CoreBank cross-system lookup.
+- Do not mark generic QR/bank transfer as paid just because an instruction or QR was generated.
+
 ## Build and test commands
 
 Use Maven.
@@ -210,6 +229,14 @@ For booking tasks, inspect:
 - `src/main/java/com/rentflow/availability/**`
 - `src/main/java/com/rentflow/listing/**`
 - related booking tests
+
+For payment tasks, inspect:
+- `docs/payment-provider-architecture.md`
+- `docs/phase-06-payment.md`
+- `docs/context/payment-rules.md`
+- `src/main/java/com/rentflow/payment/**`
+- `src/main/java/com/rentflow/booking/**`
+- related payment/booking tests
 
 For listing/vehicle tasks, inspect:
 - `docs/roadmap.md`
