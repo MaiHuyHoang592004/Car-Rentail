@@ -86,7 +86,11 @@ public class BookingController {
             @RequestBody(required = false) CancelBookingRequest request) {
         validateIdempotencyKey(idempotencyKey);
         CancelBookingRequest cancelRequest = request == null ? new CancelBookingRequest(null) : request;
-        return ResponseEntity.ok(bookingService.cancelBooking(id, idempotencyKey, cancelRequest));
+        CancelBookingResponse response = bookingService.cancelBooking(id, idempotencyKey, cancelRequest);
+        if (response.voidRetryRequired()) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+        }
+        return ResponseEntity.ok(response);
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {

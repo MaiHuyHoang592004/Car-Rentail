@@ -67,4 +67,10 @@ public class AvailabilityReserver {
         }
         return released;
     }
+
+    public void saveRows(List<AvailabilityCalendar> rows) {
+        if (!rows.isEmpty()) {
+            availabilityCalendarRepository.saveAll(rows);
+        }
+    }
 }

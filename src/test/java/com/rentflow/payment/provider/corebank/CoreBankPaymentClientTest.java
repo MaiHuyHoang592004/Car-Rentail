@@ -151,6 +151,56 @@ class CoreBankPaymentClientTest {
         assertThat(result.rawResponseJson()).contains("\"holdId\":\"hold-1\"");
     }
 
+    @Test
+    void refundSerializesRequestAndParsesResponse() throws Exception {
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/payments/refund", exchange -> {
+            requestBody.set(readBody(exchange));
+            respond(exchange, 200, """
+                    {"paymentOrderId":"payment-order-1","refundJournalId":"refund-journal-1","status":"REFUNDED"}
+                    """);
+        });
+        server.start();
+
+        CoreBankPaymentClient client = client(server);
+        CoreBankRefundResult result = client.refund(new CoreBankRefundRequest(
+                "rentflow:refund:payment:key",
+                "payment-order-1",
+                100000L,
+                "VND",
+                "Customer cancellation refund",
+                "rentflow",
+                "correlation-1",
+                "request-1",
+                "session-1",
+                "trace-1"));
+
+        assertThat(requestBody.get()).contains("\"paymentOrderId\":\"payment-order-1\"");
+        assertThat(requestBody.get()).contains("\"idempotencyKey\":\"rentflow:refund:payment:key\"");
+        assertThat(result.response().status()).isEqualTo("REFUNDED");
+        assertThat(result.response().refundJournalId()).isEqualTo("refund-journal-1");
+    }
+
+    @Test
+    void findOrderByExternalOrderRefCallsQueryParam() throws Exception {
+        AtomicReference<String> query = new AtomicReference<>();
+        server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/payments/orders", exchange -> {
+            query.set(exchange.getRequestURI().getQuery());
+            respond(exchange, 200, """
+                    {"paymentOrderId":"payment-order-1","holdId":"hold-1","status":"CAPTURED"}
+                    """);
+        });
+        server.start();
+
+        CoreBankPaymentClient client = client(server);
+        String response = client.findOrderByExternalOrderRef("rentflow:booking:abc");
+
+        assertThat(query.get()).contains("externalOrderRef=rentflow%3Abooking%3Aabc");
+        assertThat(response).contains("\"paymentOrderId\":\"payment-order-1\"");
+    }
+
     private CoreBankPaymentClient client(HttpServer server) {
         CoreBankPaymentProperties properties = new CoreBankPaymentProperties();
         properties.setBaseUrl("http://localhost:" + server.getAddress().getPort());

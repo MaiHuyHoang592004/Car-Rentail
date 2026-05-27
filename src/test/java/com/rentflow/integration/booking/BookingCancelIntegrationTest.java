@@ -18,6 +18,20 @@ import com.rentflow.listing.entity.CancellationPolicy;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.payment.entity.BookingPayment;
+import com.rentflow.payment.entity.PaymentMethod;
+import com.rentflow.payment.entity.PaymentProviderType;
+import com.rentflow.payment.entity.PaymentStatus;
+import com.rentflow.payment.entity.PaymentTransaction;
+import com.rentflow.payment.entity.PaymentTransactionStatus;
+import com.rentflow.payment.entity.PaymentTransactionType;
+import com.rentflow.payment.provider.corebank.CoreBankCaptureHoldResponse;
+import com.rentflow.payment.provider.corebank.CoreBankCaptureHoldResult;
+import com.rentflow.payment.provider.corebank.CoreBankPaymentClient;
+import com.rentflow.payment.provider.corebank.CoreBankVoidHoldResponse;
+import com.rentflow.payment.provider.corebank.CoreBankVoidHoldResult;
+import com.rentflow.payment.repository.BookingPaymentRepository;
+import com.rentflow.payment.repository.PaymentTransactionRepository;
 import com.rentflow.vehicle.entity.FuelType;
 import com.rentflow.vehicle.entity.TransmissionType;
 import com.rentflow.vehicle.entity.Vehicle;
@@ -28,6 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 
@@ -38,6 +53,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,7 +71,10 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Autowired private BookingRepository bookingRepository;
     @Autowired private AvailabilityCalendarRepository availabilityRepository;
     @Autowired private IdempotencyKeyRepository idempotencyKeyRepository;
+    @Autowired private BookingPaymentRepository bookingPaymentRepository;
+    @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private JwtTokenProvider jwtTokenProvider;
+    @MockBean private CoreBankPaymentClient coreBankPaymentClient;
 
     private AuthUser customer;
     private AuthUser host;
@@ -66,6 +86,8 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         idempotencyKeyRepository.deleteAll();
+        paymentTransactionRepository.deleteAll();
+        bookingPaymentRepository.deleteAll();
         availabilityRepository.deleteAll();
         bookingRepository.deleteAll();
         listingRepository.deleteAll();
@@ -143,6 +165,8 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Test
     void cancelConfirmedBookingReturnsInvalidStatus() throws Exception {
         Booking booking = saveBooking(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 5, 1));
+        bookingRepository.save(booking);
 
         mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
                         .header("Authorization", "Bearer " + customerToken)
@@ -153,6 +177,189 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("BOOKING_INVALID_STATUS"));
+    }
+
+    @Test
+    void cancelPendingHostApprovalVoidsPaymentAndReleasesAvailability() throws Exception {
+        Booking booking = saveBooking(BookingStatus.PENDING_HOST_APPROVAL);
+        saveHeldAvailability(booking);
+        saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.voidHold(any())).thenReturn(new CoreBankVoidHoldResult(
+                new CoreBankVoidHoldResponse("hold-1", "VOIDED"),
+                "{\"holdId\":\"hold-1\",\"status\":\"VOIDED\"}"));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Cancel pending"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
+    }
+
+    @Test
+    void cancelConfirmedFullRefundVoidsAuthorizationWithoutCapture() throws Exception {
+        Booking booking = saveBooking(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 7, 1));
+        booking.setReturnDate(LocalDate.of(2026, 7, 3));
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"FLEXIBLE","instantBook":true,"dailyKmLimit":200}
+                """);
+        bookingRepository.save(booking);
+        saveBookedAvailability(booking);
+        saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.voidHold(any())).thenReturn(new CoreBankVoidHoldResult(
+                new CoreBankVoidHoldResponse("hold-1", "VOIDED"),
+                "{\"holdId\":\"hold-1\",\"status\":\"VOIDED\"}"));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Early cancel"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.voidRetryRequired").value(false));
+
+        BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
+        assertThat(payment.getCapturedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void cancelConfirmedPartialPenaltyCaptureThenVoidSucceeds() throws Exception {
+        Booking booking = saveBooking(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 5, 30));
+        booking.setReturnDate(LocalDate.of(2026, 6, 1));
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
+                """);
+        bookingRepository.save(booking);
+        saveBookedAvailability(booking);
+        saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.captureHold(any())).thenReturn(new CoreBankCaptureHoldResult(
+                new CoreBankCaptureHoldResponse("payment-order-1", "journal-1", "CAPTURED"),
+                "{\"paymentOrderId\":\"payment-order-1\",\"journalId\":\"journal-1\",\"status\":\"CAPTURED\"}"));
+        when(coreBankPaymentClient.voidHold(any())).thenReturn(new CoreBankVoidHoldResult(
+                new CoreBankVoidHoldResponse("hold-1", "VOIDED"),
+                "{\"holdId\":\"hold-1\",\"status\":\"VOIDED\"}"));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Late cancel"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.voidRetryRequired").value(false));
+
+        BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(payment.getCapturedAmount()).isEqualByComparingTo("750000.00");
+        assertThat(payment.getProviderStatus()).isEqualTo("VOIDED");
+    }
+
+    @Test
+    void cancelConfirmedPartialPenaltyWhenVoidFailsReturnsAccepted() throws Exception {
+        Booking booking = saveBooking(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 5, 30));
+        booking.setReturnDate(LocalDate.of(2026, 6, 1));
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
+                """);
+        bookingRepository.save(booking);
+        saveBookedAvailability(booking);
+        saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.captureHold(any())).thenReturn(new CoreBankCaptureHoldResult(
+                new CoreBankCaptureHoldResponse("payment-order-1", "journal-1", "CAPTURED"),
+                "{\"paymentOrderId\":\"payment-order-1\",\"journalId\":\"journal-1\",\"status\":\"CAPTURED\"}"));
+        when(coreBankPaymentClient.voidHold(any())).thenThrow(new com.rentflow.common.exception.PaymentProviderUnavailableException("void fail"));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Late cancel"}
+                                """))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.voidRetryRequired").value(true))
+                .andExpect(jsonPath("$.code").value("PAYMENT_VOID_RETRY_REQUIRED"));
+
+        Booking cancelled = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertThat(cancelled.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+
+        BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        assertThat(payment.getAuthorizedAmount()).isEqualByComparingTo("1500000.00");
+        assertThat(payment.getCapturedAmount()).isEqualByComparingTo("750000.00");
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(payment.getProviderStatus()).isEqualTo("VOID_RETRY_REQUIRED");
+
+        List<PaymentTransaction> txns = paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId());
+        assertThat(txns).hasSize(2);
+        assertThat(txns.get(0).getType()).isEqualTo(PaymentTransactionType.CAPTURE);
+        assertThat(txns.get(0).getStatus()).isEqualTo(PaymentTransactionStatus.SUCCEEDED);
+        assertThat(txns.get(0).getAmount()).isEqualByComparingTo("750000.00");
+        assertThat(txns.get(1).getType()).isEqualTo(PaymentTransactionType.VOID);
+        assertThat(txns.get(1).getStatus()).isEqualTo(PaymentTransactionStatus.FAILED);
+
+        AvailabilityCalendar first = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate())).orElseThrow();
+        AvailabilityCalendar second = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate().plusDays(1))).orElseThrow();
+        assertThat(List.of(first, second)).allSatisfy(row -> assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.FREE));
+    }
+
+    @Test
+    void cancelConfirmedPartialPenaltyWhenVoidFailsThenReplayReturns202WithoutReinvokingPayments() throws Exception {
+        Booking booking = saveBooking(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 5, 30));
+        booking.setReturnDate(LocalDate.of(2026, 6, 1));
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
+                """);
+        bookingRepository.save(booking);
+        saveBookedAvailability(booking);
+        saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.captureHold(any())).thenReturn(new CoreBankCaptureHoldResult(
+                new CoreBankCaptureHoldResponse("payment-order-1", "journal-1", "CAPTURED"),
+                "{\"paymentOrderId\":\"payment-order-1\",\"journalId\":\"journal-1\",\"status\":\"CAPTURED\"}"));
+        when(coreBankPaymentClient.voidHold(any())).thenThrow(new com.rentflow.common.exception.PaymentProviderUnavailableException("void fail"));
+
+        String key = UUID.randomUUID().toString();
+        String body = """
+                {"reason":"Late cancel"}
+                """;
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.voidRetryRequired").value(true))
+                .andExpect(jsonPath("$.code").value("PAYMENT_VOID_RETRY_REQUIRED"));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.voidRetryRequired").value(true))
+                .andExpect(jsonPath("$.code").value("PAYMENT_VOID_RETRY_REQUIRED"));
+
+        BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        assertThat(payment.getCapturedAmount()).isEqualByComparingTo("750000.00");
+        List<PaymentTransaction> txns = paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId());
+        assertThat(txns).hasSize(2);
     }
 
     @Test
@@ -249,5 +456,33 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
         second.setHoldToken(booking.getHoldToken());
         second.setHoldExpiresAt(booking.getHoldExpiresAt());
         availabilityRepository.saveAll(List.of(first, second));
+    }
+
+    private void saveBookedAvailability(Booking booking) {
+        AvailabilityCalendar first = new AvailabilityCalendar(listing.getId(), booking.getPickupDate());
+        first.setStatus(AvailabilityStatus.BOOKED);
+        first.setBookingId(booking.getId());
+        AvailabilityCalendar second = new AvailabilityCalendar(listing.getId(), booking.getPickupDate().plusDays(1));
+        second.setStatus(AvailabilityStatus.BOOKED);
+        second.setBookingId(booking.getId());
+        availabilityRepository.saveAll(List.of(first, second));
+    }
+
+    private void saveAuthorizedPayment(UUID bookingId) {
+        BookingPayment payment = new BookingPayment();
+        payment.setBookingId(bookingId);
+        payment.setSelectedBankId(UUID.fromString("00000000-0000-0000-0000-000000000111"));
+        payment.setPaymentMethod(PaymentMethod.COREBANK_TRANSFER);
+        payment.setProvider(PaymentProviderType.COREBANK);
+        payment.setStatus(PaymentStatus.AUTHORIZED);
+        payment.setAuthorizedAmount(new BigDecimal("1500000.00"));
+        payment.setCapturedAmount(BigDecimal.ZERO);
+        payment.setRefundedAmount(BigDecimal.ZERO);
+        payment.setCurrency("VND");
+        payment.setExternalOrderRef("rentflow:booking:" + bookingId);
+        payment.setProviderPaymentOrderId("payment-order-1");
+        payment.setProviderHoldId("hold-1");
+        payment.setProviderStatus("AUTHORIZED");
+        bookingPaymentRepository.save(payment);
     }
 }

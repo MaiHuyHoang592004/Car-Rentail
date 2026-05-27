@@ -1,13 +1,19 @@
 package com.rentflow.payment.provider.corebank;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rentflow.payment.config.CoreBankPaymentProperties;
 import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
 import com.rentflow.payment.provider.AuthorizeCommand;
 import com.rentflow.payment.provider.AuthorizeResult;
+import com.rentflow.payment.provider.CaptureCommand;
+import com.rentflow.payment.provider.CaptureResult;
 import com.rentflow.payment.provider.PaymentProvider;
+import com.rentflow.payment.provider.ProviderOrderSnapshot;
+import com.rentflow.payment.provider.RefundCommand;
+import com.rentflow.payment.provider.RefundResult;
 import com.rentflow.payment.provider.VoidCommand;
 import com.rentflow.payment.provider.VoidResult;
 import org.springframework.stereotype.Component;
@@ -80,6 +86,58 @@ public class CoreBankPaymentProvider implements PaymentProvider {
         return new VoidResult(result.response().status(), result.rawResponseJson());
     }
 
+    @Override
+    public CaptureResult capture(CaptureCommand command) {
+        CoreBankCaptureHoldResult result = coreBankPaymentClient.captureHold(new CoreBankCaptureHoldRequest(
+                command.providerIdempotencyKey(),
+                command.providerPaymentOrderId(),
+                toAmountMinor(command.amount(), command.currency()),
+                command.currency(),
+                ACTOR,
+                command.correlationId(),
+                command.requestId(),
+                command.sessionId(),
+                command.traceId()));
+        return new CaptureResult(
+                result.response().status(),
+                result.response().journalId(),
+                result.rawResponseJson());
+    }
+
+    @Override
+    public RefundResult refund(RefundCommand command) {
+        CoreBankRefundResult result = coreBankPaymentClient.refund(new CoreBankRefundRequest(
+                command.providerIdempotencyKey(),
+                command.providerPaymentOrderId(),
+                toAmountMinor(command.amount(), command.currency()),
+                command.currency(),
+                command.reason(),
+                ACTOR,
+                command.correlationId(),
+                command.requestId(),
+                command.sessionId(),
+                command.traceId()));
+        return new RefundResult(
+                result.response().status(),
+                result.response().refundJournalId(),
+                result.rawResponseJson());
+    }
+
+    @Override
+    public ProviderOrderSnapshot findByExternalOrderRef(String externalOrderRef) {
+        String rawJson = coreBankPaymentClient.findOrderByExternalOrderRef(externalOrderRef);
+        JsonNode orderNode = orderNode(rawJson);
+        return new ProviderOrderSnapshot(
+                text(orderNode, "status"),
+                text(orderNode, "paymentOrderId", "payment_order_id"),
+                text(orderNode, "holdId", "hold_id"),
+                decimal(orderNode, "authorizedAmount", "authorized_amount", "amount"),
+                decimal(orderNode, "capturedAmount", "captured_amount"),
+                decimal(orderNode, "refundedAmount", "refunded_amount"),
+                text(orderNode, "currency"),
+                rawJson);
+    }
+
     private long toAmountMinor(BigDecimal totalAmount, String currency) {
         BigDecimal normalized = "VND".equalsIgnoreCase(currency)
                 ? totalAmount
@@ -93,5 +151,41 @@ public class CoreBankPaymentProvider implements PaymentProvider {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize CoreBank payload", e);
         }
+    }
+
+    private JsonNode orderNode(String rawJson) {
+        try {
+            JsonNode root = objectMapper.readTree(rawJson);
+            if (root.isArray()) {
+                return root.isEmpty() ? root : root.get(0);
+            }
+            JsonNode items = root.path("items");
+            if (items.isArray()) {
+                return items.isEmpty() ? items : items.get(0);
+            }
+            return root;
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to parse CoreBank order query response", e);
+        }
+    }
+
+    private String text(JsonNode node, String... keys) {
+        for (String key : keys) {
+            JsonNode value = node.path(key);
+            if (!value.isMissingNode() && !value.isNull()) {
+                return value.asText();
+            }
+        }
+        return null;
+    }
+
+    private BigDecimal decimal(JsonNode node, String... keys) {
+        for (String key : keys) {
+            JsonNode value = node.path(key);
+            if (!value.isMissingNode() && !value.isNull()) {
+                return value.decimalValue();
+            }
+        }
+        return null;
     }
 }

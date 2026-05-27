@@ -5,8 +5,15 @@ import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
 import com.rentflow.payment.provider.AuthorizeCommand;
 import com.rentflow.payment.provider.AuthorizeResult;
+import com.rentflow.payment.provider.CaptureCommand;
+import com.rentflow.payment.provider.CaptureResult;
 import com.rentflow.payment.provider.PaymentProvider;
+import com.rentflow.payment.provider.ProviderOrderSnapshot;
+import com.rentflow.payment.provider.RefundCommand;
+import com.rentflow.payment.provider.RefundResult;
 import com.rentflow.payment.provider.TransferInstruction;
+import com.rentflow.payment.provider.VoidCommand;
+import com.rentflow.payment.provider.VoidResult;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -63,5 +70,25 @@ public class BankTransferQrProvider implements PaymentProvider {
         return "manual-vietqr:"
                 + Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(rawPayload.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Override
+    public CaptureResult capture(CaptureCommand command) {
+        throw new UnsupportedOperationException("BankTransferQrProvider does not support capture");
+    }
+
+    @Override
+    public VoidResult voidAuthorization(VoidCommand command) {
+        throw new UnsupportedOperationException("BankTransferQrProvider does not support void");
+    }
+
+    @Override
+    public RefundResult refund(RefundCommand command) {
+        throw new UnsupportedOperationException("BankTransferQrProvider does not support refund");
+    }
+
+    @Override
+    public ProviderOrderSnapshot findByExternalOrderRef(String externalOrderRef) {
+        throw new UnsupportedOperationException("BankTransferQrProvider does not support reconciliation lookup");
     }
 }

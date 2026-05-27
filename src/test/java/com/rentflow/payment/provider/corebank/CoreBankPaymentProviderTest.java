@@ -9,8 +9,13 @@ import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
 import com.rentflow.payment.provider.AuthorizeCommand;
 import com.rentflow.payment.provider.AuthorizeResult;
+import com.rentflow.payment.provider.CaptureCommand;
+import com.rentflow.payment.provider.CaptureResult;
 import com.rentflow.payment.provider.VoidCommand;
 import com.rentflow.payment.provider.VoidResult;
+import com.rentflow.payment.provider.ProviderOrderSnapshot;
+import com.rentflow.payment.provider.RefundCommand;
+import com.rentflow.payment.provider.RefundResult;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -94,5 +99,80 @@ class CoreBankPaymentProviderTest {
         assertThat(requestCaptor.getValue().holdId()).isEqualTo("hold-1");
         assertThat(result.providerStatus()).isEqualTo("VOIDED");
         assertThat(result.providerMetadataJson()).contains("\"status\":\"VOIDED\"");
+    }
+
+    @Test
+    void captureMapsCommandToCoreBankRequestAndResult() {
+        CoreBankPaymentClient client = mock(CoreBankPaymentClient.class);
+        CoreBankPaymentProperties properties = new CoreBankPaymentProperties();
+        CoreBankPaymentProvider provider = new CoreBankPaymentProvider(client, properties, new ObjectMapper());
+        when(client.captureHold(org.mockito.ArgumentMatchers.any())).thenReturn(new CoreBankCaptureHoldResult(
+                new CoreBankCaptureHoldResponse("payment-order-1", "journal-1", "CAPTURED"),
+                "{\"paymentOrderId\":\"payment-order-1\",\"journalId\":\"journal-1\",\"status\":\"CAPTURED\"}"));
+
+        CaptureResult result = provider.capture(new CaptureCommand(
+                "rentflow:capture:payment:key",
+                "payment-order-1",
+                new BigDecimal("500000.00"),
+                "VND",
+                "correlation-1",
+                "request-1",
+                "session-1",
+                "trace-1"));
+
+        ArgumentCaptor<CoreBankCaptureHoldRequest> requestCaptor = ArgumentCaptor.forClass(CoreBankCaptureHoldRequest.class);
+        verify(client).captureHold(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().idempotencyKey()).isEqualTo("rentflow:capture:payment:key");
+        assertThat(requestCaptor.getValue().paymentOrderId()).isEqualTo("payment-order-1");
+        assertThat(requestCaptor.getValue().amountMinor()).isEqualTo(500000L);
+        assertThat(result.providerJournalId()).isEqualTo("journal-1");
+        assertThat(result.providerStatus()).isEqualTo("CAPTURED");
+    }
+
+    @Test
+    void refundMapsCommandToCoreBankRequestAndResult() {
+        CoreBankPaymentClient client = mock(CoreBankPaymentClient.class);
+        CoreBankPaymentProperties properties = new CoreBankPaymentProperties();
+        CoreBankPaymentProvider provider = new CoreBankPaymentProvider(client, properties, new ObjectMapper());
+        when(client.refund(org.mockito.ArgumentMatchers.any())).thenReturn(new CoreBankRefundResult(
+                new CoreBankRefundResponse("payment-order-1", "refund-journal-1", "REFUNDED"),
+                "{\"paymentOrderId\":\"payment-order-1\",\"refundJournalId\":\"refund-journal-1\",\"status\":\"REFUNDED\"}"));
+
+        RefundResult result = provider.refund(new RefundCommand(
+                "rentflow:refund:payment:key",
+                "payment-order-1",
+                new BigDecimal("200000.00"),
+                "VND",
+                "Customer cancellation refund",
+                "correlation-1",
+                "request-1",
+                "session-1",
+                "trace-1"));
+
+        ArgumentCaptor<CoreBankRefundRequest> requestCaptor = ArgumentCaptor.forClass(CoreBankRefundRequest.class);
+        verify(client).refund(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().idempotencyKey()).isEqualTo("rentflow:refund:payment:key");
+        assertThat(requestCaptor.getValue().paymentOrderId()).isEqualTo("payment-order-1");
+        assertThat(requestCaptor.getValue().amountMinor()).isEqualTo(200000L);
+        assertThat(result.providerJournalId()).isEqualTo("refund-journal-1");
+        assertThat(result.providerStatus()).isEqualTo("REFUNDED");
+    }
+
+    @Test
+    void findByExternalOrderRefParsesSnapshot() {
+        CoreBankPaymentClient client = mock(CoreBankPaymentClient.class);
+        CoreBankPaymentProperties properties = new CoreBankPaymentProperties();
+        CoreBankPaymentProvider provider = new CoreBankPaymentProvider(client, properties, new ObjectMapper());
+        when(client.findOrderByExternalOrderRef("rentflow:booking:1")).thenReturn("""
+                {"paymentOrderId":"payment-order-1","holdId":"hold-1","status":"CAPTURED","authorizedAmount":1400000.00,"capturedAmount":1400000.00,"refundedAmount":200000.00,"currency":"VND"}
+                """);
+
+        ProviderOrderSnapshot snapshot = provider.findByExternalOrderRef("rentflow:booking:1");
+
+        assertThat(snapshot.paymentOrderId()).isEqualTo("payment-order-1");
+        assertThat(snapshot.holdId()).isEqualTo("hold-1");
+        assertThat(snapshot.status()).isEqualTo("CAPTURED");
+        assertThat(snapshot.authorizedAmount()).isEqualByComparingTo("1400000.00");
+        assertThat(snapshot.refundedAmount()).isEqualByComparingTo("200000.00");
     }
 }
