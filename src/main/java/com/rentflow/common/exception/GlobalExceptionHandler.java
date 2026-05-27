@@ -171,6 +171,16 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
     }
 
+    @ExceptionHandler(PaymentProviderUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentProviderUnavailable(
+            PaymentProviderUnavailableException ex,
+            HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        log.error("Payment provider unavailable [{}]: {} - {}", cid, ex.getCode(), ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ErrorResponse.of(ex.getCode(), ex.getMessage(), cid));
+    }
+
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<ErrorResponse> handleRateLimitExceeded(
             RateLimitExceededException ex, HttpServletRequest request) {

@@ -112,6 +112,22 @@ class SecurityEndpointsTest {
     }
 
     @Test
+    void authorizePaymentEndpoint_withoutToken_returns401() throws Exception {
+        mockMvc.perform(post("/api/v1/bookings/{id}/payments/authorize",
+                        UUID.fromString("11111111-1111-4111-8111-111111111111"))
+                        .header("Idempotency-Key", "8b71f8d2-9e1d-4f7a-bbe6-334c3816df91")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "bankId": "22222222-2222-4222-8222-222222222222",
+                                  "paymentMethod": "BANK_TRANSFER_QR"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    @Test
     void customerToken_onRoleProtectedEndpoints_returns403() throws Exception {
         String customerToken = tokenProvider.generateAccessToken(
                 UUID.randomUUID(),
