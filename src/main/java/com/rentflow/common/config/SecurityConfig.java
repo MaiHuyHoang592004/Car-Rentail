@@ -79,6 +79,11 @@ public class SecurityConfig {
                     // Payment bank catalog is used inside authenticated checkout flow in Slice 6A
                     .requestMatchers(HttpMethod.GET, "/api/v1/payment-banks").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/payments/authorize").authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{id}/payments").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/capture").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/void").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/refund").authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/payments/{id}/reconciliation").authenticated()
                     // Booking endpoints require authentication; service layer enforces roles and ownership
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/cancel").authenticated()

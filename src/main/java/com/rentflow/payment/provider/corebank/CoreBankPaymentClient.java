@@ -70,6 +70,61 @@ public class CoreBankPaymentClient {
         }
     }
 
+    public CoreBankCaptureHoldResult captureHold(CoreBankCaptureHoldRequest request) {
+        try {
+            ResponseEntity<String> responseEntity = restClient.post()
+                    .uri("/api/payments/capture-hold")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .toEntity(String.class);
+            String responseBody = requiredBody(responseEntity.getBody(), "CoreBank capture-hold response body was empty");
+            return new CoreBankCaptureHoldResult(
+                    deserialize(responseBody, CoreBankCaptureHoldResponse.class),
+                    responseBody);
+        } catch (RestClientResponseException e) {
+            throw new PaymentProviderUnavailableException(
+                    "CoreBank capture-hold request failed with status " + e.getStatusCode(), e);
+        }
+    }
+
+    public CoreBankRefundResult refund(CoreBankRefundRequest request) {
+        try {
+            ResponseEntity<String> responseEntity = restClient.post()
+                    .uri("/api/payments/refund")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .toEntity(String.class);
+            String responseBody = requiredBody(responseEntity.getBody(), "CoreBank refund response body was empty");
+            return new CoreBankRefundResult(
+                    deserialize(responseBody, CoreBankRefundResponse.class),
+                    responseBody);
+        } catch (RestClientResponseException e) {
+            throw new PaymentProviderUnavailableException(
+                    "CoreBank refund request failed with status " + e.getStatusCode(), e);
+        }
+    }
+
+    public String findOrderByExternalOrderRef(String externalOrderRef) {
+        try {
+            ResponseEntity<String> responseEntity = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/api/payments/orders")
+                            .queryParam("externalOrderRef", externalOrderRef)
+                            .build())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .toEntity(String.class);
+            return requiredBody(responseEntity.getBody(), "CoreBank order query response body was empty");
+        } catch (RestClientResponseException e) {
+            throw new PaymentProviderUnavailableException(
+                    "CoreBank order query request failed with status " + e.getStatusCode(), e);
+        }
+    }
+
     private SimpleClientHttpRequestFactory requestFactory(CoreBankPaymentProperties properties) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) properties.getConnectTimeout().toMillis());

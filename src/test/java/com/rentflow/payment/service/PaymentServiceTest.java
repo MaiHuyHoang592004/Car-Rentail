@@ -3,6 +3,10 @@ package com.rentflow.payment.service;
 import com.rentflow.common.exception.ValidationException;
 import com.rentflow.payment.dto.AuthorizePaymentRequest;
 import com.rentflow.payment.dto.AuthorizePaymentResponse;
+import com.rentflow.payment.dto.CapturePaymentRequest;
+import com.rentflow.payment.dto.PaymentDetailResponse;
+import com.rentflow.payment.dto.ReconciliationResponse;
+import com.rentflow.payment.dto.RefundPaymentRequest;
 import com.rentflow.payment.entity.PaymentBank;
 import com.rentflow.payment.entity.PaymentMethod;
 import com.rentflow.payment.entity.PaymentProviderType;
@@ -31,12 +35,25 @@ class PaymentServiceTest {
     @Mock private PaymentBankRepository paymentBankRepository;
     @Mock private BankTransferAuthorizeService bankTransferAuthorizeService;
     @Mock private CoreBankAuthorizeService coreBankAuthorizeService;
+    @Mock private PaymentQueryService paymentQueryService;
+    @Mock private CoreBankCaptureService coreBankCaptureService;
+    @Mock private CoreBankVoidService coreBankVoidService;
+    @Mock private CoreBankRefundService coreBankRefundService;
+    @Mock private PaymentReconciliationService paymentReconciliationService;
 
     private PaymentService paymentService;
 
     @BeforeEach
     void setUp() {
-        paymentService = new PaymentService(paymentBankRepository, bankTransferAuthorizeService, coreBankAuthorizeService);
+        paymentService = new PaymentService(
+                paymentBankRepository,
+                bankTransferAuthorizeService,
+                coreBankAuthorizeService,
+                paymentQueryService,
+                coreBankCaptureService,
+                coreBankVoidService,
+                coreBankRefundService,
+                paymentReconciliationService);
     }
 
     @Test
@@ -75,6 +92,58 @@ class PaymentServiceTest {
                 new AuthorizePaymentRequest(BANK_ID, PaymentMethod.BANK_TRANSFER_QR)))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Selected payment bank is not available");
+    }
+
+    @Test
+    void delegatesGetBookingPayment() {
+        PaymentDetailResponse response = mock(PaymentDetailResponse.class);
+        when(paymentQueryService.getByBookingId(BOOKING_ID)).thenReturn(response);
+
+        paymentService.getBookingPayment(BOOKING_ID);
+
+        verify(paymentQueryService).getByBookingId(BOOKING_ID);
+    }
+
+    @Test
+    void delegatesCapturePayment() {
+        PaymentDetailResponse response = mock(PaymentDetailResponse.class);
+        CapturePaymentRequest request = new CapturePaymentRequest(new java.math.BigDecimal("100000.00"));
+        when(coreBankCaptureService.capture(BOOKING_ID, "key", request)).thenReturn(response);
+
+        paymentService.capturePayment(BOOKING_ID, "key", request);
+
+        verify(coreBankCaptureService).capture(BOOKING_ID, "key", request);
+    }
+
+    @Test
+    void delegatesVoidPayment() {
+        PaymentDetailResponse response = mock(PaymentDetailResponse.class);
+        when(coreBankVoidService.voidAuthorization(BOOKING_ID, "key")).thenReturn(response);
+
+        paymentService.voidPayment(BOOKING_ID, "key");
+
+        verify(coreBankVoidService).voidAuthorization(BOOKING_ID, "key");
+    }
+
+    @Test
+    void delegatesRefundPayment() {
+        PaymentDetailResponse response = mock(PaymentDetailResponse.class);
+        RefundPaymentRequest request = new RefundPaymentRequest(new java.math.BigDecimal("100000.00"), "Customer cancellation");
+        when(coreBankRefundService.refund(BOOKING_ID, "key", request)).thenReturn(response);
+
+        paymentService.refundPayment(BOOKING_ID, "key", request);
+
+        verify(coreBankRefundService).refund(BOOKING_ID, "key", request);
+    }
+
+    @Test
+    void delegatesReconcilePayment() {
+        ReconciliationResponse response = mock(ReconciliationResponse.class);
+        when(paymentReconciliationService.reconcile(BOOKING_ID)).thenReturn(response);
+
+        paymentService.reconcilePayment(BOOKING_ID);
+
+        verify(paymentReconciliationService).reconcile(BOOKING_ID);
     }
 
     private PaymentBank bank(PaymentMethod paymentMethod, PaymentProviderType providerType) {

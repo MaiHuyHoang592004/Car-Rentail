@@ -8,7 +8,11 @@ public interface PaymentProvider {
 
     AuthorizeResult authorize(AuthorizeCommand command);
 
-    default VoidResult voidAuthorization(VoidCommand command) {
-        throw new UnsupportedOperationException("Void is not supported by provider " + getClass().getSimpleName());
-    }
+    CaptureResult capture(CaptureCommand command);
+
+    RefundResult refund(RefundCommand command);
+
+    ProviderOrderSnapshot findByExternalOrderRef(String externalOrderRef);
+
+    VoidResult voidAuthorization(VoidCommand command);
 }

@@ -60,6 +60,12 @@ rentflow:
       enabled: ${EXPIRE_HELD_BOOKINGS_ENABLED:true}
       batch-size: ${EXPIRE_HELD_BOOKINGS_BATCH_SIZE:100}
       fixed-delay-ms: ${EXPIRE_HELD_BOOKINGS_FIXED_DELAY_MS:60000}
+    void-retry:
+      enabled: ${VOID_RETRY_ENABLED:true}
+      batch-size: ${VOID_RETRY_BATCH_SIZE:50}
+      fixed-delay-ms: ${VOID_RETRY_FIXED_DELAY_MS:60000}
+      max-attempts: ${VOID_RETRY_MAX_ATTEMPTS:10}
+      backoff-seconds: ${VOID_RETRY_BACKOFF_SECONDS:300}
   rate-limit:
     enabled: ${RENTFLOW_RATE_LIMIT_ENABLED:true}
     login:

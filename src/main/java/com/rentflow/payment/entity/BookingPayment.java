@@ -13,6 +13,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -66,6 +67,18 @@ public class BookingPayment extends BaseEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "provider_metadata", columnDefinition = "jsonb")
     private String providerMetadata;
+
+    @Column(name = "void_retry_required", nullable = false)
+    private boolean voidRetryRequired = false;
+
+    @Column(name = "void_retry_count", nullable = false)
+    private Integer voidRetryCount = 0;
+
+    @Column(name = "void_retry_next_at")
+    private Instant voidRetryNextAt;
+
+    @Column(name = "void_retry_last_error", columnDefinition = "TEXT")
+    private String voidRetryLastError;
 
     @Version
     @Column(nullable = false)

@@ -273,6 +273,29 @@ class BookingControllerTest {
     }
 
     @Test
+    void cancelBookingReturnsAcceptedWhenVoidRetryRequired() throws Exception {
+        when(bookingService.cancelBooking(eq(BOOKING_ID), eq(VALID_IDEMPOTENCY_KEY), any(CancelBookingRequest.class)))
+                .thenReturn(new CancelBookingResponse(
+                        BOOKING_ID,
+                        BookingStatus.CANCELLED,
+                        "Late cancel",
+                        true,
+                        true,
+                        "PAYMENT_VOID_RETRY_REQUIRED",
+                        "VOID_RETRY_REQUIRED"));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", BOOKING_ID)
+                        .header("Idempotency-Key", VALID_IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Late cancel"}
+                                """))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.voidRetryRequired").value(true))
+                .andExpect(jsonPath("$.code").value("PAYMENT_VOID_RETRY_REQUIRED"));
+    }
+
+    @Test
     void cancelBookingMissingBodyDelegatesWithNullReason() throws Exception {
         when(bookingService.cancelBooking(eq(BOOKING_ID), eq(VALID_IDEMPOTENCY_KEY), any(CancelBookingRequest.class)))
                 .thenReturn(cancelResponse(null));

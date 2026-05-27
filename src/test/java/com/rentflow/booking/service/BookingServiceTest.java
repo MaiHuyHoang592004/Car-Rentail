@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.rentflow.auth.entity.Role;
+import com.rentflow.audit.service.AuditLogService;
 import com.rentflow.availability.entity.AvailabilityCalendar;
 import com.rentflow.availability.entity.AvailabilityStatus;
 import com.rentflow.availability.repository.AvailabilityCalendarRepository;
@@ -17,18 +18,32 @@ import com.rentflow.common.exception.BookingNotFoundException;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.DriverLicenseNotApprovedException;
 import com.rentflow.common.exception.ListingNotFoundException;
+import com.rentflow.common.exception.CorrelationIdHelper;
+import com.rentflow.common.exception.PaymentProviderUnavailableException;
 import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.idempotency.service.IdempotencyResolution;
 import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.idempotency.service.IdempotencyService;
 import com.rentflow.common.security.SecurityContext;
+import com.rentflow.payment.entity.BookingPayment;
+import com.rentflow.payment.entity.PaymentProviderType;
+import com.rentflow.payment.entity.PaymentStatus;
+import com.rentflow.payment.entity.PaymentTransaction;
+import com.rentflow.payment.provider.CaptureResult;
+import com.rentflow.payment.provider.PaymentProvider;
+import com.rentflow.payment.provider.PaymentProviderRouter;
+import com.rentflow.payment.provider.VoidCommand;
+import com.rentflow.payment.provider.VoidResult;
+import com.rentflow.payment.repository.BookingPaymentRepository;
+import com.rentflow.payment.repository.PaymentTransactionRepository;
 import com.rentflow.listing.entity.CancellationPolicy;
 import com.rentflow.listing.entity.Extra;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.entity.PricingType;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.outbox.service.OutboxService;
 import com.rentflow.user.entity.UserProfile;
 import com.rentflow.user.repository.UserProfileRepository;
 import com.rentflow.vehicle.entity.Vehicle;
@@ -86,6 +101,14 @@ class BookingServiceTest {
     @Mock private IdempotencyService idempotencyService;
     @Mock private IdempotencyFailureMarker idempotencyFailureMarker;
     @Mock private SecurityContext securityContext;
+    @Mock private BookingPaymentRepository bookingPaymentRepository;
+    @Mock private PaymentTransactionRepository paymentTransactionRepository;
+    @Mock private PaymentProviderRouter paymentProviderRouter;
+    @Mock private PaymentProvider paymentProvider;
+    @Mock private CorrelationIdHelper correlationIdHelper;
+    @Mock private BookingTimelineService bookingTimelineService;
+    @Mock private AuditLogService auditLogService;
+    @Mock private OutboxService outboxService;
 
     private BookingService bookingService;
     private ObjectMapper objectMapper;
@@ -113,8 +136,19 @@ class BookingServiceTest {
                 securityContext,
                 objectMapper,
                 new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
+                bookingPaymentRepository,
+                paymentTransactionRepository,
+                paymentProviderRouter,
+                correlationIdHelper,
+                new CancellationPolicyCalculator(fixedClock),
+                bookingTimelineService,
+                auditLogService,
+                outboxService,
                 fixedClock,
                 15);
+        lenient().when(correlationIdHelper.getOrGenerate()).thenReturn("corr-1");
+        lenient().when(paymentProviderRouter.route(PaymentProviderType.COREBANK)).thenReturn(paymentProvider);
+        lenient().when(paymentTransactionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     }
 
     @Test
@@ -216,6 +250,14 @@ class BookingServiceTest {
                 securityContext,
                 objectMapper,
                 new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
+                bookingPaymentRepository,
+                paymentTransactionRepository,
+                paymentProviderRouter,
+                correlationIdHelper,
+                new CancellationPolicyCalculator(fixedClock),
+                bookingTimelineService,
+                auditLogService,
+                outboxService,
                 fixedClock,
                 15);
         mockProceed();
@@ -593,7 +635,7 @@ class BookingServiceTest {
     @Test
     void cancelBookingConfirmedStatusThrowsBookingInvalidStatus() {
         Booking booking = booking();
-        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setStatus(BookingStatus.IN_PROGRESS);
         mockCancelProceed();
         when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
 
@@ -607,21 +649,265 @@ class BookingServiceTest {
     }
 
     @Test
-    void cancelBookingNonOwnerThrowsBookingNotFound() {
+    void cancelBookingPendingHostApprovalVoidsPaymentAndCancels() {
         Booking booking = booking();
-        UUID otherUserId = UUID.fromString("99999999-9999-9999-9999-999999999999");
-        when(securityContext.currentUserId()).thenReturn(otherUserId);
+        booking.setStatus(BookingStatus.PENDING_HOST_APPROVAL);
+        List<AvailabilityCalendar> rows = heldAvailabilityRows(booking, UUID.randomUUID());
+        BookingPayment payment = authorizedPayment();
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(rows);
+        when(paymentProvider.voidAuthorization(any())).thenReturn(new VoidResult("VOIDED", "{\"status\":\"VOIDED\"}"));
+
+        CancelBookingResponse response = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Host declined"));
+
+        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
+        assertThat(response.voidRetryRequired()).isFalse();
+    }
+
+    @Test
+    void cancelBookingConfirmedPartialPenaltyReturnsRetryRequiredWhenVoidFails() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
+                """);
+        List<AvailabilityCalendar> rows = heldAvailabilityRows(booking, UUID.randomUUID());
+        BookingPayment payment = authorizedPayment();
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(rows);
+        when(paymentProvider.capture(any())).thenReturn(new CaptureResult("CAPTURED", "journal-1", "{\"status\":\"CAPTURED\"}"));
+        doThrow(new PaymentProviderUnavailableException("void failed")).when(paymentProvider).voidAuthorization(any(VoidCommand.class));
+
+        CancelBookingResponse response = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Late cancel"));
+
+        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(response.voidRetryRequired()).isTrue();
+        assertThat(response.code()).isEqualTo("PAYMENT_VOID_RETRY_REQUIRED");
+    }
+
+    @Test
+    void cancelBookingConfirmedFullRefundVoidsAndCancels() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        List<AvailabilityCalendar> rows = heldAvailabilityRows(booking, UUID.randomUUID());
+        BookingPayment payment = authorizedPayment();
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(rows);
+        when(paymentProvider.voidAuthorization(any())).thenReturn(new VoidResult("VOIDED", "{\"status\":\"VOIDED\"}"));
+
+        CancelBookingResponse response = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Full refund cancel"));
+
+        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(response.voidRetryRequired()).isFalse();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
+        verify(paymentProvider).voidAuthorization(any());
+        verify(paymentProvider, never()).capture(any());
+    }
+
+    @Test
+    void cancelBookingConfirmedPartialPenaltyCaptureThenVoidSucceeds() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
+                """);
+        List<AvailabilityCalendar> rows = heldAvailabilityRows(booking, UUID.randomUUID());
+        BookingPayment payment = authorizedPayment();
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(rows);
+        when(paymentProvider.capture(any())).thenReturn(new CaptureResult("CAPTURED", "journal-1", "{\"status\":\"CAPTURED\"}"));
+        when(paymentProvider.voidAuthorization(any())).thenReturn(new VoidResult("VOIDED", "{\"status\":\"VOIDED\"}"));
+
+        CancelBookingResponse response = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Late cancel"));
+
+        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(response.voidRetryRequired()).isFalse();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(payment.getAuthorizedAmount()).isEqualByComparingTo("1500000.00");
+        assertThat(payment.getCapturedAmount()).isEqualByComparingTo("750000.00");
+        assertThat(payment.getProviderStatus()).isEqualTo("VOIDED");
+        verify(paymentProvider).capture(any());
+        verify(paymentProvider).voidAuthorization(any());
+    }
+
+    @Test
+    void cancelBookingConfirmedRejectsNonCoreBankProvider() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        BookingPayment payment = authorizedPayment();
+        payment.setProvider(PaymentProviderType.VIETQR_MANUAL);
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "PAYMENT_PROVIDER_UNSUPPORTED");
+    }
+
+    @Test
+    void cancelBookingConfirmedRejectsNonAuthorizedPayment() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        BookingPayment payment = authorizedPayment();
+        payment.setStatus(PaymentStatus.CAPTURED);
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "PAYMENT_INVALID_STATUS");
+    }
+
+    @Test
+    void cancelBookingHostAllowed() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.HELD);
+        UUID hostUserId = HOST_ID;
+        when(securityContext.currentUserId()).thenReturn(hostUserId);
         when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
-        when(idempotencyService.resolve(otherUserId, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+        when(idempotencyService.resolve(eq(hostUserId), eq(IdempotencyScope.CANCEL_BOOKING), eq(IDEMPOTENCY_KEY), eq(REQUEST_HASH)))
                 .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
         when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
 
-        assertThatThrownBy(() -> bookingService.cancelBooking(
+        CancelBookingResponse response = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Host cancel"));
+
+        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelBookingAdminAllowed() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.HELD);
+        UUID adminId = UUID.fromString("aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa");
+        when(securityContext.currentUserId()).thenReturn(adminId);
+        when(securityContext.hasRole(Role.ADMIN)).thenReturn(true);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(eq(adminId), eq(IdempotencyScope.CANCEL_BOOKING), eq(IDEMPOTENCY_KEY), eq(REQUEST_HASH)))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
+
+        CancelBookingResponse response = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Admin cancel"));
+
+        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelBookingConfirmedPaymentMissingThrows() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.empty());
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "PAYMENT_NOT_FOUND");
+    }
+
+    @Test
+    void cancelBookingReplayPreservesVoidRetryRequiredFlag() throws Exception {
+        CancelBookingResponse replayed = new CancelBookingResponse(
                 BOOKING_ID,
-                IDEMPOTENCY_KEY,
-                new CancelBookingRequest("Change of plan")))
-                .isInstanceOf(BookingNotFoundException.class)
-                .hasFieldOrPropertyWithValue("code", "BOOKING_NOT_FOUND");
+                BookingStatus.CANCELLED,
+                "Late cancel",
+                true,
+                true,
+                "PAYMENT_VOID_RETRY_REQUIRED",
+                "VOID_RETRY_REQUIRED");
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.replay(202, objectMapper.writeValueAsString(replayed)));
+
+        CancelBookingResponse result = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Late cancel"));
+
+        assertThat(result.voidRetryRequired()).isTrue();
+        assertThat(result.code()).isEqualTo("PAYMENT_VOID_RETRY_REQUIRED");
+        assertThat(result.status()).isEqualTo(BookingStatus.CANCELLED);
+        verifyNoInteractions(paymentProvider);
+    }
+
+    @Test
+    void cancelBookingReplayDoesNotReinvokePaymentMutations() throws Exception {
+        CancelBookingResponse replayed = new CancelBookingResponse(
+                BOOKING_ID,
+                BookingStatus.CANCELLED,
+                "Late cancel",
+                true,
+                true,
+                "PAYMENT_VOID_RETRY_REQUIRED",
+                "VOID_RETRY_REQUIRED");
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.replay(202, objectMapper.writeValueAsString(replayed)));
+
+        bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Late cancel"));
+
+        verifyNoInteractions(paymentProvider);
+        verify(bookingRepository, never()).findByIdForUpdate(any());
+        verify(bookingPaymentRepository, never()).findByBookingIdForUpdate(any());
+    }
+
+    @Test
+    void cancelBookingPaymentMissingThrowsOnPendingHostApproval() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.PENDING_HOST_APPROVAL);
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.empty());
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "PAYMENT_NOT_FOUND");
+    }
+
+    @Test
+    void cancelBookingConfirmedAfterPartialPenaltyStoresVoidFailureState() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
+                """);
+        List<AvailabilityCalendar> rows = heldAvailabilityRows(booking, UUID.randomUUID());
+        BookingPayment payment = authorizedPayment();
+        mockCancelProceed();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
+        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(rows);
+        when(paymentProvider.capture(any())).thenReturn(new CaptureResult("CAPTURED", "journal-1", "{\"status\":\"CAPTURED\"}"));
+        doThrow(new PaymentProviderUnavailableException("void fail")).when(paymentProvider).voidAuthorization(any());
+
+        CancelBookingResponse response = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Late cancel"));
+
+        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(response.voidRetryRequired()).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(payment.getProviderStatus()).isEqualTo("VOID_RETRY_REQUIRED");
+    }
+
+    private void mockCancelProceed() {
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
     }
 
     @Test
@@ -680,6 +966,24 @@ class BookingServiceTest {
         assertThat(booking.getCancellationReason()).hasSize(500);
     }
 
+    @Test
+    void cancelBookingNonOwnerThrowsBookingNotFound() {
+        Booking booking = booking();
+        UUID otherUserId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        when(securityContext.currentUserId()).thenReturn(otherUserId);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(otherUserId, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(
+                BOOKING_ID,
+                IDEMPOTENCY_KEY,
+                new CancelBookingRequest("Change of plan")))
+                .isInstanceOf(BookingNotFoundException.class)
+                .hasFieldOrPropertyWithValue("code", "BOOKING_NOT_FOUND");
+    }
+
     private void mockProceed() {
         mockProceed(request());
     }
@@ -707,13 +1011,6 @@ class BookingServiceTest {
             booking.setId(BOOKING_ID);
             return booking;
         });
-    }
-
-    private void mockCancelProceed() {
-        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
-        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
-        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CANCEL_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
-                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
     }
 
     private CreateBookingRequest request() {
@@ -828,5 +1125,20 @@ class BookingServiceTest {
                 """);
         booking.setCreatedAt(NOW);
         return booking;
+    }
+
+    private BookingPayment authorizedPayment() {
+        BookingPayment payment = new BookingPayment();
+        payment.setId(UUID.fromString("88888888-8888-4888-8888-888888888888"));
+        payment.setBookingId(BOOKING_ID);
+        payment.setProvider(PaymentProviderType.COREBANK);
+        payment.setStatus(PaymentStatus.AUTHORIZED);
+        payment.setCurrency("VND");
+        payment.setAuthorizedAmount(new BigDecimal("1500000.00"));
+        payment.setCapturedAmount(BigDecimal.ZERO);
+        payment.setRefundedAmount(BigDecimal.ZERO);
+        payment.setProviderPaymentOrderId("payment-order-1");
+        payment.setProviderHoldId("hold-1");
+        return payment;
     }
 }
