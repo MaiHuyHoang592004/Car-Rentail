@@ -4,6 +4,18 @@
 
 Implement cancellation policy calculator, full cancellation flow with payment handling, booking timeline, and audit logging.
 
+## Slice Status (2026-05-29)
+
+- [x] Slice 7.2R — Void-retry reliability persistence
+  - Cancellation paths that fail at VOID now persist retry metadata (`voidRetryRequired`, `voidRetryCount`, `voidRetryNextAt`, `voidRetryLastError`).
+  - Same idempotency-key replay returns `202 PAYMENT_VOID_RETRY_REQUIRED` without re-invoking capture/void side effects.
+- [x] Slice 7.4 — Audit sanitization coverage
+  - `DefaultAuditLogService` now redacts sensitive fields in JSON `details` payload before persistence.
+  - Protected keys include password/token hashes, encrypted identifiers, and provider payment references.
+- [x] Slice 7.5 — Outbox completeness (listing admin decisions)
+  - `LISTING_APPROVED` and `LISTING_REJECTED` outbox events are now written in the same transaction as state change.
+  - Integration coverage verifies outbox rows for approve/reject flows.
+
 ## Must Implement
 
 - [ ] CancellationPolicyCalculator: FLEXIBLE, MODERATE, STRICT policies

@@ -42,7 +42,7 @@
 | PAYMENT_FAILED | 402 | Payment operation failed |
 | PAYMENT_VOID_RETRY_REQUIRED | 202 | Cancellation done but void retry required |
 | VALIDATION_ERROR | 400 | Request validation failed |
-| TOO_MANY_REQUESTS | 429 | Rate limit exceeded |
+| RATE_LIMIT_EXCEEDED | 429 | Rate limit exceeded |
 | INTERNAL_ERROR | 500 | Unexpected server error |
 
 ## HTTP Status Code Usage

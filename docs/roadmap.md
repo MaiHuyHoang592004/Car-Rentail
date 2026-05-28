@@ -40,6 +40,9 @@ Frontend đã tồn tại trong `frontend/` với:
 - Important cleanup batch: not-found handling, SecurityContext annotation, vehicle archive update, phone validation, ADMIN role rejection, optimistic lock handling.
 - Security hardening batch: Swagger disabled in prod, explicit CORS origins, typed JWT auth errors, unauthenticated requests return 401 while wrong-role requests return 403.
 - Rate-limit contract hardening `8B.2`: public GET endpoints now have test evidence for `429 + Retry-After + {code,message,correlationId}` and path normalization edge cases.
+- Rate-limit integration hardening `8B.1R`: login and booking throttling now have integration evidence for `429 + Retry-After + RATE_LIMIT_EXCEEDED`.
+- Phase 7 hardening updates: audit detail sanitization and listing approve/reject outbox emission are now implemented with test evidence.
+- Cancellation reliability update `7.2R`: void-retry metadata persistence and idempotent 202 replay behavior are covered by integration tests.
 
 ### Docs/code drift
 

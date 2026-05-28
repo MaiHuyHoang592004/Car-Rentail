@@ -6,6 +6,11 @@ Implement hardening features: rate limiting, notifications, host approval/reject
 
 ## Slice Status (2026-05-29)
 
+- [x] Slice 8B.1R — Login/booking rate-limit integration evidence
+  - Added integration scenarios that verify:
+    - login failed-attempt throttling returns `429` with `Retry-After`
+    - booking creation throttling returns `429` with `Retry-After`
+  - Contract assertions include `{code,message,correlationId}` with `code=RATE_LIMIT_EXCEEDED`.
 - [x] Slice 8B.2 — Public endpoint rate-limit contract hardening
   - Added WebMvc contract coverage for:
     - `GET /api/v1/listings`
@@ -33,13 +38,13 @@ Implement hardening features: rate limiting, notifications, host approval/reject
 
 ### Rate Limiting (Redis)
 
-- [ ] Rate limiting service using Redis
-- [ ] `RateLimitService`: checkAndIncrement(key, limit, windowSeconds)
-- [ ] `RateLimitFilter`: applies to mutation endpoints
-- [ ] Login rate limit: 5 attempts / 15 min / IP or email
-- [ ] Booking rate limit: 10 attempts / hour / user
-- [ ] Public endpoint rate limit: 60 requests / min / IP
-- [ ] 429 TOO_MANY_REQUESTS response with `Retry-After` header
+- [x] Rate limiting service using Redis
+- [x] `RateLimitService`: sliding-window consume/check behavior
+- [x] Public endpoint rate-limit filter applies to public GET scope
+- [x] Login rate limit: 5 attempts / 15 min / IP or email
+- [x] Booking rate limit: 10 attempts / hour / user
+- [x] Public endpoint rate limit: 60 requests / min / IP
+- [x] 429 response with `Retry-After` header and JSON error contract
 
 ### Notifications
 
@@ -144,10 +149,10 @@ PENDING_HOST_APPROVAL booking:
 
 ## Acceptance Criteria
 
-- [ ] Login rate limiting works (5/15min)
-- [ ] Booking rate limiting works (10/hour)
-- [ ] Public endpoint rate limiting works (60/min)
-- [ ] 429 response includes `Retry-After` header
+- [x] Login rate limiting works (5/15min)
+- [x] Booking rate limiting works (10/hour)
+- [x] Public endpoint rate limiting works (60/min)
+- [x] 429 response includes `Retry-After` header
 - [ ] Notifications created for important events
 - [ ] User can view own notifications
 - [ ] Host can view bookings for own listings
@@ -158,8 +163,8 @@ PENDING_HOST_APPROVAL booking:
 
 ## Tests Required
 
-- [ ] Integration: Login rate limit exceeded -> 429
-- [ ] Integration: Booking rate limit exceeded -> 429
+- [x] Integration: Login rate limit exceeded -> 429
+- [x] Integration: Booking rate limit exceeded -> 429
 - [ ] Integration: Host approval -> CONFIRMED
 - [ ] Integration: Host rejection -> REJECTED, VOID
 - [ ] Integration: Host approval timeout -> EXPIRED
