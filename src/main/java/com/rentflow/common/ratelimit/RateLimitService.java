@@ -106,6 +106,14 @@ public class RateLimitService {
         assertAllowed(bookingKey(customerId), booking.getCreateLimit(), booking.getCreateWindow(), true);
     }
 
+    public void consumePublicEndpoint(String clientIp) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+        RateLimitProperties.PublicEndpoint publicEndpoint = properties.getPublicEndpoint();
+        assertAllowed(publicEndpointKey(clientIp), publicEndpoint.getLimit(), publicEndpoint.getWindow(), true);
+    }
+
     private void assertAllowed(String key, int limit, Duration window, boolean consume) {
         Long retryAfterSeconds;
         if (consume) {
@@ -139,5 +147,10 @@ public class RateLimitService {
 
     private String bookingKey(UUID customerId) {
         return "rl:booking:create:" + customerId;
+    }
+
+    private String publicEndpointKey(String clientIp) {
+        String normalizedIp = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp.trim();
+        return "rl:public:" + normalizedIp;
     }
 }

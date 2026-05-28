@@ -39,6 +39,7 @@ Frontend đã tồn tại trong `frontend/` với:
 - Critical refactor batch `C01-C07`: idempotency/auth hardening, production frontend API wiring, docs/code drift cleanup.
 - Important cleanup batch: not-found handling, SecurityContext annotation, vehicle archive update, phone validation, ADMIN role rejection, optimistic lock handling.
 - Security hardening batch: Swagger disabled in prod, explicit CORS origins, typed JWT auth errors, unauthenticated requests return 401 while wrong-role requests return 403.
+- Rate-limit contract hardening `8B.2`: public GET endpoints now have test evidence for `429 + Retry-After + {code,message,correlationId}` and path normalization edge cases.
 
 ### Docs/code drift
 

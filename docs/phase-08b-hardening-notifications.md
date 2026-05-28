@@ -4,6 +4,21 @@
 
 Implement hardening features: rate limiting, notifications, host approval/rejection flow, and void retry admin notification.
 
+## Slice Status (2026-05-29)
+
+- [x] Slice 8B.2 — Public endpoint rate-limit contract hardening
+  - Added WebMvc contract coverage for:
+    - `GET /api/v1/listings`
+    - `GET /api/v1/listings/{id}`
+    - `GET /api/v1/listings/{id}/availability`
+    - `GET /api/v1/health`
+    - `GET /actuator/health`
+  - Verified contract on limit exceed:
+    - HTTP `429`
+    - `Retry-After` header
+    - JSON error body fields: `code`, `message`, `correlationId`
+  - Added tests for path normalization edge cases (trailing slash, context path) and default property values (`login=15m`, `booking=1h`, `public=60/1m`).
+
 ## Must Implement
 
 ### Rate Limiting (Redis)

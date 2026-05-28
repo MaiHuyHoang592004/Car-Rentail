@@ -12,6 +12,7 @@ public class RateLimitProperties {
     private boolean enabled = true;
     private Login login = new Login();
     private Booking booking = new Booking();
+    private PublicEndpoint publicEndpoint = new PublicEndpoint();
 
     public boolean isEnabled() {
         return enabled;
@@ -37,9 +38,17 @@ public class RateLimitProperties {
         this.booking = booking;
     }
 
+    public PublicEndpoint getPublicEndpoint() {
+        return publicEndpoint;
+    }
+
+    public void setPublicEndpoint(PublicEndpoint publicEndpoint) {
+        this.publicEndpoint = publicEndpoint;
+    }
+
     public static class Login {
         private int limit = 5;
-        private Duration window = Duration.ofMinutes(5);
+        private Duration window = Duration.ofMinutes(15);
 
         public int getLimit() {
             return limit;
@@ -60,7 +69,7 @@ public class RateLimitProperties {
 
     public static class Booking {
         private int createLimit = 10;
-        private Duration createWindow = Duration.ofMinutes(1);
+        private Duration createWindow = Duration.ofHours(1);
 
         public int getCreateLimit() {
             return createLimit;
@@ -76,6 +85,27 @@ public class RateLimitProperties {
 
         public void setCreateWindow(Duration createWindow) {
             this.createWindow = createWindow;
+        }
+    }
+
+    public static class PublicEndpoint {
+        private int limit = 60;
+        private Duration window = Duration.ofMinutes(1);
+
+        public int getLimit() {
+            return limit;
+        }
+
+        public void setLimit(int limit) {
+            this.limit = limit;
+        }
+
+        public Duration getWindow() {
+            return window;
+        }
+
+        public void setWindow(Duration window) {
+            this.window = window;
         }
     }
 }
