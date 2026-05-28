@@ -212,6 +212,46 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void cancelPendingHostApprovalWhenVoidFailsReturnsAcceptedAndPersistsRetryMetadata() throws Exception {
+        Booking booking = saveBooking(BookingStatus.PENDING_HOST_APPROVAL);
+        saveHeldAvailability(booking);
+        saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.voidHold(any()))
+                .thenThrow(new com.rentflow.common.exception.PaymentProviderUnavailableException("void fail"));
+
+        Instant before = Instant.now();
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Cancel pending"}
+                                """))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.voidRetryRequired").value(true))
+                .andExpect(jsonPath("$.code").value("PAYMENT_VOID_RETRY_REQUIRED"));
+
+        Booking cancelled = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertThat(cancelled.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+
+        BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        assertThat(payment.isVoidRetryRequired()).isTrue();
+        assertThat(payment.getVoidRetryCount()).isEqualTo(1);
+        assertThat(payment.getVoidRetryLastError()).contains("void fail");
+        assertThat(payment.getVoidRetryNextAt()).isNotNull();
+        assertThat(payment.getVoidRetryNextAt()).isAfter(before.plusSeconds(250));
+        assertThat(payment.getVoidRetryNextAt()).isBefore(before.plusSeconds(360));
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
+        assertThat(payment.getProviderStatus()).isEqualTo("VOID_RETRY_REQUIRED");
+
+        List<PaymentTransaction> txns = paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId());
+        assertThat(txns).hasSize(1);
+        assertThat(txns.get(0).getType()).isEqualTo(PaymentTransactionType.VOID);
+        assertThat(txns.get(0).getStatus()).isEqualTo(PaymentTransactionStatus.FAILED);
+    }
+
+    @Test
     void cancelConfirmedFullRefundVoidsAuthorizationWithoutCapture() throws Exception {
         Booking booking = saveBooking(BookingStatus.CONFIRMED);
         booking.setPickupDate(LocalDate.now().plusDays(3));
@@ -312,6 +352,10 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
         assertThat(payment.getCapturedAmount()).isEqualByComparingTo("750000.00");
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
         assertThat(payment.getProviderStatus()).isEqualTo("VOID_RETRY_REQUIRED");
+        assertThat(payment.isVoidRetryRequired()).isTrue();
+        assertThat(payment.getVoidRetryCount()).isEqualTo(1);
+        assertThat(payment.getVoidRetryLastError()).contains("void fail");
+        assertThat(payment.getVoidRetryNextAt()).isNotNull();
 
         List<PaymentTransaction> txns = paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId());
         assertThat(txns).hasSize(2);
@@ -390,6 +434,10 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.voidRetryRequired").value(true))
                 .andExpect(jsonPath("$.code").value("PAYMENT_VOID_RETRY_REQUIRED"));
 
+        BookingPayment afterFirstAttempt = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        Instant retryNextAt = afterFirstAttempt.getVoidRetryNextAt();
+        Integer retryCount = afterFirstAttempt.getVoidRetryCount();
+
         mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
                         .header("Authorization", "Bearer " + customerToken)
                         .header("Idempotency-Key", key)
@@ -401,6 +449,10 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
 
         BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
         assertThat(payment.getCapturedAmount()).isEqualByComparingTo("750000.00");
+        assertThat(payment.isVoidRetryRequired()).isTrue();
+        assertThat(payment.getVoidRetryCount()).isEqualTo(retryCount);
+        assertThat(payment.getVoidRetryNextAt()).isEqualTo(retryNextAt);
+        assertThat(payment.getVoidRetryLastError()).contains("void fail");
         List<PaymentTransaction> txns = paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId());
         assertThat(txns).hasSize(2);
     }

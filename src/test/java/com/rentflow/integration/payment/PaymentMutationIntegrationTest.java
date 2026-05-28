@@ -7,8 +7,13 @@ import com.rentflow.auth.repository.AuthUserRepository;
 import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.common.idempotency.repository.IdempotencyKeyRepository;
 import com.rentflow.common.security.JwtTokenProvider;
 import com.rentflow.integration.BaseIntegrationTest;
+import com.rentflow.listing.entity.CancellationPolicy;
+import com.rentflow.listing.entity.Listing;
+import com.rentflow.listing.entity.ListingStatus;
+import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.payment.entity.BookingPayment;
 import com.rentflow.payment.entity.PaymentMethod;
 import com.rentflow.payment.entity.PaymentProviderType;
@@ -25,6 +30,12 @@ import com.rentflow.payment.provider.corebank.CoreBankVoidHoldResponse;
 import com.rentflow.payment.provider.corebank.CoreBankVoidHoldResult;
 import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
+import com.rentflow.vehicle.entity.FuelType;
+import com.rentflow.vehicle.entity.TransmissionType;
+import com.rentflow.vehicle.entity.Vehicle;
+import com.rentflow.vehicle.entity.VehicleCategory;
+import com.rentflow.vehicle.entity.VehicleStatus;
+import com.rentflow.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -52,6 +63,9 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
     @Autowired private BookingRepository bookingRepository;
     @Autowired private BookingPaymentRepository bookingPaymentRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
+    @Autowired private IdempotencyKeyRepository idempotencyKeyRepository;
+    @Autowired private ListingRepository listingRepository;
+    @Autowired private VehicleRepository vehicleRepository;
     @Autowired private JwtTokenProvider jwtTokenProvider;
 
     @MockBean private CoreBankPaymentClient coreBankPaymentClient;
@@ -64,18 +78,23 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
     private String hostToken;
     private String adminToken;
     private String strangerToken;
+    private Listing listing;
 
     @BeforeEach
     void setUp() {
         paymentTransactionRepository.deleteAll();
         bookingPaymentRepository.deleteAll();
+        idempotencyKeyRepository.deleteAll();
         bookingRepository.deleteAll();
+        listingRepository.deleteAll();
+        vehicleRepository.deleteAll();
         authUserRepository.deleteAll();
 
         customer = saveUser("customer", Role.CUSTOMER);
         host = saveUser("host", Role.HOST);
         admin = saveUser("admin", Role.ADMIN);
         stranger = saveUser("stranger", Role.CUSTOMER);
+        listing = saveListing(host);
         customerToken = token(customer, Role.CUSTOMER);
         hostToken = token(host, Role.HOST);
         adminToken = token(admin, Role.ADMIN);
@@ -124,12 +143,12 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
                         .header("Authorization", "Bearer " + hostToken)
                         .header("Idempotency-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                .content("""
                                 {"amount":1400000.00}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.payment.status").value("CAPTURED"))
-                .andExpect(jsonPath("$.transactions[1].type").value("CAPTURE"));
+                .andExpect(jsonPath("$.transactions[0].type").value("CAPTURE"));
 
         mockMvc.perform(post("/api/v1/payments/{paymentId}/capture", payment.getId())
                         .header("Authorization", "Bearer " + hostToken)
@@ -287,7 +306,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
         Booking booking = new Booking();
         booking.setCustomerId(customerId);
         booking.setHostId(hostId);
-        booking.setListingId(UUID.randomUUID());
+        booking.setListingId(listing.getId());
         booking.setPickupDate(LocalDate.of(2026, 6, 1));
         booking.setReturnDate(LocalDate.of(2026, 6, 3));
         booking.setStatus(status);
@@ -298,6 +317,34 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
                 {"cancellationPolicy":"FLEXIBLE","instantBook":true,"dailyKmLimit":200}
                 """);
         return bookingRepository.save(booking);
+    }
+
+    private Listing saveListing(AuthUser hostUser) {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setHostId(hostUser.getId());
+        vehicle.setCategory(VehicleCategory.SEDAN);
+        vehicle.setMake("Toyota");
+        vehicle.setModel("Vios");
+        vehicle.setManufactureYear(2022);
+        vehicle.setTransmission(TransmissionType.AUTO);
+        vehicle.setFuelType(FuelType.PETROL);
+        vehicle.setSeats(5);
+        vehicle.setCity("Hanoi");
+        vehicle.setStatus(VehicleStatus.ACTIVE);
+        vehicle = vehicleRepository.save(vehicle);
+
+        Listing newListing = new Listing();
+        newListing.setHostId(hostUser.getId());
+        newListing.setVehicleId(vehicle.getId());
+        newListing.setTitle("Payment mutation listing");
+        newListing.setCity("Hanoi");
+        newListing.setBasePricePerDay(new BigDecimal("700000.00"));
+        newListing.setCurrency("VND");
+        newListing.setInstantBook(true);
+        newListing.setDailyKmLimit(200);
+        newListing.setCancellationPolicy(CancellationPolicy.FLEXIBLE);
+        newListing.setStatus(ListingStatus.ACTIVE);
+        return listingRepository.save(newListing);
     }
 
     private BookingPayment saveAuthorizedPayment(UUID bookingId) {
