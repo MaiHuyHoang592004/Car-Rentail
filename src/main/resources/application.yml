@@ -78,6 +78,12 @@ rentflow:
       enabled: ${EXPIRE_HOST_APPROVALS_ENABLED:true}
       batch-size: ${EXPIRE_HOST_APPROVALS_BATCH_SIZE:100}
       fixed-delay-ms: ${EXPIRE_HOST_APPROVALS_FIXED_DELAY_MS:60000}
+    outbox-publisher:
+      enabled: ${OUTBOX_PUBLISHER_ENABLED:true}
+      batch-size: ${OUTBOX_PUBLISHER_BATCH_SIZE:100}
+      fixed-delay-ms: ${OUTBOX_PUBLISHER_FIXED_DELAY_MS:60000}
+      max-attempts: ${OUTBOX_PUBLISHER_MAX_ATTEMPTS:5}
+      backoff-seconds: ${OUTBOX_PUBLISHER_BACKOFF_SECONDS:60}
   rate-limit:
     enabled: ${RENTFLOW_RATE_LIMIT_ENABLED:true}
     login:
