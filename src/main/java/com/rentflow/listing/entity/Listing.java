@@ -56,6 +56,12 @@ public class Listing extends BaseEntity {
     @Column(name = "cancellation_policy", nullable = false, length = 20)
     private CancellationPolicy cancellationPolicy = CancellationPolicy.FLEXIBLE;
 
+    @Column(name = "average_rating", nullable = false, precision = 3, scale = 2)
+    private BigDecimal averageRating = BigDecimal.ZERO;
+
+    @Column(name = "review_count", nullable = false)
+    private Integer reviewCount = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private ListingStatus status = ListingStatus.DRAFT;
