@@ -92,6 +92,11 @@ rentflow:
   booking:
     require-email-verification: ${RENTFLOW_BOOKING_REQUIRE_EMAIL_VERIFICATION:false}
     require-driver-verification: ${RENTFLOW_BOOKING_REQUIRE_DRIVER_VERIFICATION:false}
+  file:
+    signed-url:
+      ttl: ${RENTFLOW_FILE_SIGNED_URL_TTL:PT10M}
+      base-url: ${RENTFLOW_FILE_SIGNED_URL_BASE:https://files.rentflow.local}
+      secret: ${RENTFLOW_FILE_SIGNED_URL_SECRET:change-me}
 
 server:
   error:
