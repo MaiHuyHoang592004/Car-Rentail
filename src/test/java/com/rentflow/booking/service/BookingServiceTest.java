@@ -17,6 +17,8 @@ import com.rentflow.common.exception.AccessDeniedException;
 import com.rentflow.common.exception.BookingNotFoundException;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.DriverLicenseNotApprovedException;
+import com.rentflow.common.exception.EmailNotVerifiedException;
+import com.rentflow.common.exception.IdempotencyKeyConflictException;
 import com.rentflow.common.exception.ListingNotFoundException;
 import com.rentflow.common.exception.CorrelationIdHelper;
 import com.rentflow.common.exception.PaymentProviderUnavailableException;
@@ -25,6 +27,8 @@ import com.rentflow.common.idempotency.service.IdempotencyResolution;
 import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.idempotency.service.IdempotencyService;
+import com.rentflow.common.ratelimit.RateLimitService;
+import com.rentflow.common.security.EmailVerificationPolicy;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.payment.entity.BookingPayment;
 import com.rentflow.payment.entity.PaymentProviderType;
@@ -44,6 +48,7 @@ import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.entity.PricingType;
 import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.outbox.service.OutboxService;
+import com.rentflow.notification.service.AdminNotificationService;
 import com.rentflow.user.entity.UserProfile;
 import com.rentflow.user.repository.UserProfileRepository;
 import com.rentflow.vehicle.entity.Vehicle;
@@ -76,6 +81,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -100,7 +106,9 @@ class BookingServiceTest {
     @Mock private VehicleRepository vehicleRepository;
     @Mock private IdempotencyService idempotencyService;
     @Mock private IdempotencyFailureMarker idempotencyFailureMarker;
+    @Mock private RateLimitService rateLimitService;
     @Mock private SecurityContext securityContext;
+    @Mock private EmailVerificationPolicy emailVerificationPolicy;
     @Mock private BookingPaymentRepository bookingPaymentRepository;
     @Mock private PaymentTransactionRepository paymentTransactionRepository;
     @Mock private PaymentProviderRouter paymentProviderRouter;
@@ -109,6 +117,7 @@ class BookingServiceTest {
     @Mock private BookingTimelineService bookingTimelineService;
     @Mock private AuditLogService auditLogService;
     @Mock private OutboxService outboxService;
+    @Mock private AdminNotificationService adminNotificationService;
 
     private BookingService bookingService;
     private ObjectMapper objectMapper;
@@ -130,10 +139,12 @@ class BookingServiceTest {
                 listingRepository,
                 idempotencyService,
                 idempotencyFailureMarker,
+                rateLimitService,
                 new BookingPriceCalculator(),
                 validator,
                 reserver,
                 securityContext,
+                emailVerificationPolicy,
                 objectMapper,
                 new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
                 bookingPaymentRepository,
@@ -144,8 +155,10 @@ class BookingServiceTest {
                 bookingTimelineService,
                 auditLogService,
                 outboxService,
+                adminNotificationService,
                 fixedClock,
-                15);
+                15,
+                false);
         lenient().when(correlationIdHelper.getOrGenerate()).thenReturn("corr-1");
         lenient().when(paymentProviderRouter.route(PaymentProviderType.COREBANK)).thenReturn(paymentProvider);
         lenient().when(paymentTransactionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -163,6 +176,7 @@ class BookingServiceTest {
         BookingResponse result = bookingService.createBooking(IDEMPOTENCY_KEY, request);
 
         assertThat(result).isEqualTo(replayed);
+        verifyNoInteractions(rateLimitService);
         verifyNoInteractions(listingRepository, bookingRepository, availabilityRepository, bookingExtraRepository);
     }
 
@@ -217,8 +231,63 @@ class BookingServiceTest {
             assertThat(row.getHoldExpiresAt()).isEqualTo(NOW.plusSeconds(900));
         });
         verify(availabilityRepository).saveAll(rows);
+        verify(rateLimitService).consumeBookingCreate(CUSTOMER_ID);
         verify(idempotencyService).complete(eq(IDEMPOTENCY_ID), eq(201), any());
         verify(idempotencyFailureMarker, never()).markFailed(any());
+    }
+
+    @Test
+    void createBookingDifferentIdempotencyKeysConsumeRateLimitPerProceed() {
+        CreateBookingRequest request = new CreateBookingRequest(
+                LISTING_ID,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 6, 3),
+                "Hanoi",
+                "Hanoi",
+                List.of());
+        Listing listing = activeListing();
+        listing.setExtras(List.of());
+        String secondKey = "9b71f8d2-9e1d-4f7a-bbe6-334c3816df92";
+        UUID secondIdempotencyId = UUID.fromString("66666666-6666-6666-6666-666666666667");
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(request)).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CREATE_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CREATE_BOOKING, secondKey, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.proceed(secondIdempotencyId));
+        when(listingRepository.findByIdAndStatusWithExtras(LISTING_ID, ListingStatus.ACTIVE))
+                .thenReturn(Optional.of(listing));
+        when(bookingRepository.existsOverlappingActiveBooking(eq(CUSTOMER_ID), any(), any(), any()))
+                .thenReturn(false);
+        when(availabilityRepository.findForBookingRangeForUpdate(
+                LISTING_ID, request.pickupDate(), request.returnDate()))
+                .thenAnswer(invocation -> availabilityRows(AvailabilityStatus.FREE, AvailabilityStatus.FREE));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
+            Booking booking = invocation.getArgument(0);
+            if (booking.getId() == null) {
+                booking.setId(UUID.randomUUID());
+            }
+            return booking;
+        });
+
+        bookingService.createBooking(IDEMPOTENCY_KEY, request);
+        bookingService.createBooking(secondKey, request);
+
+        verify(rateLimitService, times(2)).consumeBookingCreate(CUSTOMER_ID);
+    }
+
+    @Test
+    void createBookingIdempotencyConflictDoesNotConsumeRateLimit() {
+        CreateBookingRequest request = request();
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(request)).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.CREATE_BOOKING, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenThrow(new IdempotencyKeyConflictException());
+
+        assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request))
+                .isInstanceOf(IdempotencyKeyConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "IDEMPOTENCY_KEY_CONFLICT");
+        verifyNoInteractions(rateLimitService);
     }
 
     @Test
@@ -228,6 +297,50 @@ class BookingServiceTest {
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request()))
                 .isInstanceOf(AccessDeniedException.class);
+        verify(listingRepository, never()).findByIdAndStatusWithExtras(any(), any());
+        verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_ID);
+    }
+
+    @Test
+    void emailVerificationGateBlocksCreateBookingWhenEnabled() {
+        Clock fixedClock = Clock.fixed(NOW, ZoneOffset.UTC);
+        BookingValidator validator = new BookingValidator(
+                listingRepository, bookingRepository, userProfileRepository, vehicleRepository, fixedClock, false);
+        AvailabilityReserver reserver = new AvailabilityReserver(availabilityRepository);
+        bookingService = new BookingService(
+                bookingRepository,
+                bookingExtraRepository,
+                listingRepository,
+                idempotencyService,
+                idempotencyFailureMarker,
+                rateLimitService,
+                new BookingPriceCalculator(),
+                validator,
+                reserver,
+                securityContext,
+                emailVerificationPolicy,
+                objectMapper,
+                new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
+                bookingPaymentRepository,
+                paymentTransactionRepository,
+                paymentProviderRouter,
+                correlationIdHelper,
+                new CancellationPolicyCalculator(fixedClock),
+                bookingTimelineService,
+                auditLogService,
+                outboxService,
+                adminNotificationService,
+                fixedClock,
+                15,
+                true);
+        mockProceed();
+        doThrow(new EmailNotVerifiedException()).when(emailVerificationPolicy).requireVerifiedEmail(CUSTOMER_ID);
+
+        assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request()))
+                .isInstanceOf(EmailNotVerifiedException.class)
+                .hasFieldOrPropertyWithValue("code", "EMAIL_NOT_VERIFIED");
+
+        verify(rateLimitService, never()).consumeBookingCreate(any());
         verify(listingRepository, never()).findByIdAndStatusWithExtras(any(), any());
         verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_ID);
     }
@@ -244,10 +357,12 @@ class BookingServiceTest {
                 listingRepository,
                 idempotencyService,
                 idempotencyFailureMarker,
+                rateLimitService,
                 new BookingPriceCalculator(),
                 validator,
                 reserver,
                 securityContext,
+                emailVerificationPolicy,
                 objectMapper,
                 new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
                 bookingPaymentRepository,
@@ -258,8 +373,10 @@ class BookingServiceTest {
                 bookingTimelineService,
                 auditLogService,
                 outboxService,
+                adminNotificationService,
                 fixedClock,
-                15);
+                15,
+                false);
         mockProceed();
         UserProfile profile = new UserProfile();
         profile.setDriverVerificationStatus(UserProfile.DriverVerificationStatus.PENDING);
@@ -671,6 +788,8 @@ class BookingServiceTest {
     void cancelBookingConfirmedPartialPenaltyReturnsRetryRequiredWhenVoidFails() {
         Booking booking = booking();
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 5, 13));
+        booking.setReturnDate(LocalDate.of(2026, 5, 15));
         booking.setPolicySnapshot("""
                 {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
                 """);
@@ -688,6 +807,7 @@ class BookingServiceTest {
         assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
         assertThat(response.voidRetryRequired()).isTrue();
         assertThat(response.code()).isEqualTo("PAYMENT_VOID_RETRY_REQUIRED");
+        verify(adminNotificationService).notifyPaymentVoidRetryRequired(eq(BOOKING_ID), eq(payment.getId()), eq(1));
     }
 
     @Test
@@ -709,12 +829,15 @@ class BookingServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
         verify(paymentProvider).voidAuthorization(any());
         verify(paymentProvider, never()).capture(any());
+        verify(adminNotificationService, never()).notifyPaymentVoidRetryRequired(any(), any(), any(Integer.class));
     }
 
     @Test
     void cancelBookingConfirmedPartialPenaltyCaptureThenVoidSucceeds() {
         Booking booking = booking();
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 5, 13));
+        booking.setReturnDate(LocalDate.of(2026, 5, 15));
         booking.setPolicySnapshot("""
                 {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
                 """);
@@ -883,6 +1006,8 @@ class BookingServiceTest {
     void cancelBookingConfirmedAfterPartialPenaltyStoresVoidFailureState() {
         Booking booking = booking();
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 5, 13));
+        booking.setReturnDate(LocalDate.of(2026, 5, 15));
         booking.setPolicySnapshot("""
                 {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
                 """);

@@ -18,6 +18,16 @@ Implement hardening features: rate limiting, notifications, host approval/reject
     - `Retry-After` header
     - JSON error body fields: `code`, `message`, `correlationId`
   - Added tests for path normalization edge cases (trailing slash, context path) and default property values (`login=15m`, `booking=1h`, `public=60/1m`).
+- [x] Slice 8B.3 — Host approval/rejection + expiry flow
+  - Host booking APIs added (`list/approve/reject`).
+  - Idempotency scopes extended for host actions.
+  - Expiry processor/job for `PENDING_HOST_APPROVAL` (24h timeout path).
+- [x] Slice 8B.4 — Notifications + admin void-retry alerts
+  - Notification module completed (`entity/repository/service/controller`).
+  - Admin alert notifications emitted for:
+    - void retry required
+    - void retry resolved
+    - void retry exhausted max attempts
 
 ## Must Implement
 

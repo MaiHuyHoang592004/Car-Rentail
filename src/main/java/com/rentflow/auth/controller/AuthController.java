@@ -6,6 +6,7 @@ import com.rentflow.auth.service.EmailVerificationService;
 import com.rentflow.auth.service.PasswordService;
 import com.rentflow.common.exception.AuthenticationException;
 import com.rentflow.common.ratelimit.RateLimitService;
+import com.rentflow.common.security.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final RateLimitService rateLimitService;
+    private final ClientIpResolver clientIpResolver;
     private final PasswordService passwordService;
     private final EmailVerificationService emailVerificationService;
 
@@ -35,7 +37,7 @@ public class AuthController {
     public ResponseEntity<TokenResponse> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest servletRequest) {
-        String clientIp = clientIp(servletRequest);
+        String clientIp = clientIpResolver.resolve(servletRequest);
         rateLimitService.checkLoginAllowed(request.email(), clientIp);
         try {
             var response = authService.login(request);
@@ -75,13 +77,5 @@ public class AuthController {
     public ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
         emailVerificationService.verify(request.token());
         return ResponseEntity.noContent().build();
-    }
-
-    private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

@@ -84,6 +84,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/void").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/refund").authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/payments/{id}/reconciliation").authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/notifications/me").authenticated()
                     // Booking endpoints require authentication; service layer enforces roles and ownership
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/cancel").authenticated()

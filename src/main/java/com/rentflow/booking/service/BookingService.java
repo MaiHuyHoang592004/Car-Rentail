@@ -22,12 +22,15 @@ import com.rentflow.common.idempotency.service.IdempotencyResolution;
 import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.idempotency.service.IdempotencyService;
+import com.rentflow.common.ratelimit.RateLimitService;
+import com.rentflow.common.security.EmailVerificationPolicy;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.listing.entity.Extra;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.CancellationPolicy;
 import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.outbox.service.OutboxService;
+import com.rentflow.notification.service.AdminNotificationService;
 import com.rentflow.payment.entity.BookingPayment;
 import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
@@ -70,10 +73,12 @@ public class BookingService {
     private final ListingRepository listingRepository;
     private final IdempotencyService idempotencyService;
     private final IdempotencyFailureMarker idempotencyFailureMarker;
+    private final RateLimitService rateLimitService;
     private final BookingPriceCalculator bookingPriceCalculator;
     private final BookingValidator bookingValidator;
     private final AvailabilityReserver availabilityReserver;
     private final SecurityContext securityContext;
+    private final EmailVerificationPolicy emailVerificationPolicy;
     private final ObjectMapper objectMapper;
     private final BookingMapper bookingMapper;
     private final BookingPaymentRepository bookingPaymentRepository;
@@ -84,8 +89,10 @@ public class BookingService {
     private final BookingTimelineService bookingTimelineService;
     private final AuditLogService auditLogService;
     private final OutboxService outboxService;
+    private final AdminNotificationService adminNotificationService;
     private final Clock clock;
     private final long holdDurationMinutes;
+    private final boolean requireEmailVerification;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -93,10 +100,12 @@ public class BookingService {
             ListingRepository listingRepository,
             IdempotencyService idempotencyService,
             IdempotencyFailureMarker idempotencyFailureMarker,
+            RateLimitService rateLimitService,
             BookingPriceCalculator bookingPriceCalculator,
             BookingValidator bookingValidator,
             AvailabilityReserver availabilityReserver,
             SecurityContext securityContext,
+            EmailVerificationPolicy emailVerificationPolicy,
             ObjectMapper objectMapper,
             BookingMapper bookingMapper,
             BookingPaymentRepository bookingPaymentRepository,
@@ -107,17 +116,21 @@ public class BookingService {
             BookingTimelineService bookingTimelineService,
             AuditLogService auditLogService,
             OutboxService outboxService,
+            AdminNotificationService adminNotificationService,
             Clock clock,
-            @Value("${rentflow.booking.hold-duration-minutes:15}") long holdDurationMinutes) {
+            @Value("${rentflow.booking.hold-duration-minutes:15}") long holdDurationMinutes,
+            @Value("${rentflow.booking.require-email-verification:false}") boolean requireEmailVerification) {
         this.bookingRepository = bookingRepository;
         this.bookingExtraRepository = bookingExtraRepository;
         this.listingRepository = listingRepository;
         this.idempotencyService = idempotencyService;
         this.idempotencyFailureMarker = idempotencyFailureMarker;
+        this.rateLimitService = rateLimitService;
         this.bookingPriceCalculator = bookingPriceCalculator;
         this.bookingValidator = bookingValidator;
         this.availabilityReserver = availabilityReserver;
         this.securityContext = securityContext;
+        this.emailVerificationPolicy = emailVerificationPolicy;
         this.objectMapper = objectMapper;
         this.bookingMapper = bookingMapper;
         this.bookingPaymentRepository = bookingPaymentRepository;
@@ -128,8 +141,10 @@ public class BookingService {
         this.bookingTimelineService = bookingTimelineService;
         this.auditLogService = auditLogService;
         this.outboxService = outboxService;
+        this.adminNotificationService = adminNotificationService;
         this.clock = clock;
         this.holdDurationMinutes = holdDurationMinutes;
+        this.requireEmailVerification = requireEmailVerification;
     }
 
     @Transactional
@@ -148,6 +163,8 @@ public class BookingService {
 
         UUID idempotencyKeyId = ((IdempotencyResolution.Proceed) resolution).idempotencyKeyId();
         try {
+            requireVerifiedEmailForBooking(customerId);
+            rateLimitService.consumeBookingCreate(customerId);
             BookingResponse response = createBookingAfterIdempotency(customerId, request);
             idempotencyService.complete(idempotencyKeyId, 201, serialize(response));
             return response;
@@ -155,6 +172,13 @@ public class BookingService {
             idempotencyFailureMarker.markFailed(idempotencyKeyId);
             throw e;
         }
+    }
+
+    private void requireVerifiedEmailForBooking(UUID customerId) {
+        if (!requireEmailVerification) {
+            return;
+        }
+        emailVerificationPolicy.requireVerifiedEmail(customerId);
     }
 
     @Transactional(readOnly = true)
@@ -355,8 +379,8 @@ public class BookingService {
             finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
             return CancelOutcome.completed();
         } catch (RuntimeException e) {
-            markVoidFailed(payment, e);
-            emitVoidRetryRequiredSignals(booking, payment);
+            boolean firstTransitionToRetryRequired = markVoidFailed(payment, e);
+            emitVoidRetryRequiredSignals(booking, payment, firstTransitionToRetryRequired);
             finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
             return CancelOutcome.withRetryRequired();
         }
@@ -396,8 +420,8 @@ public class BookingService {
             finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
             return CancelOutcome.completed();
         } catch (RuntimeException e) {
-            markVoidFailed(payment, e);
-            emitVoidRetryRequiredSignals(booking, payment);
+            boolean firstTransitionToRetryRequired = markVoidFailed(payment, e);
+            emitVoidRetryRequiredSignals(booking, payment, firstTransitionToRetryRequired);
             finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
             return CancelOutcome.withRetryRequired();
         }
@@ -511,7 +535,8 @@ public class BookingService {
         }
     }
 
-    private void markVoidFailed(BookingPayment payment, RuntimeException e) {
+    private boolean markVoidFailed(BookingPayment payment, RuntimeException e) {
+        boolean firstTransitionToRetryRequired = !payment.isVoidRetryRequired();
         payment.setProviderStatus("VOID_RETRY_REQUIRED");
         payment.setProviderMetadata(serialize(java.util.Map.of(
                 "code", "PAYMENT_VOID_RETRY_REQUIRED",
@@ -522,6 +547,7 @@ public class BookingService {
         payment.setVoidRetryLastError(e.getMessage());
         payment.setVoidRetryNextAt(clock.instant().plusSeconds(300));
         bookingPaymentRepository.save(payment);
+        return firstTransitionToRetryRequired;
     }
 
     private void applyCaptureSuccess(BookingPayment payment, CaptureResult result, BigDecimal amount) {
@@ -586,7 +612,10 @@ public class BookingService {
         outboxService.append("BOOKING", booking.getId(), "BOOKING_CANCELLED", details);
     }
 
-    private void emitVoidRetryRequiredSignals(Booking booking, BookingPayment payment) {
+    private void emitVoidRetryRequiredSignals(
+            Booking booking,
+            BookingPayment payment,
+            boolean firstTransitionToRetryRequired) {
         UUID actorId = securityContext.currentUserId();
         String actorType = resolveActorType(actorId, booking);
         String details = serialize(Map.of(
@@ -597,6 +626,12 @@ public class BookingService {
         auditLogService.record(actorId, actorType, "PAYMENT_VOID_RETRY_REQUIRED",
                 "BOOKING_PAYMENT", payment.getId(), "FAILED", details);
         outboxService.append("BOOKING_PAYMENT", payment.getId(), "PAYMENT_VOID_RETRY_REQUIRED", details);
+        if (firstTransitionToRetryRequired) {
+            adminNotificationService.notifyPaymentVoidRetryRequired(
+                    booking.getId(),
+                    payment.getId(),
+                    payment.getVoidRetryCount() == null ? 0 : payment.getVoidRetryCount());
+        }
     }
 
     private String resolveActorType(UUID actorId, Booking booking) {

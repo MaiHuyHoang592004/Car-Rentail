@@ -1,6 +1,7 @@
 package com.rentflow.auth.repository;
 
 import com.rentflow.auth.entity.AuthUser;
+import com.rentflow.auth.entity.Role;
 import com.rentflow.auth.entity.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -29,4 +31,15 @@ public interface AuthUserRepository extends JpaRepository<AuthUser, UUID> {
 
     @Query("SELECT u.status FROM AuthUser u WHERE u.id = :id")
     Optional<UserStatus> findStatusById(@Param("id") UUID id);
+
+    @Query("""
+            SELECT DISTINCT u.id
+            FROM AuthUser u
+            JOIN u.roles r
+            WHERE r.role = :role
+              AND u.status = :status
+            """)
+    List<UUID> findUserIdsByRoleAndStatus(
+            @Param("role") Role role,
+            @Param("status") UserStatus status);
 }

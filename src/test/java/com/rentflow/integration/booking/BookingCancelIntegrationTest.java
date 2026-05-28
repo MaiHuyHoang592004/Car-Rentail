@@ -32,6 +32,8 @@ import com.rentflow.payment.provider.corebank.CoreBankVoidHoldResponse;
 import com.rentflow.payment.provider.corebank.CoreBankVoidHoldResult;
 import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
+import com.rentflow.notification.entity.NotificationType;
+import com.rentflow.notification.repository.NotificationRepository;
 import com.rentflow.vehicle.entity.FuelType;
 import com.rentflow.vehicle.entity.TransmissionType;
 import com.rentflow.vehicle.entity.Vehicle;
@@ -45,6 +47,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -73,11 +76,13 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Autowired private IdempotencyKeyRepository idempotencyKeyRepository;
     @Autowired private BookingPaymentRepository bookingPaymentRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
+    @Autowired private NotificationRepository notificationRepository;
     @Autowired private JwtTokenProvider jwtTokenProvider;
     @MockBean private CoreBankPaymentClient coreBankPaymentClient;
 
     private AuthUser customer;
     private AuthUser host;
+    private AuthUser admin;
     private AuthUser otherCustomer;
     private String customerToken;
     private String otherCustomerToken;
@@ -96,6 +101,7 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
 
         customer = saveUser("customer-" + UUID.randomUUID() + "@example.com", Role.CUSTOMER);
         host = saveUser("host-" + UUID.randomUUID() + "@example.com", Role.HOST);
+        admin = saveUser("admin-" + UUID.randomUUID() + "@example.com", Role.ADMIN);
         otherCustomer = saveUser("other-" + UUID.randomUUID() + "@example.com", Role.CUSTOMER);
         customerToken = jwtTokenProvider.generateAccessToken(customer.getId(), customer.getEmail(), List.of(Role.CUSTOMER));
         otherCustomerToken = jwtTokenProvider.generateAccessToken(
@@ -315,6 +321,40 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
         AvailabilityCalendar first = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate())).orElseThrow();
         AvailabilityCalendar second = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate().plusDays(1))).orElseThrow();
         assertThat(List.of(first, second)).allSatisfy(row -> assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.FREE));
+    }
+
+    @Test
+    void cancelConfirmedPartialPenaltyVoidFailureCreatesAdminNotification() throws Exception {
+        Booking booking = saveBooking(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 5, 30));
+        booking.setReturnDate(LocalDate.of(2026, 6, 1));
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
+                """);
+        bookingRepository.save(booking);
+        saveBookedAvailability(booking);
+        saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.captureHold(any())).thenReturn(new CoreBankCaptureHoldResult(
+                new CoreBankCaptureHoldResponse("payment-order-1", "journal-1", "CAPTURED"),
+                "{\"paymentOrderId\":\"payment-order-1\",\"journalId\":\"journal-1\",\"status\":\"CAPTURED\"}"));
+        when(coreBankPaymentClient.voidHold(any())).thenThrow(new com.rentflow.common.exception.PaymentProviderUnavailableException("void fail"));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Late cancel"}
+                                """))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.code").value("PAYMENT_VOID_RETRY_REQUIRED"));
+
+        var notifications = notificationRepository
+                .findByUserIdOrderByCreatedAtDesc(admin.getId(), PageRequest.of(0, 20))
+                .getContent();
+        assertThat(notifications)
+                .extracting(n -> n.getType().name())
+                .contains(NotificationType.PAYMENT_VOID_RETRY_REQUIRED.name());
     }
 
     @Test

@@ -45,7 +45,11 @@ jwt:
 rentflow:
   cors:
     allowed-origins: ${RENTFLOW_CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  auth:
+    client-ip:
+      trusted-proxies: ${RENTFLOW_AUTH_TRUSTED_PROXIES:}
   payment:
+    require-email-verification: ${RENTFLOW_PAYMENT_REQUIRE_EMAIL_VERIFICATION:false}
     bank-transfer:
       account-number: ${RENTFLOW_BANK_TRANSFER_ACCOUNT_NUMBER:1234567890}
       account-name: ${RENTFLOW_BANK_TRANSFER_ACCOUNT_NAME:RENTFLOW ESCROW}
@@ -66,14 +70,28 @@ rentflow:
       fixed-delay-ms: ${VOID_RETRY_FIXED_DELAY_MS:60000}
       max-attempts: ${VOID_RETRY_MAX_ATTEMPTS:10}
       backoff-seconds: ${VOID_RETRY_BACKOFF_SECONDS:300}
+    expire-driver-verifications:
+      enabled: ${EXPIRE_DRIVER_VERIFICATIONS_ENABLED:true}
+      batch-size: ${EXPIRE_DRIVER_VERIFICATIONS_BATCH_SIZE:100}
+      cron: ${EXPIRE_DRIVER_VERIFICATIONS_CRON:0 0 0 * * *}
+    expire-host-approvals:
+      enabled: ${EXPIRE_HOST_APPROVALS_ENABLED:true}
+      batch-size: ${EXPIRE_HOST_APPROVALS_BATCH_SIZE:100}
+      fixed-delay-ms: ${EXPIRE_HOST_APPROVALS_FIXED_DELAY_MS:60000}
   rate-limit:
     enabled: ${RENTFLOW_RATE_LIMIT_ENABLED:true}
     login:
       limit: ${RENTFLOW_LOGIN_RATE_LIMIT:5}
-      window: ${RENTFLOW_LOGIN_RATE_WINDOW:PT5M}
+      window: ${RENTFLOW_LOGIN_RATE_WINDOW:PT15M}
     booking:
       create-limit: ${RENTFLOW_BOOKING_CREATE_RATE_LIMIT:10}
-      create-window: ${RENTFLOW_BOOKING_CREATE_RATE_WINDOW:PT1M}
+      create-window: ${RENTFLOW_BOOKING_CREATE_RATE_WINDOW:PT1H}
+    public-endpoint:
+      limit: ${RENTFLOW_PUBLIC_RATE_LIMIT:60}
+      window: ${RENTFLOW_PUBLIC_RATE_WINDOW:PT1M}
+  booking:
+    require-email-verification: ${RENTFLOW_BOOKING_REQUIRE_EMAIL_VERIFICATION:false}
+    require-driver-verification: ${RENTFLOW_BOOKING_REQUIRE_DRIVER_VERIFICATION:false}
 
 server:
   error:

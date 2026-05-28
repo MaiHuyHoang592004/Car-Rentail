@@ -9,6 +9,7 @@ import com.rentflow.common.exception.CorrelationIdHelper;
 import com.rentflow.common.exception.GlobalExceptionHandler;
 import com.rentflow.common.exception.RateLimitExceededException;
 import com.rentflow.common.ratelimit.RateLimitService;
+import com.rentflow.common.security.ClientIpResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -21,6 +22,8 @@ import java.time.Instant;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -32,6 +35,7 @@ class AuthControllerTest {
 
     private AuthService authService;
     private RateLimitService rateLimitService;
+    private ClientIpResolver clientIpResolver;
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -39,10 +43,13 @@ class AuthControllerTest {
     void setUp() {
         authService = mock(AuthService.class);
         rateLimitService = mock(RateLimitService.class);
+        clientIpResolver = mock(ClientIpResolver.class);
+        when(clientIpResolver.resolve(any())).thenReturn("203.0.113.10");
         objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(
                         authService,
                         rateLimitService,
+                        clientIpResolver,
                         mock(com.rentflow.auth.service.PasswordService.class),
                         mock(com.rentflow.auth.service.EmailVerificationService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(new CorrelationIdHelper()))
@@ -86,8 +93,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access-token"));
 
-        verify(rateLimitService).checkLoginAllowed("user@example.com", "198.51.100.7");
-        verify(rateLimitService).clearLoginFailures("user@example.com", "198.51.100.7");
+        verify(rateLimitService).checkLoginAllowed("user@example.com", "203.0.113.10");
+        verify(rateLimitService).clearLoginFailures("user@example.com", "203.0.113.10");
     }
 
     @Test
@@ -106,5 +113,24 @@ class AuthControllerTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().string("Retry-After", "60"))
                 .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"));
+    }
+
+    @Test
+    void repeatedLoginFailuresUseSameEmailRateLimitBucket() throws Exception {
+        LoginRequest request = new LoginRequest("user@example.com", "bad-password");
+        when(authService.login(request)).thenThrow(AuthenticationException.invalidCredentials());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+
+        verify(rateLimitService, times(2)).checkLoginAllowed("user@example.com", "203.0.113.10");
+        verify(rateLimitService, times(2)).recordLoginFailure("user@example.com", "203.0.113.10");
     }
 }

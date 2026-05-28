@@ -3,6 +3,9 @@ package com.rentflow.common.idempotency.service;
 public enum IdempotencyScope {
     CREATE_BOOKING,
     CANCEL_BOOKING,
+    HOST_APPROVE_BOOKING,
+    HOST_REJECT_BOOKING,
+    HOST_EXPIRE_BOOKING_APPROVAL,
     AUTHORIZE_PAYMENT,
     CAPTURE_PAYMENT,
     VOID_PAYMENT,

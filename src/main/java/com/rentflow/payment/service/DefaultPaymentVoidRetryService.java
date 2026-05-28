@@ -4,6 +4,7 @@ import com.rentflow.audit.service.AuditLogService;
 import com.rentflow.booking.service.BookingTimelineService;
 import com.rentflow.common.exception.CorrelationIdHelper;
 import com.rentflow.outbox.service.OutboxService;
+import com.rentflow.notification.service.AdminNotificationService;
 import com.rentflow.payment.entity.BookingPayment;
 import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
@@ -36,6 +37,7 @@ public class DefaultPaymentVoidRetryService implements PaymentVoidRetryService {
     private final BookingTimelineService bookingTimelineService;
     private final AuditLogService auditLogService;
     private final OutboxService outboxService;
+    private final AdminNotificationService adminNotificationService;
     private final Clock clock;
     private final int maxAttempts;
     private final long backoffSeconds;
@@ -48,6 +50,7 @@ public class DefaultPaymentVoidRetryService implements PaymentVoidRetryService {
             BookingTimelineService bookingTimelineService,
             AuditLogService auditLogService,
             OutboxService outboxService,
+            AdminNotificationService adminNotificationService,
             Clock clock,
             @Value("${rentflow.scheduler.void-retry.max-attempts:10}") int maxAttempts,
             @Value("${rentflow.scheduler.void-retry.backoff-seconds:300}") long backoffSeconds) {
@@ -58,6 +61,7 @@ public class DefaultPaymentVoidRetryService implements PaymentVoidRetryService {
         this.bookingTimelineService = bookingTimelineService;
         this.auditLogService = auditLogService;
         this.outboxService = outboxService;
+        this.adminNotificationService = adminNotificationService;
         this.clock = clock;
         this.maxAttempts = maxAttempts;
         this.backoffSeconds = backoffSeconds;
@@ -118,6 +122,10 @@ public class DefaultPaymentVoidRetryService implements PaymentVoidRetryService {
             bookingTimelineService.append(payment.getBookingId(), "PAYMENT_VOID_RETRY_SUCCEEDED", null, "SYSTEM", details);
             auditLogService.record(null, "SYSTEM", "PAYMENT_VOID_RETRY", "BOOKING_PAYMENT", payment.getId(), "SUCCEEDED", details);
             outboxService.append("BOOKING_PAYMENT", payment.getId(), "PAYMENT_VOID_RETRY_RESOLVED", details);
+            adminNotificationService.notifyPaymentVoidRetryResolved(
+                    payment.getBookingId(),
+                    payment.getId(),
+                    payment.getVoidRetryCount() == null ? 0 : payment.getVoidRetryCount());
         } catch (RuntimeException e) {
             tx.setStatus(PaymentTransactionStatus.FAILED);
             tx.setProviderErrorCode("PAYMENT_PROVIDER_ERROR");
@@ -138,6 +146,12 @@ public class DefaultPaymentVoidRetryService implements PaymentVoidRetryService {
                     "retryRequired", payment.isVoidRetryRequired()));
             bookingTimelineService.append(payment.getBookingId(), "PAYMENT_VOID_RETRY_FAILED", null, "SYSTEM", details);
             auditLogService.record(null, "SYSTEM", "PAYMENT_VOID_RETRY", "BOOKING_PAYMENT", payment.getId(), "FAILED", details);
+            if (!payment.isVoidRetryRequired()) {
+                adminNotificationService.notifyPaymentVoidRetryFailedMaxAttempts(
+                        payment.getBookingId(),
+                        payment.getId(),
+                        payment.getVoidRetryCount() == null ? 0 : payment.getVoidRetryCount());
+            }
         }
     }
 }

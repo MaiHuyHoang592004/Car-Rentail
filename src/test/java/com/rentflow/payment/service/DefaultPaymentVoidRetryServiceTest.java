@@ -4,6 +4,7 @@ import com.rentflow.audit.service.AuditLogService;
 import com.rentflow.booking.service.BookingTimelineService;
 import com.rentflow.common.exception.CorrelationIdHelper;
 import com.rentflow.outbox.service.OutboxService;
+import com.rentflow.notification.service.AdminNotificationService;
 import com.rentflow.payment.entity.BookingPayment;
 import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
@@ -44,6 +45,7 @@ class DefaultPaymentVoidRetryServiceTest {
     @Mock private BookingTimelineService bookingTimelineService;
     @Mock private AuditLogService auditLogService;
     @Mock private OutboxService outboxService;
+    @Mock private AdminNotificationService adminNotificationService;
 
     private DefaultPaymentVoidRetryService service;
 
@@ -58,6 +60,7 @@ class DefaultPaymentVoidRetryServiceTest {
                 bookingTimelineService,
                 auditLogService,
                 outboxService,
+                adminNotificationService,
                 clock,
                 3,
                 120);
@@ -80,6 +83,7 @@ class DefaultPaymentVoidRetryServiceTest {
         assertThat(payment.getVoidRetryNextAt()).isNull();
         assertThat(payment.getVoidRetryLastError()).isNull();
         verify(outboxService).append(any(), any(), any(), any());
+        verify(adminNotificationService).notifyPaymentVoidRetryResolved(any(), any(), any(Integer.class));
     }
 
     @Test
@@ -96,6 +100,24 @@ class DefaultPaymentVoidRetryServiceTest {
         assertThat(payment.getVoidRetryCount()).isEqualTo(1);
         assertThat(payment.getVoidRetryNextAt()).isNotNull();
         verify(auditLogService).record(any(), any(), any(), any(), any(), any(), any());
+        verify(adminNotificationService, org.mockito.Mockito.never())
+                .notifyPaymentVoidRetryFailedMaxAttempts(any(), any(), any(Integer.class));
+    }
+
+    @Test
+    void retryFailureAtMaxAttemptsNotifiesAdminFinalFailure() {
+        BookingPayment payment = candidate();
+        payment.setVoidRetryCount(2);
+        when(bookingPaymentRepository.findVoidRetryCandidatesForUpdate(any(), any(Integer.class), any(Integer.class)))
+                .thenReturn(List.of(payment));
+        doThrow(new RuntimeException("provider down")).when(paymentProvider).voidAuthorization(any());
+
+        int processed = service.processBatch(10);
+
+        assertThat(processed).isEqualTo(1);
+        assertThat(payment.isVoidRetryRequired()).isFalse();
+        assertThat(payment.getVoidRetryCount()).isEqualTo(3);
+        verify(adminNotificationService).notifyPaymentVoidRetryFailedMaxAttempts(any(), any(), any(Integer.class));
     }
 
     private BookingPayment candidate() {

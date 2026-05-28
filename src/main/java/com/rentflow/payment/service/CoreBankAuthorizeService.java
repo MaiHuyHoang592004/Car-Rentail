@@ -18,6 +18,7 @@ import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyResolution;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.idempotency.service.IdempotencyService;
+import com.rentflow.common.security.EmailVerificationPolicy;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.payment.dto.AuthorizePaymentRequest;
 import com.rentflow.payment.dto.AuthorizePaymentResponse;
@@ -62,6 +63,7 @@ public class CoreBankAuthorizeService {
     private final IdempotencyService idempotencyService;
     private final IdempotencyFailureMarker idempotencyFailureMarker;
     private final SecurityContext securityContext;
+    private final EmailVerificationPolicy emailVerificationPolicy;
     private final PaymentBookingSnapshotParser bookingSnapshotParser;
     private final AuthorizePaymentResponseFactory authorizePaymentResponseFactory;
     private final PaymentProviderRouter paymentProviderRouter;
@@ -69,6 +71,7 @@ public class CoreBankAuthorizeService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
+    private final boolean requireEmailVerification;
 
     public CoreBankAuthorizeService(
             BookingRepository bookingRepository,
@@ -79,13 +82,16 @@ public class CoreBankAuthorizeService {
             IdempotencyService idempotencyService,
             IdempotencyFailureMarker idempotencyFailureMarker,
             SecurityContext securityContext,
+            EmailVerificationPolicy emailVerificationPolicy,
             PaymentBookingSnapshotParser bookingSnapshotParser,
             AuthorizePaymentResponseFactory authorizePaymentResponseFactory,
             PaymentProviderRouter paymentProviderRouter,
             CorrelationIdHelper correlationIdHelper,
             ObjectMapper objectMapper,
             Clock clock,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            @org.springframework.beans.factory.annotation.Value("${rentflow.payment.require-email-verification:false}")
+            boolean requireEmailVerification) {
         this.bookingRepository = bookingRepository;
         this.bookingPaymentRepository = bookingPaymentRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
@@ -94,6 +100,7 @@ public class CoreBankAuthorizeService {
         this.idempotencyService = idempotencyService;
         this.idempotencyFailureMarker = idempotencyFailureMarker;
         this.securityContext = securityContext;
+        this.emailVerificationPolicy = emailVerificationPolicy;
         this.bookingSnapshotParser = bookingSnapshotParser;
         this.authorizePaymentResponseFactory = authorizePaymentResponseFactory;
         this.paymentProviderRouter = paymentProviderRouter;
@@ -101,6 +108,7 @@ public class CoreBankAuthorizeService {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.requireEmailVerification = requireEmailVerification;
     }
 
     public AuthorizePaymentResponse authorizeBookingPayment(
@@ -124,6 +132,7 @@ public class CoreBankAuthorizeService {
 
         UUID idempotencyKeyId = ((IdempotencyResolution.Proceed) resolution).idempotencyKeyId();
         try {
+            requireVerifiedEmailForPayment(customerId);
             PreparedAuthorizeContext prepared = required(transactionTemplate.execute(status ->
                 prepareAuthorize(customerId, bookingId, request, bank, idempotencyKey, idempotencyKeyId)));
             AuthorizeResult authorizeResult;
@@ -543,6 +552,13 @@ public class CoreBankAuthorizeService {
 
     private PaymentProvider routedCoreBankProvider() {
         return paymentProviderRouter.route(PaymentProviderType.COREBANK);
+    }
+
+    private void requireVerifiedEmailForPayment(UUID customerId) {
+        if (!requireEmailVerification) {
+            return;
+        }
+        emailVerificationPolicy.requireVerifiedEmail(customerId);
     }
 
     private record AuthorizeHashInput(

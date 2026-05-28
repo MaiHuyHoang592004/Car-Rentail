@@ -26,6 +26,7 @@
 | AUTH_ACCOUNT_LOCKED | 423 | Account locked due to too many failed login attempts; `Retry-After` header included |
 | INVALID_TOKEN | 409 | Reset/verification token is missing, expired, or already used |
 | ACCESS_DENIED | 403 | User lacks permission |
+| EMAIL_NOT_VERIFIED | 403 | Email must be verified before this action |
 | USER_EMAIL_EXISTS | 409 | Email already registered |
 | DRIVER_LICENSE_NOT_APPROVED | 403 | Customer is not eligible to book |
 | ALREADY_SUBMITTED | 409 | Verification already pending/approved |

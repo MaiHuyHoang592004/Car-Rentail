@@ -13,6 +13,7 @@ import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyResolution;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.idempotency.service.IdempotencyService;
+import com.rentflow.common.security.EmailVerificationPolicy;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.payment.dto.AuthorizePaymentRequest;
 import com.rentflow.payment.dto.AuthorizePaymentResponse;
@@ -30,6 +31,7 @@ import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -48,10 +50,12 @@ public class BankTransferAuthorizeService {
     private final IdempotencyFailureMarker idempotencyFailureMarker;
     private final PaymentProviderRouter paymentProviderRouter;
     private final SecurityContext securityContext;
+    private final EmailVerificationPolicy emailVerificationPolicy;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final PaymentBookingSnapshotParser bookingSnapshotParser;
     private final AuthorizePaymentResponseFactory authorizePaymentResponseFactory;
+    private final boolean requireEmailVerification;
 
     public BankTransferAuthorizeService(
             BookingRepository bookingRepository,
@@ -61,10 +65,12 @@ public class BankTransferAuthorizeService {
             IdempotencyFailureMarker idempotencyFailureMarker,
             PaymentProviderRouter paymentProviderRouter,
             SecurityContext securityContext,
+            EmailVerificationPolicy emailVerificationPolicy,
             ObjectMapper objectMapper,
             Clock clock,
             PaymentBookingSnapshotParser bookingSnapshotParser,
-            AuthorizePaymentResponseFactory authorizePaymentResponseFactory) {
+            AuthorizePaymentResponseFactory authorizePaymentResponseFactory,
+            @Value("${rentflow.payment.require-email-verification:false}") boolean requireEmailVerification) {
         this.bookingRepository = bookingRepository;
         this.bookingPaymentRepository = bookingPaymentRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
@@ -72,10 +78,12 @@ public class BankTransferAuthorizeService {
         this.idempotencyFailureMarker = idempotencyFailureMarker;
         this.paymentProviderRouter = paymentProviderRouter;
         this.securityContext = securityContext;
+        this.emailVerificationPolicy = emailVerificationPolicy;
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.bookingSnapshotParser = bookingSnapshotParser;
         this.authorizePaymentResponseFactory = authorizePaymentResponseFactory;
+        this.requireEmailVerification = requireEmailVerification;
     }
 
     @Transactional
@@ -100,6 +108,7 @@ public class BankTransferAuthorizeService {
 
         UUID idempotencyKeyId = ((IdempotencyResolution.Proceed) resolution).idempotencyKeyId();
         try {
+            requireVerifiedEmailForPayment(customerId);
             AuthorizePaymentResponse response = authorizeAfterIdempotency(customerId, bookingId, request, bank, idempotencyKeyId);
             idempotencyService.complete(idempotencyKeyId, 200, serialize(response));
             return response;
@@ -176,6 +185,13 @@ public class BankTransferAuthorizeService {
                     "Payment cannot be authorized in its current status for booking " + bookingId);
         }
         return bookingPayment;
+    }
+
+    private void requireVerifiedEmailForPayment(UUID customerId) {
+        if (!requireEmailVerification) {
+            return;
+        }
+        emailVerificationPolicy.requireVerifiedEmail(customerId);
     }
 
     private void applyAuthorizeResult(

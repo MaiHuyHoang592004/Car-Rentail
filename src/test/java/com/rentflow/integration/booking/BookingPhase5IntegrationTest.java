@@ -186,6 +186,55 @@ class BookingPhase5IntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void createBookingMissingRequiredFieldsReturnsValidationError() throws Exception {
+        String body = """
+                {
+                  "pickupLocation":"Hanoi",
+                  "returnLocation":"Hanoi"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", uuidV4())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void createBookingWithNullListingIdReturnsValidationError() throws Exception {
+        String body = """
+                {
+                  "listingId":null,
+                  "pickupDate":"%s",
+                  "returnDate":"%s",
+                  "pickupLocation":"Hanoi",
+                  "returnLocation":"Hanoi",
+                  "extras":[]
+                }
+                """.formatted(PICKUP_DATE, RETURN_DATE);
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", uuidV4())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void createBookingInvalidDateRangeReturnsValidationError() throws Exception {
+        saveAvailability(listing.getId(), PICKUP_DATE, RETURN_DATE, AvailabilityStatus.FREE);
+
+        postCreate(customerToken, uuidV4(), createBody(listing.getId(), RETURN_DATE, PICKUP_DATE))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     void customerOverlapReturnsBookingOverlapCustomer() throws Exception {
         saveBooking(customer, host, listing, BookingStatus.HELD, PICKUP_DATE, RETURN_DATE);
         saveAvailability(listing.getId(), PICKUP_DATE.plusDays(1), RETURN_DATE.plusDays(1), AvailabilityStatus.FREE);

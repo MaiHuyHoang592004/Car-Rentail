@@ -12,11 +12,13 @@ import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.CorrelationIdHelper;
+import com.rentflow.common.exception.EmailNotVerifiedException;
 import com.rentflow.common.exception.PaymentProviderUnavailableException;
 import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyResolution;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.idempotency.service.IdempotencyService;
+import com.rentflow.common.security.EmailVerificationPolicy;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.payment.dto.AuthorizePaymentRequest;
 import com.rentflow.payment.dto.AuthorizePaymentResponse;
@@ -81,6 +83,7 @@ class CoreBankAuthorizeServiceTest {
     @Mock private IdempotencyService idempotencyService;
     @Mock private IdempotencyFailureMarker idempotencyFailureMarker;
     @Mock private SecurityContext securityContext;
+    @Mock private EmailVerificationPolicy emailVerificationPolicy;
     @Mock private PaymentProviderRouter paymentProviderRouter;
     @Mock private PaymentProvider coreBankProvider;
     @Mock private CorrelationIdHelper correlationIdHelper;
@@ -120,13 +123,15 @@ class CoreBankAuthorizeServiceTest {
                 idempotencyService,
                 idempotencyFailureMarker,
                 securityContext,
+                emailVerificationPolicy,
                 new PaymentBookingSnapshotParser(objectMapper),
                 new AuthorizePaymentResponseFactory(),
                 paymentProviderRouter,
                 correlationIdHelper,
                 objectMapper,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                transactionManager);
+                transactionManager,
+                false);
         lenient().when(paymentProviderRouter.route(PaymentProviderType.COREBANK)).thenReturn(coreBankProvider);
     }
 
@@ -144,6 +149,62 @@ class CoreBankAuthorizeServiceTest {
         assertThatThrownBy(() -> authorizeService.authorizeBookingPayment(BOOKING_ID, "key", request, bank()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasFieldOrPropertyWithValue("code", "PAYMENT_ACCOUNT_NOT_LINKED");
+
+        verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_KEY_ID);
+    }
+
+    @Test
+    void authorizeFailsWhenEmailNotVerifiedAndGateEnabled() {
+        PlatformTransactionManager transactionManager = new AbstractPlatformTransactionManager() {
+            @Override
+            protected Object doGetTransaction() {
+                return new Object();
+            }
+
+            @Override
+            protected void doBegin(Object transaction, TransactionDefinition definition) {
+            }
+
+            @Override
+            protected void doCommit(DefaultTransactionStatus status) {
+            }
+
+            @Override
+            protected void doRollback(DefaultTransactionStatus status) {
+            }
+        };
+        authorizeService = new CoreBankAuthorizeService(
+                bookingRepository,
+                bookingPaymentRepository,
+                paymentTransactionRepository,
+                customerPaymentAccountRepository,
+                availabilityCalendarRepository,
+                idempotencyService,
+                idempotencyFailureMarker,
+                securityContext,
+                emailVerificationPolicy,
+                new PaymentBookingSnapshotParser(objectMapper),
+                new AuthorizePaymentResponseFactory(),
+                paymentProviderRouter,
+                correlationIdHelper,
+                objectMapper,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                transactionManager,
+                true);
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(any())).thenReturn("hash");
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.AUTHORIZE_PAYMENT, "key", "hash"))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_KEY_ID));
+        org.mockito.Mockito.doThrow(new EmailNotVerifiedException())
+                .when(emailVerificationPolicy).requireVerifiedEmail(CUSTOMER_ID);
+
+        assertThatThrownBy(() -> authorizeService.authorizeBookingPayment(
+                BOOKING_ID,
+                "key",
+                new AuthorizePaymentRequest(BANK_ID, PaymentMethod.COREBANK_TRANSFER),
+                bank()))
+                .isInstanceOf(EmailNotVerifiedException.class)
+                .hasFieldOrPropertyWithValue("code", "EMAIL_NOT_VERIFIED");
 
         verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_KEY_ID);
     }

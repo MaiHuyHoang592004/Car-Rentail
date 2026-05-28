@@ -66,4 +66,24 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             UUID customerId,
             BookingStatus status,
             Pageable pageable);
+
+    Page<Booking> findByHostIdOrderByCreatedAtDesc(UUID hostId, Pageable pageable);
+
+    Page<Booking> findByHostIdAndStatusOrderByCreatedAtDesc(
+            UUID hostId,
+            BookingStatus status,
+            Pageable pageable);
+
+    @Query(value = """
+            SELECT *
+            FROM bookings
+            WHERE status = 'PENDING_HOST_APPROVAL'
+              AND host_approval_expires_at < :now
+            ORDER BY host_approval_expires_at ASC, id ASC
+            LIMIT :batchSize
+            FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
+    List<Booking> findExpiredHostApprovalCandidatesForUpdate(
+            @Param("now") Instant now,
+            @Param("batchSize") int batchSize);
 }

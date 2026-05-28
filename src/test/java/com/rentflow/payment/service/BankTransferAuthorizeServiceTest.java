@@ -9,10 +9,12 @@ import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.common.exception.IdempotencyKeyConflictException;
 import com.rentflow.common.exception.ValidationException;
+import com.rentflow.common.exception.EmailNotVerifiedException;
 import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyResolution;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
 import com.rentflow.common.idempotency.service.IdempotencyService;
+import com.rentflow.common.security.EmailVerificationPolicy;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.payment.dto.AuthorizePaymentRequest;
 import com.rentflow.payment.dto.AuthorizePaymentResponse;
@@ -70,6 +72,7 @@ class BankTransferAuthorizeServiceTest {
     @Mock private IdempotencyService idempotencyService;
     @Mock private IdempotencyFailureMarker idempotencyFailureMarker;
     @Mock private SecurityContext securityContext;
+    @Mock private EmailVerificationPolicy emailVerificationPolicy;
     @Mock private PaymentProviderRouter paymentProviderRouter;
     @Mock private PaymentProvider paymentProvider;
 
@@ -89,10 +92,12 @@ class BankTransferAuthorizeServiceTest {
                 idempotencyFailureMarker,
                 paymentProviderRouter,
                 securityContext,
+                emailVerificationPolicy,
                 objectMapper,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new PaymentBookingSnapshotParser(objectMapper),
-                new AuthorizePaymentResponseFactory());
+                new AuthorizePaymentResponseFactory(),
+                false);
     }
 
     @Test
@@ -233,6 +238,42 @@ class BankTransferAuthorizeServiceTest {
                 .isInstanceOf(IdempotencyKeyConflictException.class)
                 .hasFieldOrPropertyWithValue("code", "IDEMPOTENCY_KEY_CONFLICT");
 
+        verifyNoInteractions(bookingRepository, bookingPaymentRepository, paymentTransactionRepository, paymentProviderRouter);
+    }
+
+    @Test
+    void authorizeFailsWhenEmailNotVerifiedAndGateEnabled() {
+        authorizeService = new BankTransferAuthorizeService(
+                bookingRepository,
+                bookingPaymentRepository,
+                paymentTransactionRepository,
+                idempotencyService,
+                idempotencyFailureMarker,
+                paymentProviderRouter,
+                securityContext,
+                emailVerificationPolicy,
+                objectMapper,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                new PaymentBookingSnapshotParser(objectMapper),
+                new AuthorizePaymentResponseFactory(),
+                true);
+        AuthorizePaymentRequest request = new AuthorizePaymentRequest(BANK_ID, PaymentMethod.BANK_TRANSFER_QR);
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(idempotencyService.computeHash(any())).thenReturn(REQUEST_HASH);
+        when(idempotencyService.resolve(CUSTOMER_ID, IdempotencyScope.AUTHORIZE_PAYMENT, IDEMPOTENCY_KEY, REQUEST_HASH))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_KEY_ID));
+        org.mockito.Mockito.doThrow(new EmailNotVerifiedException())
+                .when(emailVerificationPolicy).requireVerifiedEmail(CUSTOMER_ID);
+
+        assertThatThrownBy(() -> authorizeService.authorizeBookingPayment(
+                BOOKING_ID,
+                IDEMPOTENCY_KEY,
+                request,
+                bank(PaymentMethod.BANK_TRANSFER_QR, PaymentProviderType.VIETQR_MANUAL)))
+                .isInstanceOf(EmailNotVerifiedException.class)
+                .hasFieldOrPropertyWithValue("code", "EMAIL_NOT_VERIFIED");
+
+        verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_KEY_ID);
         verifyNoInteractions(bookingRepository, bookingPaymentRepository, paymentTransactionRepository, paymentProviderRouter);
     }
 
