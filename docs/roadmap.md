@@ -46,6 +46,7 @@ Frontend đã tồn tại trong `frontend/` với:
 - Phase 9 foundation `9.1-9.5`: files metadata + signed URL, trip lifecycle, reviews, disputes, reporting/payout baseline are implemented with unit/WebMvc evidence and integration tests in place.
 - Outbox publisher `9.6`: scheduler + retry/backoff/max-attempt persistence has been implemented with unit coverage and integration evidence for retry progression/idempotent send behavior.
 - CI/observability baseline `9.7`: GitHub Actions CI (`unit/package` + `integration profile`) and actuator metrics/prometheus exposure with secured access are now wired.
+- Release stabilization `9.8`: CoreBank external-order query param assertion is now semantic (decoded key/value), and `mvn clean verify` gate is green.
 
 ### Docs/code drift
 

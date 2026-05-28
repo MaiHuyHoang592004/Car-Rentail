@@ -12,8 +12,12 @@ import org.springframework.web.client.RestClient;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -197,8 +201,25 @@ class CoreBankPaymentClientTest {
         CoreBankPaymentClient client = client(server);
         String response = client.findOrderByExternalOrderRef("rentflow:booking:abc");
 
-        assertThat(query.get()).contains("externalOrderRef=rentflow%3Abooking%3Aabc");
+        Map<String, String> queryParams = parseQueryParams(query.get());
+        assertThat(queryParams).containsKey("externalOrderRef");
+        assertThat(queryParams.get("externalOrderRef")).isEqualTo("rentflow:booking:abc");
         assertThat(response).contains("\"paymentOrderId\":\"payment-order-1\"");
+    }
+
+    private Map<String, String> parseQueryParams(String query) {
+        if (query == null || query.isBlank()) {
+            return Map.of();
+        }
+        return Arrays.stream(query.split("&"))
+                .map(part -> part.split("=", 2))
+                .collect(Collectors.toMap(
+                        pair -> decode(pair[0]),
+                        pair -> pair.length > 1 ? decode(pair[1]) : ""));
+    }
+
+    private String decode(String value) {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     private CoreBankPaymentClient client(HttpServer server) {
