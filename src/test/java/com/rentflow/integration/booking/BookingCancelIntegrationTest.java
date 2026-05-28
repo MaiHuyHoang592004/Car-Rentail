@@ -11,6 +11,7 @@ import com.rentflow.availability.repository.AvailabilityCalendarRepository;
 import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.booking.repository.BookingTimelineEntryRepository;
 import com.rentflow.common.idempotency.repository.IdempotencyKeyRepository;
 import com.rentflow.common.security.JwtTokenProvider;
 import com.rentflow.integration.BaseIntegrationTest;
@@ -72,6 +73,7 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Autowired private VehicleRepository vehicleRepository;
     @Autowired private ListingRepository listingRepository;
     @Autowired private BookingRepository bookingRepository;
+    @Autowired private BookingTimelineEntryRepository bookingTimelineEntryRepository;
     @Autowired private AvailabilityCalendarRepository availabilityRepository;
     @Autowired private IdempotencyKeyRepository idempotencyKeyRepository;
     @Autowired private BookingPaymentRepository bookingPaymentRepository;
@@ -90,10 +92,11 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        idempotencyKeyRepository.deleteAll();
+        bookingTimelineEntryRepository.deleteAll();
         paymentTransactionRepository.deleteAll();
         bookingPaymentRepository.deleteAll();
         availabilityRepository.deleteAll();
+        idempotencyKeyRepository.deleteAll();
         bookingRepository.deleteAll();
         listingRepository.deleteAll();
         vehicleRepository.deleteAll();
@@ -171,7 +174,7 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Test
     void cancelConfirmedBookingReturnsInvalidStatus() throws Exception {
         Booking booking = saveBooking(BookingStatus.CONFIRMED);
-        booking.setPickupDate(LocalDate.of(2026, 5, 1));
+        booking.setPickupDate(LocalDate.now().minusDays(1));
         bookingRepository.save(booking);
 
         mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
@@ -211,8 +214,8 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Test
     void cancelConfirmedFullRefundVoidsAuthorizationWithoutCapture() throws Exception {
         Booking booking = saveBooking(BookingStatus.CONFIRMED);
-        booking.setPickupDate(LocalDate.of(2026, 7, 1));
-        booking.setReturnDate(LocalDate.of(2026, 7, 3));
+        booking.setPickupDate(LocalDate.now().plusDays(3));
+        booking.setReturnDate(booking.getPickupDate().plusDays(2));
         booking.setPolicySnapshot("""
                 {"cancellationPolicy":"FLEXIBLE","instantBook":true,"dailyKmLimit":200}
                 """);
@@ -242,8 +245,8 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Test
     void cancelConfirmedPartialPenaltyCaptureThenVoidSucceeds() throws Exception {
         Booking booking = saveBooking(BookingStatus.CONFIRMED);
-        booking.setPickupDate(LocalDate.of(2026, 5, 30));
-        booking.setReturnDate(LocalDate.of(2026, 6, 1));
+        booking.setPickupDate(LocalDate.now().plusDays(2));
+        booking.setReturnDate(booking.getPickupDate().plusDays(2));
         booking.setPolicySnapshot("""
                 {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
                 """);
@@ -277,8 +280,8 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Test
     void cancelConfirmedPartialPenaltyWhenVoidFailsReturnsAccepted() throws Exception {
         Booking booking = saveBooking(BookingStatus.CONFIRMED);
-        booking.setPickupDate(LocalDate.of(2026, 5, 30));
-        booking.setReturnDate(LocalDate.of(2026, 6, 1));
+        booking.setPickupDate(LocalDate.now().plusDays(2));
+        booking.setReturnDate(booking.getPickupDate().plusDays(2));
         booking.setPolicySnapshot("""
                 {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
                 """);
@@ -326,8 +329,8 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Test
     void cancelConfirmedPartialPenaltyVoidFailureCreatesAdminNotification() throws Exception {
         Booking booking = saveBooking(BookingStatus.CONFIRMED);
-        booking.setPickupDate(LocalDate.of(2026, 5, 30));
-        booking.setReturnDate(LocalDate.of(2026, 6, 1));
+        booking.setPickupDate(LocalDate.now().plusDays(2));
+        booking.setReturnDate(booking.getPickupDate().plusDays(2));
         booking.setPolicySnapshot("""
                 {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
                 """);
@@ -360,8 +363,8 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Test
     void cancelConfirmedPartialPenaltyWhenVoidFailsThenReplayReturns202WithoutReinvokingPayments() throws Exception {
         Booking booking = saveBooking(BookingStatus.CONFIRMED);
-        booking.setPickupDate(LocalDate.of(2026, 5, 30));
-        booking.setReturnDate(LocalDate.of(2026, 6, 1));
+        booking.setPickupDate(LocalDate.now().plusDays(2));
+        booking.setReturnDate(booking.getPickupDate().plusDays(2));
         booking.setPolicySnapshot("""
                 {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
                 """);
