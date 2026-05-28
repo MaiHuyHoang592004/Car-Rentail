@@ -1,5 +1,7 @@
 package com.rentflow.listing.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rentflow.availability.repository.AvailabilityCalendarRepository;
 import com.rentflow.auth.entity.AuthUser;
 import com.rentflow.auth.repository.AuthUserRepository;
@@ -16,6 +18,7 @@ import com.rentflow.listing.event.ListingApprovedEvent;
 import com.rentflow.listing.mapper.ListingMapper;
 import com.rentflow.listing.repository.ExtraRepository;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.outbox.service.OutboxService;
 import com.rentflow.user.repository.UserProfileRepository;
 import com.rentflow.vehicle.entity.Vehicle;
 import com.rentflow.vehicle.entity.VehicleStatus;
@@ -27,7 +30,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -43,6 +48,8 @@ public class AdminListingService {
     private final ExtraRepository extraRepository;
     private final UserProfileRepository userProfileRepository;
     private final AuthUserRepository authUserRepository;
+    private final OutboxService outboxService;
+    private final ObjectMapper objectMapper;
 
     public AdminListingService(ListingRepository listingRepository,
                                VehicleRepository vehicleRepository,
@@ -52,7 +59,9 @@ public class AdminListingService {
                                ListingMapper mapper,
                                ExtraRepository extraRepository,
                                UserProfileRepository userProfileRepository,
-                               AuthUserRepository authUserRepository) {
+                               AuthUserRepository authUserRepository,
+                               OutboxService outboxService,
+                               ObjectMapper objectMapper) {
         this.listingRepository = listingRepository;
         this.vehicleRepository = vehicleRepository;
         this.availabilityRepository = availabilityRepository;
@@ -62,6 +71,8 @@ public class AdminListingService {
         this.extraRepository = extraRepository;
         this.userProfileRepository = userProfileRepository;
         this.authUserRepository = authUserRepository;
+        this.outboxService = outboxService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -150,12 +161,14 @@ public class AdminListingService {
         }
 
         eventPublisher.publishEvent(new ListingApprovedEvent(listingId));
-
-        // TODO (Phase 7/9): Insert outbox event for LISTING_APPROVED:
-        //   INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, status, created_at, updated_at)
-        //   VALUES ('Listing', :listingId, 'LISTING_APPROVED',
-        //           '{"listingId": :listingId, "hostId": :hostId, "approvedAt": :approvedAt}'::jsonb,
-        //           'NEW', NOW(), NOW());
+        outboxService.append(
+                "LISTING",
+                listing.getId(),
+                "LISTING_APPROVED",
+                serializePayload(Map.of(
+                        "listingId", listing.getId(),
+                        "hostId", listing.getHostId(),
+                        "approvedAt", Instant.now().toString())));
 
         log.info("Listing approved: {} (vehicle: {})", listingId, vehicle.getId());
 
@@ -175,12 +188,15 @@ public class AdminListingService {
         stateMachine.validateTransition(listing.getStatus(), ListingStatus.DRAFT);
         listing.setStatus(ListingStatus.DRAFT);
         listingRepository.save(listing);
-
-        // TODO (Phase 7/9): Insert outbox event for LISTING_REJECTED:
-        //   INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, status, created_at, updated_at)
-        //   VALUES ('Listing', :listingId, 'LISTING_REJECTED',
-        //           '{"listingId": :listingId, "hostId": :hostId, "reason": :reason, "rejectedAt": :rejectedAt}'::jsonb,
-        //           'NEW', NOW(), NOW());
+        outboxService.append(
+                "LISTING",
+                listing.getId(),
+                "LISTING_REJECTED",
+                serializePayload(Map.of(
+                        "listingId", listing.getId(),
+                        "hostId", listing.getHostId(),
+                        "reason", reason == null ? "" : reason,
+                        "rejectedAt", Instant.now().toString())));
 
         log.info("Listing rejected: {} reason: {}", listingId, reason);
 
@@ -231,5 +247,13 @@ public class AdminListingService {
         log.info("Listing reactivated: {}", listingId);
 
         return mapper.toResponse(listing, vehicle, List.of());
+    }
+
+    private String serializePayload(Map<String, Object> payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Failed to serialize listing outbox payload", ex);
+        }
     }
 }

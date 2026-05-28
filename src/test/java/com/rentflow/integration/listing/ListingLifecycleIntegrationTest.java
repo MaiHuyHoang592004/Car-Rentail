@@ -8,6 +8,7 @@ import com.rentflow.auth.repository.UserRoleRepository;
 import com.rentflow.availability.repository.AvailabilityCalendarRepository;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.outbox.repository.OutboxEventRepository;
 import com.rentflow.vehicle.entity.VehicleStatus;
 import com.rentflow.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,6 +73,9 @@ class ListingLifecycleIntegrationTest {
     @Autowired
     private AvailabilityCalendarRepository availabilityRepository;
 
+    @Autowired
+    private OutboxEventRepository outboxEventRepository;
+
     private String hostToken;
     private String adminToken;
     private UUID hostUserId;
@@ -84,6 +88,7 @@ class ListingLifecycleIntegrationTest {
         listingRepository.deleteAll();
         vehicleRepository.deleteAll();
         availabilityRepository.deleteAll();
+        outboxEventRepository.deleteAll();
 
         JsonNode hostReg = registerUser("host@example.com", "Password@123", "HOST");
         hostUserId = UUID.fromString(hostReg.get("id").asText());
@@ -171,6 +176,12 @@ class ListingLifecycleIntegrationTest {
 
         long count = availabilityRepository.countByListingId(UUID.fromString(listingId));
         assertThat(count).isEqualTo(365);
+        assertThat(outboxEventRepository.findAll())
+                .anySatisfy(event -> {
+                    assertThat(event.getAggregateType()).isEqualTo("LISTING");
+                    assertThat(event.getAggregateId()).isEqualTo(UUID.fromString(listingId));
+                    assertThat(event.getEventType()).isEqualTo("LISTING_APPROVED");
+                });
 
         var rows = availabilityRepository.findByListingIdAndAvailableDateBetweenOrderByAvailableDateAsc(
             UUID.fromString(listingId), LocalDate.now(), LocalDate.now().plusDays(10));
@@ -224,6 +235,14 @@ class ListingLifecycleIntegrationTest {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("DRAFT"));
+
+        assertThat(outboxEventRepository.findAll())
+                .anySatisfy(event -> {
+                    assertThat(event.getAggregateType()).isEqualTo("LISTING");
+                    assertThat(event.getAggregateId()).isEqualTo(UUID.fromString(listingId));
+                    assertThat(event.getEventType()).isEqualTo("LISTING_REJECTED");
+                    assertThat(event.getPayload()).contains("Incomplete description");
+                });
     }
 
     @Test

@@ -11,6 +11,7 @@ import com.rentflow.listing.repository.ExtraRepository;
 import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.listing.service.AdminListingService;
 import com.rentflow.listing.service.ListingStateMachine;
+import com.rentflow.outbox.service.OutboxService;
 import com.rentflow.user.repository.UserProfileRepository;
 import com.rentflow.vehicle.entity.*;
 import com.rentflow.vehicle.repository.VehicleRepository;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -38,8 +40,10 @@ class OneActiveListingPerVehicleTest {
     @Mock private ExtraRepository extraRepository;
     @Mock private UserProfileRepository userProfileRepository;
     @Mock private AuthUserRepository authUserRepository;
+    @Mock private OutboxService outboxService;
     @Spy private ListingStateMachine stateMachine = new ListingStateMachine();
     private ListingMapper listingMapper = new ListingMapper();
+    private ObjectMapper objectMapper = new ObjectMapper();
     @Mock private ApplicationEventPublisher eventPublisher;
 
     private AdminListingService adminListingService;
@@ -54,7 +58,8 @@ class OneActiveListingPerVehicleTest {
         adminListingService = new AdminListingService(
             listingRepository, vehicleRepository, availabilityRepository,
             eventPublisher, stateMachine, listingMapper,
-            extraRepository, userProfileRepository, authUserRepository);
+            extraRepository, userProfileRepository, authUserRepository,
+            outboxService, objectMapper);
 
         listingId = UUID.randomUUID();
         vehicleId = UUID.randomUUID();
