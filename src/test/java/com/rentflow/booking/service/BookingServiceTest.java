@@ -731,6 +731,7 @@ class BookingServiceTest {
         verify(bookingRepository).save(booking);
         verify(availabilityRepository).saveAll(rows);
         verify(idempotencyService).complete(eq(IDEMPOTENCY_ID), eq(200), any());
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("BOOKING_CANCELLED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
     }
 
     @Test
@@ -807,6 +808,8 @@ class BookingServiceTest {
         assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
         assertThat(response.voidRetryRequired()).isTrue();
         assertThat(response.code()).isEqualTo("PAYMENT_VOID_RETRY_REQUIRED");
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("CANCELLATION_PENALTY_CAPTURED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("PAYMENT_VOID_RETRY_REQUIRED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
         verify(adminNotificationService).notifyPaymentVoidRetryRequired(eq(BOOKING_ID), eq(payment.getId()), eq(1));
     }
 
@@ -860,6 +863,8 @@ class BookingServiceTest {
         assertThat(payment.getProviderStatus()).isEqualTo("VOIDED");
         verify(paymentProvider).capture(any());
         verify(paymentProvider).voidAuthorization(any());
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("CANCELLATION_PENALTY_CAPTURED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("BOOKING_CANCELLED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
     }
 
     @Test
