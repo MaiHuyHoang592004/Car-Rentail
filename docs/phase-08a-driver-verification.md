@@ -4,6 +4,19 @@
 
 Implement driver verification: license submission, admin review, automatic expiry, and booking gate.
 
+## Slice Status (2026-05-29)
+
+- [x] Driver verification core implemented
+  - Submission API: `POST /api/v1/users/me/driver-license`
+  - Admin review APIs: approve/reject/list
+  - Duplicate guard for active statuses (`PENDING`, `APPROVED`)
+  - Re-submission path after `REJECTED`/`EXPIRED`
+  - Persistence migration: `V15__driver_verification_core.sql`
+- [x] Expiry scheduler implemented
+  - `ExpireDriverVerificationsJob` + `ExpireDriverVerificationsProcessor`
+  - Batch processing with `FOR UPDATE SKIP LOCKED`
+  - Profile status synchronization to `EXPIRED`
+
 ## Must Implement
 
 - [ ] `DriverVerification` entity + repository
