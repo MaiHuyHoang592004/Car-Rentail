@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -41,4 +42,56 @@ public interface BookingPaymentRepository extends JpaRepository<BookingPayment, 
             @Param("now") Instant now,
             @Param("maxAttempts") int maxAttempts,
             @Param("batchSize") int batchSize);
+
+    @Query("""
+            SELECT COALESCE(SUM(bp.capturedAmount), 0)
+            FROM BookingPayment bp
+            JOIN Booking b ON b.id = bp.bookingId
+            WHERE bp.capturedAmount > 0
+              AND b.createdAt >= :fromInclusive
+              AND b.createdAt < :toExclusive
+            """)
+    BigDecimal sumCapturedAmountInRange(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive);
+
+    @Query("""
+            SELECT COALESCE(COUNT(b.id), 0)
+            FROM BookingPayment bp
+            JOIN Booking b ON b.id = bp.bookingId
+            WHERE bp.capturedAmount > 0
+              AND b.createdAt >= :fromInclusive
+              AND b.createdAt < :toExclusive
+            """)
+    long countCapturedBookingsInRange(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive);
+
+    @Query("""
+            SELECT COALESCE(SUM(bp.capturedAmount), 0)
+            FROM BookingPayment bp
+            JOIN Booking b ON b.id = bp.bookingId
+            WHERE bp.capturedAmount > 0
+              AND b.hostId = :hostId
+              AND b.createdAt >= :fromInclusive
+              AND b.createdAt < :toExclusive
+            """)
+    BigDecimal sumCapturedAmountForHostInRange(
+            @Param("hostId") UUID hostId,
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive);
+
+    @Query("""
+            SELECT COALESCE(COUNT(b.id), 0)
+            FROM BookingPayment bp
+            JOIN Booking b ON b.id = bp.bookingId
+            WHERE bp.capturedAmount > 0
+              AND b.hostId = :hostId
+              AND b.createdAt >= :fromInclusive
+              AND b.createdAt < :toExclusive
+            """)
+    long countCapturedBookingsForHostInRange(
+            @Param("hostId") UUID hostId,
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive);
 }

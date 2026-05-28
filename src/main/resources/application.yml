@@ -97,6 +97,8 @@ rentflow:
       ttl: ${RENTFLOW_FILE_SIGNED_URL_TTL:PT10M}
       base-url: ${RENTFLOW_FILE_SIGNED_URL_BASE:https://files.rentflow.local}
       secret: ${RENTFLOW_FILE_SIGNED_URL_SECRET:change-me}
+  report:
+    platform-fee-rate: ${RENTFLOW_PLATFORM_FEE_RATE:0.15}
 
 server:
   error:
