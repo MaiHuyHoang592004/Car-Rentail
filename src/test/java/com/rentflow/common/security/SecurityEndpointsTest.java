@@ -59,6 +59,39 @@ class SecurityEndpointsTest {
     }
 
     @Test
+    void actuatorMetricsEndpoint_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void actuatorMetricsEndpoint_customerToken_returns403() throws Exception {
+        String customerToken = tokenProvider.generateAccessToken(
+                UUID.randomUUID(),
+                "customer-metrics@example.com",
+                java.util.List.of(Role.CUSTOMER));
+
+        mockMvc.perform(get("/actuator/metrics")
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void actuatorMetricsEndpoint_adminToken_returns200() throws Exception {
+        String adminToken = tokenProvider.generateAccessToken(
+                UUID.randomUUID(),
+                "admin-metrics@example.com",
+                java.util.List.of(Role.ADMIN));
+
+        mockMvc.perform(get("/actuator/metrics")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.names").isArray());
+    }
+
+    @Test
     void protectedEndpoint_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/users/me")
                         .header("X-Correlation-Id", "security-test-cid"))

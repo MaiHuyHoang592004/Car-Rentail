@@ -67,6 +67,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/verify-email").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                     .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                    .requestMatchers("/actuator/**").hasRole("ADMIN")
                     // Swagger / OpenAPI
                     .requestMatchers("/swagger-ui/**").permitAll()
                     .requestMatchers("/swagger-ui.html").permitAll()

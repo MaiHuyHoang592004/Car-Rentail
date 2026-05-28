@@ -43,6 +43,9 @@ Frontend đã tồn tại trong `frontend/` với:
 - Rate-limit integration hardening `8B.1R`: login and booking throttling now have integration evidence for `429 + Retry-After + RATE_LIMIT_EXCEEDED`.
 - Phase 7 hardening updates: audit detail sanitization and listing approve/reject outbox emission are now implemented with test evidence.
 - Cancellation reliability update `7.2R`: void-retry metadata persistence and idempotent 202 replay behavior are covered by integration tests.
+- Phase 9 foundation `9.1-9.5`: files metadata + signed URL, trip lifecycle, reviews, disputes, reporting/payout baseline are implemented with unit/WebMvc evidence and integration tests in place.
+- Outbox publisher `9.6`: scheduler + retry/backoff/max-attempt persistence has been implemented with unit coverage and integration evidence for retry progression/idempotent send behavior.
+- CI/observability baseline `9.7`: GitHub Actions CI (`unit/package` + `integration profile`) and actuator metrics/prometheus exposure with secured access are now wired.
 
 ### Docs/code drift
 
@@ -391,7 +394,7 @@ Scope:
 
 ### Phase 9 — P2 Extensions
 
-Only after core is stable.
+Status: core slices `9.1` through `9.7` are implemented in the current codebase; remaining work is provider-grade hardening and release validation.
 
 Scope:
 

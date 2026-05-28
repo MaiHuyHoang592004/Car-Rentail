@@ -74,6 +74,12 @@ class HealthControllerTest {
     @MockBean
     private com.rentflow.auth.repository.AuthUserRepository authUserRepository;
 
+    @MockBean
+    private com.rentflow.common.ratelimit.RateLimitService rateLimitService;
+
+    @MockBean
+    private com.rentflow.common.security.ClientIpResolver clientIpResolver;
+
     @Autowired
     private MockMvc mockMvc;
 
