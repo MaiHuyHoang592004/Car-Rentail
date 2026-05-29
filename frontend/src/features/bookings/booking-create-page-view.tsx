@@ -7,10 +7,12 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { CalendarDays, MapPin, PlusCircle } from "lucide-react";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
-import { PageHeader } from "@/components/rentflow/page-header";
+import { BookingSectionCard } from "@/features/bookings/booking-section-card";
+import { BookingPriceSummary } from "@/features/bookings/booking-price-summary";
 import { createBooking, type CreateBookingInput } from "@/features/bookings/api";
 import { getTodayIsoDate } from "@/features/bookings/date-utils";
 import { bookingCreateSchema, type BookingCreateFormState } from "@/features/bookings/forms";
@@ -19,13 +21,13 @@ import { ApiError } from "@/lib/api-error";
 import { handleApiError } from "@/lib/handle-api-error";
 import { newIdempotencyKey } from "@/lib/idempotency";
 
+type VerificationGateState = {
+  message: string;
+};
+
 type BookingCreatePageViewProps = {
   listingId: string;
   isGuest: boolean;
-};
-
-type VerificationGateState = {
-  message: string;
 };
 
 export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageViewProps) {
@@ -51,12 +53,13 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
   const [verificationGate, setVerificationGate] = useState<VerificationGateState | null>(null);
   const selectedExtraIds = form.watch("selectedExtraIds");
   const pickupDate = form.watch("pickupDate");
+  const returnDate = form.watch("returnDate");
   const errors = form.formState.errors;
-
   const selectedExtras = useMemo(() => {
     if (!listing) return [];
     return listing.extras.filter((extra) => selectedExtraIds.includes(extra.id));
   }, [listing, selectedExtraIds]);
+  const listingData = listing!;
 
   const createMutation = useMutation({
     mutationFn: (input: CreateBookingInput) => createBooking(input, idempotencyKeyRef.current),
@@ -70,17 +73,17 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
         onCode: {
           EMAIL_NOT_VERIFIED: (e) =>
             setVerificationGate({
-              message: e.message || "Bạn cần xác minh email trước khi tạo booking.",
+              message: e.message || "Ban can xac minh email truoc khi dat xe.",
             }),
           BOOKING_OVERLAP_CUSTOMER: (e) =>
-            setOverlap(e.message || "Bạn đã có booking trùng thời gian."),
+            setOverlap(e.message || "Ban da co booking trung thoi gian."),
           LISTING_NOT_AVAILABLE: (e) =>
             form.setError("root", {
-              message: e.message || "Xe không khả dụng cho ngày đã chọn.",
+              message: e.message || "Xe khong kha dung cho ngay da chon.",
             }),
           IDEMPOTENCY_KEY_CONFLICT: () => {
             idempotencyKeyRef.current = newIdempotencyKey();
-            toast.error("Yêu cầu đã thay đổi, vui lòng submit lại");
+            toast.error("Yeu cau da thay doi, vui long submit lai");
           },
         },
         onFieldError: (field, message) => {
@@ -98,20 +101,6 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
       }),
   });
 
-  if (!listing) {
-    return (
-      <AppShell activePath="/listings">
-        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <h1 className="text-3xl font-bold text-foreground">Không tìm thấy xe</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Listing này hiện không khả dụng hoặc đã bị gỡ khỏi hệ thống.
-          </p>
-        </section>
-      </AppShell>
-    );
-  }
-  const listingData = listing;
-
   function toggleExtra(extraId: string) {
     const next = selectedExtraIds.includes(extraId)
       ? selectedExtraIds.filter((id) => id !== extraId)
@@ -121,10 +110,9 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
 
   function handleSubmit(values: BookingCreateFormState) {
     if (isGuest) {
-      form.setError("root", { message: "Bạn cần đăng nhập trước khi tạo booking." });
+      form.setError("root", { message: "Ban can dang nhap truoc khi tao booking." });
       return;
     }
-
     setOverlap(null);
     setSubmitError(null);
     setVerificationGate(null);
@@ -138,178 +126,211 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
     });
   }
 
+  if (!listing) {
+    return (
+      <AppShell activePath="/listings">
+        <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+          <h1 className="text-2xl font-bold text-foreground">Khong tim thay xe</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Xe nay hien khong kha dung hoac da bi go khoi he thong.
+          </p>
+        </section>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell activePath="/listings">
-      <div className="space-y-6">
-        <PageHeader
-          title={`Đặt ${listingData.title}`}
-          description="Tạo HELD booking. Hold giữ 15 phút sẵn sàng cho thanh toán."
-        />
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-foreground">Dat xe</h1>
+          <Link
+            href={`/listings/${listingData.id}`}
+            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Quay lai
+          </Link>
+        </div>
 
         {isGuest ? (
-          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-            <p className="text-sm">
-              Chế độ khách: cần đăng nhập để tạo booking.
-            </p>
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm text-amber-900">Ban can dang nhap de hoan tat dat xe.</p>
             <Link
               href={`/login?next=/listings/${listingData.id}/book`}
-              className="mt-3 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              className="mt-3 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
             >
-              Đăng nhập để đặt xe
+              Dang nhap de dat xe
             </Link>
           </section>
         ) : null}
 
         {overlap ? (
-          <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-900">
-            <p className="text-sm font-semibold">Trùng booking</p>
-            <p className="mt-1 text-sm">{overlap}</p>
+          <section className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+            <p className="text-sm font-semibold text-rose-900">Trung booking</p>
+            <p className="mt-1 text-sm text-rose-800">{overlap}</p>
             <Link
               href="/me/bookings"
-              className="mt-3 inline-flex rounded-full bg-rose-700 px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              className="mt-3 inline-flex rounded-full bg-rose-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
             >
-              Xem các booking đang active của bạn
+              Xem cac booking cua ban
             </Link>
           </section>
         ) : null}
 
         {verificationGate ? (
-          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-            <p className="text-sm font-semibold">Email chưa được xác minh</p>
-            <p className="mt-1 text-sm">{verificationGate.message}</p>
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-900">Email chua duoc xac minh</p>
+            <p className="mt-1 text-sm text-amber-800">{verificationGate.message}</p>
             <Link
               href="/me/profile"
-              className="mt-3 inline-flex rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              className="mt-3 inline-flex rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
             >
-              Đi đến hồ sơ để xác minh email
+              Xac minh email
             </Link>
           </section>
         ) : null}
 
         {submitError ? <ApiErrorPanel error={submitError} /> : null}
 
-        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-foreground">Thông tin đặt xe</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Giá cơ bản: {listingData.basePricePerDay.toLocaleString("en-US")} {listingData.currency} / ngày
-          </p>
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1 space-y-5">
+            <BookingSectionCard
+              title="Thoi gian thue"
+              icon={<CalendarDays className="h-5 w-5" />}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-foreground">
+                    Ngay nhan xe
+                  </label>
+                  <input
+                    type="date"
+                    {...form.register("pickupDate", {
+                      onChange: () => {
+                        setOverlap(null);
+                        setSubmitError(null);
+                      },
+                    })}
+                    min={getTodayIsoDate()}
+                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+                  />
+                  {errors.pickupDate ? (
+                    <p className="mt-1 text-xs text-rose-700">{errors.pickupDate.message}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-foreground">
+                    Ngay tra xe
+                  </label>
+                  <input
+                    type="date"
+                    {...form.register("returnDate", {
+                      onChange: () => {
+                        setOverlap(null);
+                        setSubmitError(null);
+                      },
+                    })}
+                    min={pickupDate || getTodayIsoDate()}
+                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+                  />
+                  {errors.returnDate ? (
+                    <p className="mt-1 text-xs text-rose-700">{errors.returnDate.message}</p>
+                  ) : null}
+                </div>
+              </div>
+            </BookingSectionCard>
 
-          <form onSubmit={form.handleSubmit(handleSubmit)} noValidate className="mt-4 space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Ngày nhận</label>
-                <input
-                  type="date"
-                  {...form.register("pickupDate", {
-                    onChange: () => {
-                      setOverlap(null);
-                      setSubmitError(null);
-                    },
-                  })}
-                  min={getTodayIsoDate()}
-                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
-                />
-                {errors.pickupDate ? (
-                  <p className="mt-1 text-xs text-rose-700">{errors.pickupDate.message}</p>
-                ) : null}
+            <BookingSectionCard
+              title="Dia diem nhan / tra xe"
+              icon={<MapPin className="h-5 w-5" />}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-foreground">
+                    Dia diem nhan xe
+                  </label>
+                  <input
+                    type="text"
+                    {...form.register("pickupLocation")}
+                    placeholder={listingData.address}
+                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-foreground">
+                    Dia diem tra xe
+                  </label>
+                  <input
+                    type="text"
+                    {...form.register("returnLocation")}
+                    placeholder={listingData.address}
+                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Ngày trả</label>
-                <input
-                  type="date"
-                  {...form.register("returnDate", {
-                    onChange: () => {
-                      setOverlap(null);
-                      setSubmitError(null);
-                    },
-                  })}
-                  min={pickupDate || getTodayIsoDate()}
-                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
-                />
-                {errors.returnDate ? (
-                  <p className="mt-1 text-xs text-rose-700">{errors.returnDate.message}</p>
-                ) : null}
-              </div>
-            </div>
+            </BookingSectionCard>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Địa điểm nhận</label>
-                <input
-                  type="text"
-                  {...form.register("pickupLocation")}
-                  placeholder={listingData.address}
-                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Địa điểm trả</label>
-                <input
-                  type="text"
-                  {...form.register("returnLocation")}
-                  placeholder={listingData.address}
-                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
-                />
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-2 text-sm font-semibold text-foreground">Dịch vụ thêm</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {listingData.extras.map((extra) => {
-                  const checked = selectedExtraIds.includes(extra.id);
-                  return (
-                    <label
-                      key={extra.id}
-                      className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                    >
-                      <span>{extra.name}</span>
-                      <span className="flex items-center gap-2">
-                        <span className="text-muted-foreground">
-                          {extra.price.toLocaleString("en-US")} {extra.currency}
+            {listingData.extras.length > 0 ? (
+              <BookingSectionCard
+                title="Dich vu them"
+                icon={<PlusCircle className="h-5 w-5" />}
+              >
+                <div className="flex flex-col gap-2">
+                  {listingData.extras.map((extra) => {
+                    const checked = selectedExtraIds.includes(extra.id);
+                    return (
+                      <label
+                        key={extra.id}
+                        className={`flex items-center justify-between rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                          checked
+                            ? "border-primary bg-primary/5"
+                            : "border-border bg-background hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleExtra(extra.id)}
+                            className="size-4 rounded border-input accent-primary"
+                          />
+                          <span className="text-sm font-medium text-foreground">
+                            {extra.name}
+                          </span>
+                        </div>
+                        <span className="text-sm font-semibold text-foreground">
+                          {extra.price.toLocaleString("vi-VN")} {extra.currency}
                         </span>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleExtra(extra.id)}
-                          className="size-4 rounded border-input"
-                        />
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {selectedExtras.length > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Đã chọn {selectedExtras.length} dịch vụ thêm (mỗi loại số lượng 1).
-              </p>
+                      </label>
+                    );
+                  })}
+                </div>
+                {selectedExtras.length > 0 ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Da chon {selectedExtras.length} dich vu them.
+                  </p>
+                ) : null}
+              </BookingSectionCard>
             ) : null}
 
             {errors.root ? (
-              <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
                 {errors.root.message}
               </p>
             ) : null}
+          </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="submit"
-                disabled={createMutation.isPending}
-                className="rounded-full bg-secondary px-5 py-2.5 text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                {createMutation.isPending ? "Đang giữ xe..." : "Giữ xe này"}
-              </button>
-              <Link
-                href={`/listings/${listingData.id}`}
-                className="rounded-full border border-border bg-background px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-accent"
-              >
-                Quay lại
-              </Link>
-            </div>
-          </form>
-        </section>
+          <div className="w-full lg:sticky lg:top-6 lg:w-80 lg:shrink-0">
+            <BookingPriceSummary
+              listing={listingData}
+              pickupDate={pickupDate}
+              returnDate={returnDate}
+              selectedExtraIds={selectedExtraIds}
+              onBook={form.handleSubmit(handleSubmit)}
+              isPending={createMutation.isPending}
+            />
+          </div>
+        </div>
       </div>
     </AppShell>
   );

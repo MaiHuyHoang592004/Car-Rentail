@@ -118,12 +118,12 @@ describe("BookingCreatePageView", () => {
       ),
     );
     wrap(<BookingCreatePageView listingId="lst-001" isGuest={false} />);
-    await screen.findByText(/Đặt Toyota Vios 2022/);
+    await screen.findByText(/Dat xe/);
 
     const dateInputs = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
     await userEvent.type(dateInputs[0], pickup);
     await userEvent.type(dateInputs[1], ret);
-    await userEvent.click(screen.getByRole("button", { name: /Giữ xe này/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Giữ xe trong 15 phút/ }));
 
     await waitFor(() => expect(routerPush).toHaveBeenCalledWith("/bookings/bk-99"));
     const [url, init] = fetchSpy.mock.calls[1] as [string, RequestInit];
@@ -147,26 +147,26 @@ describe("BookingCreatePageView", () => {
       ),
     );
     wrap(<BookingCreatePageView listingId="lst-001" isGuest={false} />);
-    await screen.findByText(/Đặt Toyota Vios 2022/);
+    await screen.findByText(/Dat xe/);
 
     const dateInputs = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
     await userEvent.type(dateInputs[0], isoOffset(1));
     await userEvent.type(dateInputs[1], isoOffset(3));
-    await userEvent.click(screen.getByRole("button", { name: /Giữ xe này/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Giữ xe trong 15 phút/ }));
 
-    await waitFor(() => expect(screen.getByText("Trùng booking")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Trung booking")).toBeInTheDocument());
     expect(routerPush).not.toHaveBeenCalled();
   });
 
   it("blocks submit with validation when return ≤ pickup", async () => {
     fetchSpy.mockResolvedValueOnce(listingResponse());
     wrap(<BookingCreatePageView listingId="lst-001" isGuest={false} />);
-    await screen.findByText(/Đặt Toyota Vios 2022/);
+    await screen.findByText(/Dat xe/);
     const sameDay = isoOffset(1);
     const dateInputs = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
     await userEvent.type(dateInputs[0], sameDay);
     await userEvent.type(dateInputs[1], sameDay);
-    await userEvent.click(screen.getByRole("button", { name: /Giữ xe này/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Giữ xe trong 15 phút/ }));
 
     expect(screen.getByText("Ngày trả phải sau ngày nhận.")).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -184,18 +184,18 @@ describe("BookingCreatePageView", () => {
       ),
     );
     wrap(<BookingCreatePageView listingId="lst-001" isGuest={false} />);
-    await screen.findByText(/Đặt Toyota Vios 2022/);
+    await screen.findByText(/Dat xe/);
 
     const dateInputs = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
     await userEvent.type(dateInputs[0], isoOffset(1));
     await userEvent.type(dateInputs[1], isoOffset(3));
-    await userEvent.click(screen.getByRole("button", { name: /Giữ xe này/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Giữ xe trong 15 phút/ }));
 
     await waitFor(() =>
-      expect(screen.getByText("Email chưa được xác minh")).toBeInTheDocument(),
+      expect(screen.getByText("Email chua duoc xac minh")).toBeInTheDocument(),
     );
     expect(
-      screen.getByRole("link", { name: "Đi đến hồ sơ để xác minh email" }),
+      screen.getByRole("link", { name: /Xac minh email/ }),
     ).toHaveAttribute("href", "/me/profile");
   });
 });
