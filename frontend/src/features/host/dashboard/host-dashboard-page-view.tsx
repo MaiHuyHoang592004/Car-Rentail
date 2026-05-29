@@ -2,11 +2,16 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { AppShell } from "@/components/rentflow/app-shell";
-import { PageHeader } from "@/components/rentflow/page-header";
+import { AlertCircle, Car, ListChecks } from "lucide-react";
+import { WorkspaceSidebar } from "@/components/rentflow/workspace-sidebar";
+import { HostWorkspaceNav } from "@/features/host/components/host-workspace-nav";
 import { HostMetricStrip } from "@/features/host/components/host-metric-strip";
 import { getHostVehiclesByStatus } from "@/features/host/vehicles/api";
 import { getHostListings } from "@/features/host/listings/api";
+import {
+  getVehicleStatusLabel,
+  getListingStatusLabel,
+} from "@/lib/display-labels";
 
 export function HostDashboardPageView() {
   const { data: vehicles = [], isLoading: loadingVehicles } = useQuery({
@@ -39,83 +44,129 @@ export function HostDashboardPageView() {
   };
 
   return (
-    <AppShell activePath="/host/dashboard">
+    <WorkspaceSidebar
+      sidebar={<HostWorkspaceNav />}
+      activePath="/host/dashboard"
+    >
       <div className="space-y-6">
-        <PageHeader
-          title="Bảng điều khiển Chủ xe"
-          description="Tổng quan đội xe, tin đăng và các thao tác đang chờ xử lý."
-        />
+        {/* Page title */}
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Bang dieu khien Chu xe</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Tong quan dong xe, tin dang va cac thao tac dang cho xu ly.
+          </p>
+        </div>
 
         <HostMetricStrip metrics={metrics} />
 
+        {/* Quick Actions */}
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-foreground">Thao tác nhanh</h2>
+          <h2 className="text-lg font-bold text-foreground">Thao tac nhanh</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               href="/host/vehicles/new"
               className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Thêm xe
+              Them xe
             </Link>
             <Link
               href="/host/listings/new"
-              className="rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90"
+              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
             >
-              Tạo tin đăng
+              Tao tin dang
+            </Link>
+            <Link
+              href="/host/listings"
+              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            >
+              Cap nhat lich
             </Link>
           </div>
         </section>
 
+        {/* Two-column: attention items */}
         <div className="grid gap-4 lg:grid-cols-2">
+          {/* Vehicles needing attention */}
           <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-foreground">Xe cần xử lý</h2>
+            <div className="flex items-center gap-2">
+              <Car className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-base font-bold text-foreground">Xe can xu ly</h2>
+              {vehicleAttention.length > 0 && (
+                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-800">
+                  {vehicleAttention.length}
+                </span>
+              )}
+            </div>
             {loadingVehicles ? (
-              <p className="mt-3 text-sm text-muted-foreground">Đang tải...</p>
+              <p className="mt-3 text-sm text-muted-foreground">Dang tai...</p>
             ) : vehicleAttention.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">Không có xe nào cần xử lý.</p>
+              <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4 text-emerald-600" />
+                Khong co xe nao can xu ly.
+              </div>
             ) : (
               <div className="mt-3 space-y-2">
                 {vehicleAttention.map((vehicle) => (
-                  <div
+                  <Link
                     key={vehicle.id}
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    href={`/host/vehicles/${vehicle.id}`}
+                    className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm transition-colors hover:border-primary/50 hover:bg-accent"
                   >
-                    <p className="font-semibold text-foreground">
-                      {vehicle.make} {vehicle.model} ({vehicle.year})
-                    </p>
-                    <p className="text-muted-foreground">
-                      {vehicle.status} &bull; {vehicle.city}
-                    </p>
-                  </div>
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {vehicle.make} {vehicle.model} ({vehicle.year})
+                      </p>
+                      <p className="text-muted-foreground">
+                        {getVehicleStatusLabel(vehicle.status)} &bull; {vehicle.city}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Xem</span>
+                  </Link>
                 ))}
               </div>
             )}
           </section>
 
+          {/* Listings needing attention */}
           <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-foreground">Tin đăng cần xử lý</h2>
+            <div className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-base font-bold text-foreground">Tin dang can xu ly</h2>
+              {listingAttention.length > 0 && (
+                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-800">
+                  {listingAttention.length}
+                </span>
+              )}
+            </div>
             {loadingListings ? (
-              <p className="mt-3 text-sm text-muted-foreground">Đang tải...</p>
+              <p className="mt-3 text-sm text-muted-foreground">Dang tai...</p>
             ) : listingAttention.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">Không có tin đăng nào cần xử lý.</p>
+              <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4 text-emerald-600" />
+                Khong co tin dang nao can xu ly.
+              </div>
             ) : (
               <div className="mt-3 space-y-2">
                 {listingAttention.map((listing) => (
-                  <div
+                  <Link
                     key={listing.id}
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    href={`/host/listings/${listing.id}`}
+                    className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm transition-colors hover:border-primary/50 hover:bg-accent"
                   >
-                    <p className="font-semibold text-foreground">{listing.title}</p>
-                    <p className="text-muted-foreground">
-                      {listing.status} &bull; {listing.city}
-                    </p>
-                  </div>
+                    <div>
+                      <p className="font-semibold text-foreground">{listing.title}</p>
+                      <p className="text-muted-foreground">
+                        {getListingStatusLabel(listing.status)} &bull; {listing.city}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Xem</span>
+                  </Link>
                 ))}
               </div>
             )}
           </section>
         </div>
       </div>
-    </AppShell>
+    </WorkspaceSidebar>
   );
 }

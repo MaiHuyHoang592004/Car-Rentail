@@ -18,7 +18,7 @@ const NAV: NavItem[] = [
   { href: "/", label: "Trang chủ", visibleTo: "public" },
   { href: "/listings", label: "Tìm xe", visibleTo: "public" },
   { href: "/me/bookings", label: "Đơn của tôi", visibleTo: "authenticated" },
-  { href: "/host/dashboard", label: "Host", visibleTo: "HOST" },
+  { href: "/host/dashboard", label: "Chu xe", visibleTo: "HOST" },
   { href: "/admin", label: "Admin", visibleTo: "ADMIN" },
 ];
 

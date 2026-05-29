@@ -6,10 +6,10 @@ type HostMetricStripProps = {
 
 export function HostMetricStrip({ metrics }: HostMetricStripProps) {
   const items = [
-    { label: "Total Vehicles", value: String(metrics.totalVehicles) },
-    { label: "Active Listings", value: String(metrics.activeListings) },
-    { label: "Pending Approvals", value: String(metrics.pendingApprovals) },
-    { label: "Blocked Dates", value: String(metrics.blockedDates) },
+    { label: "Tong xe", value: String(metrics.totalVehicles) },
+    { label: "Tin dang hoat dong", value: String(metrics.activeListings) },
+    { label: "Tin cho duyet", value: String(metrics.pendingApprovals) },
+    { label: "Ngay bi chan", value: String(metrics.blockedDates) },
   ];
 
   return (
