@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/rentflow/app-shell";
@@ -44,6 +44,27 @@ export function ProfilePageView() {
     queryFn: getProfile,
   });
 
+  const [form, setForm] = useState<ProfileFormState>({
+    fullName: "",
+    phone: "",
+    dateOfBirth: "",
+    addressLine: "",
+  });
+  const [errors, setErrors] = useState<ProfileFormErrors>({});
+  const [banner, setBanner] = useState<string>("");
+
+  // Sync profile data into form state — runs once when profile loads.
+  useEffect(() => {
+    if (profile && form.fullName === "") {
+      setForm({
+        fullName: profile.fullName,
+        phone: profile.phone,
+        dateOfBirth: profile.dateOfBirth,
+        addressLine: profile.addressLine,
+      });
+    }
+  }, [profile, form.fullName]);
+
   const { mutate: doUpdate, isPending: saving } = useMutation({
     mutationFn: updateProfile,
     onSuccess: (updated) => {
@@ -63,40 +84,6 @@ export function ProfilePageView() {
       toast.error("Không thể gửi lại email xác minh. Vui lòng thử lại.");
     },
   });
-
-  const [form, setForm] = useState<ProfileFormState>({
-    fullName: "",
-    phone: "",
-    dateOfBirth: "",
-    addressLine: "",
-  });
-  const [errors, setErrors] = useState<ProfileFormErrors>({});
-  const [banner, setBanner] = useState<string>("");
-
-  if (isLoading) {
-    return (
-      <AppShell activePath="/me/profile">
-        <PageSkeleton message="Đang tải hồ sơ..." />
-      </AppShell>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <AppShell activePath="/me/profile">
-        <EmptyState title="Không tải được hồ sơ" />
-      </AppShell>
-    );
-  }
-
-  if (form.fullName === "") {
-    setForm({
-      fullName: profile.fullName,
-      phone: profile.phone,
-      dateOfBirth: profile.dateOfBirth,
-      addressLine: profile.addressLine,
-    });
-  }
 
   function updateField(field: keyof ProfileFormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -120,6 +107,22 @@ export function ProfilePageView() {
       dateOfBirth: form.dateOfBirth || null,
       addressLine: form.addressLine.trim(),
     });
+  }
+
+  if (isLoading) {
+    return (
+      <AppShell activePath="/me/profile">
+        <PageSkeleton message="Đang tải hồ sơ..." />
+      </AppShell>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <AppShell activePath="/me/profile">
+        <EmptyState title="Không tải được hồ sơ" />
+      </AppShell>
+    );
   }
 
   return (

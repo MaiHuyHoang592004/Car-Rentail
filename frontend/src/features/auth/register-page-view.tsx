@@ -23,17 +23,21 @@ const registerSchema = z.object({
     .min(8, "Mật khẩu cần ít nhất 8 ký tự."),
   roles: z
     .array(z.enum(["CUSTOMER", "HOST"]))
-    .min(1, "Chọn ít nhất một vai trò."),
+    .min(1, "Chọn ít nhất một mục đích."),
 });
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
-const ROLE_OPTIONS: { value: "CUSTOMER" | "HOST"; label: string; hint?: string }[] = [
-  { value: "CUSTOMER", label: "Khách thuê" },
+const ROLE_OPTIONS: { value: "CUSTOMER" | "HOST"; label: string; description: string }[] = [
+  {
+    value: "CUSTOMER",
+    label: "Tôi muốn thuê xe",
+    description: "Tìm và đặt xe từ các Host đã được xác minh.",
+  },
   {
     value: "HOST",
-    label: "Chủ xe (Host)",
-    hint: "Tài khoản Host cần xác minh giấy phép kinh doanh trước khi đăng tin.",
+    label: "Tôi muốn cho thuê xe",
+    description: "Đăng xe của bạn và bắt đầu kiếm thu nhập.",
   },
 ];
 
@@ -105,7 +109,7 @@ export function RegisterPageView() {
       <div className="py-6">
         <AuthCard
           title="Tạo tài khoản RentFlow"
-          description="Đăng ký để thuê xe hoặc trở thành Host của hệ thống."
+          description="Đăng ký tài khoản để bắt đầu."
         >
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <AuthFormLayout
@@ -163,7 +167,7 @@ export function RegisterPageView() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-semibold text-foreground">Vai trò</p>
+                <p className="mb-2 text-sm font-semibold text-foreground">Bạn muốn dùng RentFlow để làm gì?</p>
                 <div className="space-y-2">
                   {ROLE_OPTIONS.map((option) => {
                     const selected = selectedRoles.includes(option.value);
@@ -180,12 +184,10 @@ export function RegisterPageView() {
                         ].join(" ")}
                         aria-pressed={selected}
                       >
-                        <span className="font-semibold">{option.label}</span>
-                        {option.hint ? (
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            {option.hint}
-                          </span>
-                        ) : null}
+                        <span className="block font-semibold">{option.label}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {option.description}
+                        </span>
                       </button>
                     );
                   })}
@@ -193,6 +195,9 @@ export function RegisterPageView() {
                 {errors.roles ? (
                   <p className="mt-1 text-xs text-red-700">{errors.roles.message as string}</p>
                 ) : null}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Bạn có thể bật thêm chế độ Host sau trong hồ sơ.
+                </p>
               </div>
 
               <button
