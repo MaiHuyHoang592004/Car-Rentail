@@ -6,7 +6,7 @@
 >
 > Effort: **XS** (< 2h) | **S** (2-4h) | **M** (4-8h) | **L** (8-16h) | **XL** (> 16h)
 >
-> Last updated: 2026-05-29
+> Last updated: 2026-05-30
 >
 > Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I26`, `I27`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I40`, `I41`, `I42`, `I43`, `I44`, `I46`, `I47`.
 
@@ -293,6 +293,12 @@ if (userOpt.isEmpty()) {
 ---
 
 # Summary
+
+This file is now primarily a historical record of completed refactors and deferred nice-to-have items.
+For active release-hardening work, treat [`docs/roadmap.md`](docs/roadmap.md) and `docs/transaction-rules.md`
+as the source of truth. Current active gap: `BookingService.cancelBooking()` still needs the same
+provider-call-outside-transaction hardening already applied to host reject, void retry, trip checkout,
+and host-approval expiry.
 
 | Category | Count | Effort |
 |---|---|---|

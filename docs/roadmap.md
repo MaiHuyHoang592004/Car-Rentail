@@ -52,6 +52,9 @@ Frontend đã tồn tại trong `frontend/` với:
 - Frontend auth hardening `FE-AUTH-2`: `api-client` runtime ownership is now instance-first via `AuthProvider`, BFF refresh re-syncs `rentflow_role` via `/users/me`, and middleware treats missing/empty role cookie as an invalid session.
 - Email verification enforcement `AUTH-VERIFY-3`: booking creation and payment authorization now reject unverified accounts with `403 EMAIL_NOT_VERIFIED`, and frontend maps that state to profile/resend-verification UX.
 - Frontend UX/integration hardening: mobile nav drawer, Vietnamese-first copy, real listing/profile API wiring, and local startup preflight/one-command backend scripts are now in place.
+- Transaction correctness hardening `TX-HARDEN-1`: host reject, trip checkout capture, void retry, and host-approval expiry now use `prepare -> provider call outside TX -> finalize` with finalize-time revalidation and `PAYMENT_FINALIZATION_UNSAFE` evidence on drift.
+- Remaining transaction gap for this track: `BookingService.cancelBooking()` still performs provider capture/void work while holding DB locks and remains the primary release-correctness follow-up.
+- Integration gate recovery `TX-HARDEN-1A`: `BookingMapper` bean wiring was normalized to a single runtime constructor, restoring Spring app-context boot for booking/trip integration tests and unblocking full `mvn test` gate.
 
 ### Docs/code drift
 

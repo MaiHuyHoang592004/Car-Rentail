@@ -6,9 +6,10 @@ import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.booking.service.AvailabilityReserver;
+import com.rentflow.common.exception.BookingNotFoundException;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.CorrelationIdHelper;
-import com.rentflow.common.exception.PaymentProviderUnavailableException;
+import com.rentflow.common.exception.PaymentNotFoundException;
 import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
 import com.rentflow.common.idempotency.service.IdempotencyResolution;
 import com.rentflow.common.idempotency.service.IdempotencyScope;
@@ -26,7 +27,8 @@ import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -47,6 +49,7 @@ public class ExpireHostApprovalsProcessor {
     private final CorrelationIdHelper correlationIdHelper;
     private final Clock clock;
     private final long backoffSeconds;
+    private final TransactionTemplate transactionTemplate;
 
     public ExpireHostApprovalsProcessor(
             BookingRepository bookingRepository,
@@ -58,6 +61,7 @@ public class ExpireHostApprovalsProcessor {
             PaymentProviderRouter paymentProviderRouter,
             CorrelationIdHelper correlationIdHelper,
             Clock clock,
+            PlatformTransactionManager transactionManager,
             @Value("${rentflow.scheduler.void-retry.backoff-seconds:300}") long backoffSeconds) {
         this.bookingRepository = bookingRepository;
         this.bookingPaymentRepository = bookingPaymentRepository;
@@ -69,34 +73,63 @@ public class ExpireHostApprovalsProcessor {
         this.correlationIdHelper = correlationIdHelper;
         this.clock = clock;
         this.backoffSeconds = backoffSeconds;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
     public int processBatch(int batchSize) {
         Instant now = clock.instant();
-        List<Booking> candidates = bookingRepository.findExpiredHostApprovalCandidatesForUpdate(now, batchSize);
+        List<ExpiredHostApprovalCandidate> candidates = transactionTemplate.execute(status -> bookingRepository
+                .findExpiredHostApprovalCandidatesForUpdate(now, batchSize)
+                .stream()
+                .filter(booking -> isExpiredPendingApproval(booking, now))
+                .map(booking -> new ExpiredHostApprovalCandidate(
+                        booking.getId(),
+                        booking.getHostId(),
+                        booking.getHostApprovalExpiresAt()))
+                .toList());
+
+        if (candidates == null || candidates.isEmpty()) {
+            return 0;
+        }
+
         int processed = 0;
-        for (Booking booking : candidates) {
-            if (booking.getStatus() != BookingStatus.PENDING_HOST_APPROVAL
-                    || booking.getHostApprovalExpiresAt() == null
-                    || !booking.getHostApprovalExpiresAt().isBefore(now)) {
-                continue;
-            }
+        for (ExpiredHostApprovalCandidate candidate : candidates) {
             UUID idempotencyKeyId = null;
             try {
-                String key = "host-approval-expire:" + booking.getId();
+                String key = "host-approval-expire:" + candidate.bookingId();
                 String requestHash = idempotencyService.computeHash(
-                        new HostApprovalExpiryHashInput(booking.getId(), booking.getHostApprovalExpiresAt()));
+                        new HostApprovalExpiryHashInput(candidate.bookingId(), candidate.hostApprovalExpiresAt()));
                 IdempotencyResolution resolution = idempotencyService.resolve(
-                        booking.getHostId(),
+                        candidate.hostId(),
                         IdempotencyScope.HOST_EXPIRE_BOOKING_APPROVAL,
                         key,
                         requestHash);
                 if (resolution instanceof IdempotencyResolution.Replay) {
                     continue;
                 }
+
                 idempotencyKeyId = ((IdempotencyResolution.Proceed) resolution).idempotencyKeyId();
-                expireSingle(booking, key, idempotencyKeyId);
+                UUID resolvedIdempotencyKeyId = idempotencyKeyId;
+                PreparedExpiryContext prepared = transactionTemplate.execute(status ->
+                        prepareExpiry(candidate.bookingId(), key, resolvedIdempotencyKeyId));
+                if (prepared == null) {
+                    continue;
+                }
+
+                VoidResult voidResult;
+                try {
+                    voidResult = paymentProviderRouter.route(PaymentProviderType.COREBANK)
+                            .voidAuthorization(prepared.command());
+                } catch (RuntimeException e) {
+                    String errorCode = e instanceof com.rentflow.common.exception.PaymentProviderUnavailableException
+                            ? "PAYMENT_PROVIDER_UNAVAILABLE"
+                            : "PAYMENT_PROVIDER_ERROR";
+                    transactionTemplate.executeWithoutResult(status ->
+                            markProviderFailureAndRetry(prepared, errorCode, e.getMessage()));
+                    throw e;
+                }
+                transactionTemplate.executeWithoutResult(status ->
+                        finalizeExpiry(prepared, voidResult, resolvedIdempotencyKeyId));
                 processed++;
             } catch (RuntimeException e) {
                 if (idempotencyKeyId != null) {
@@ -107,7 +140,13 @@ public class ExpireHostApprovalsProcessor {
         return processed;
     }
 
-    private void expireSingle(Booking booking, String idempotencyKey, UUID idempotencyKeyId) {
+    private PreparedExpiryContext prepareExpiry(UUID bookingId, String schedulerIdempotencyKey, UUID idempotencyKeyId) {
+        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException(bookingId.toString()));
+        if (!isExpiredPendingApproval(booking, clock.instant())) {
+            return null;
+        }
+
         BookingPayment payment = bookingPaymentRepository.findByBookingIdForUpdate(booking.getId())
                 .orElseThrow(() -> new BusinessRuleException("PAYMENT_NOT_FOUND", "Payment not found for booking"));
         validatePayment(payment);
@@ -115,40 +154,6 @@ public class ExpireHostApprovalsProcessor {
         List<AvailabilityCalendar> availabilityRows = availabilityReserver.lockForBooking(booking);
         validateHeldAvailabilityRows(availabilityRows, booking);
 
-        try {
-            VoidResult voidResult = voidAuthorization(payment, idempotencyKey, idempotencyKeyId);
-            payment.setStatus(PaymentStatus.VOIDED);
-            payment.setProviderStatus(voidResult.providerStatus());
-            payment.setProviderMetadata(voidResult.providerMetadataJson());
-            payment.setVoidRetryRequired(false);
-            payment.setVoidRetryNextAt(null);
-            payment.setVoidRetryLastError(null);
-            bookingPaymentRepository.save(payment);
-
-            booking.setStatus(BookingStatus.EXPIRED);
-            booking.setHoldToken(null);
-            booking.setHoldExpiresAt(null);
-            booking.setHostApprovalExpiresAt(null);
-            bookingRepository.save(booking);
-
-            availabilityRows.forEach(row -> {
-                row.setStatus(AvailabilityStatus.FREE);
-                row.setBookingId(null);
-                row.setHoldToken(null);
-                row.setHoldExpiresAt(null);
-            });
-            availabilityReserver.saveRows(availabilityRows);
-            idempotencyService.complete(idempotencyKeyId, 200, "{\"status\":\"EXPIRED\"}");
-        } catch (RuntimeException e) {
-            markVoidRetryRequired(payment, e);
-            throw e;
-        }
-    }
-
-    private VoidResult voidAuthorization(
-            BookingPayment payment,
-            String schedulerIdempotencyKey,
-            UUID idempotencyKeyId) {
         String correlationId = correlationIdHelper.getOrGenerate();
         String requestId = UUID.randomUUID().toString();
         PaymentTransaction tx = new PaymentTransaction();
@@ -164,31 +169,85 @@ public class ExpireHostApprovalsProcessor {
         tx.setIdempotencyKeyId(idempotencyKeyId);
         tx = paymentTransactionRepository.save(tx);
 
+        return new PreparedExpiryContext(
+                booking.getId(),
+                tx.getId(),
+                new VoidCommand(
+                        "rentflow:host-approval-timeout:void:" + payment.getId() + ":" + schedulerIdempotencyKey,
+                        payment.getProviderHoldId(),
+                        correlationId,
+                        requestId,
+                        payment.getId().toString(),
+                        correlationId));
+    }
+
+    private void finalizeExpiry(
+            PreparedExpiryContext prepared,
+            VoidResult voidResult,
+            UUID idempotencyKeyId) {
+        Booking booking = bookingRepository.findByIdForUpdate(prepared.bookingId())
+                .orElseThrow(() -> new BookingNotFoundException(prepared.bookingId().toString()));
+        BookingPayment payment = bookingPaymentRepository.findByBookingIdForUpdate(prepared.bookingId())
+                .orElseThrow(() -> new PaymentNotFoundException(prepared.bookingId().toString()));
+        List<AvailabilityCalendar> availabilityRows = availabilityReserver.lockForBooking(booking);
+        PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
+                .orElseThrow(() -> new PaymentNotFoundException(prepared.bookingId().toString()));
+
+        validateExpiryFinalizationState(booking, payment, availabilityRows, tx);
+
+        payment.setStatus(PaymentStatus.VOIDED);
+        payment.setProviderStatus(voidResult.providerStatus());
+        payment.setProviderMetadata(voidResult.providerMetadataJson());
+        payment.setVoidRetryRequired(false);
+        payment.setVoidRetryNextAt(null);
+        payment.setVoidRetryLastError(null);
+        bookingPaymentRepository.save(payment);
+
+        tx.setStatus(PaymentTransactionStatus.SUCCEEDED);
+        tx.setProviderResponse(voidResult.providerMetadataJson());
+        tx.setProviderErrorCode(null);
+        tx.setProviderErrorMessage(null);
+        paymentTransactionRepository.save(tx);
+
+        booking.setStatus(BookingStatus.EXPIRED);
+        booking.setHoldToken(null);
+        booking.setHoldExpiresAt(null);
+        booking.setHostApprovalExpiresAt(null);
+        bookingRepository.save(booking);
+
+        availabilityRows.forEach(row -> {
+            row.setStatus(AvailabilityStatus.FREE);
+            row.setBookingId(null);
+            row.setHoldToken(null);
+            row.setHoldExpiresAt(null);
+        });
+        availabilityReserver.saveRows(availabilityRows);
+        idempotencyService.complete(idempotencyKeyId, 200, "{\"status\":\"EXPIRED\"}");
+    }
+
+    private void validateExpiryFinalizationState(
+            Booking booking,
+            BookingPayment payment,
+            List<AvailabilityCalendar> availabilityRows,
+            PaymentTransaction tx) {
         try {
-            VoidResult result = paymentProviderRouter.route(PaymentProviderType.COREBANK).voidAuthorization(new VoidCommand(
-                    "rentflow:host-approval-timeout:void:" + payment.getId() + ":" + schedulerIdempotencyKey,
-                    payment.getProviderHoldId(),
-                    correlationId,
-                    requestId,
-                    payment.getId().toString(),
-                    correlationId));
-            tx.setStatus(PaymentTransactionStatus.SUCCEEDED);
-            tx.setProviderResponse(result.providerMetadataJson());
-            paymentTransactionRepository.save(tx);
-            return result;
-        } catch (PaymentProviderUnavailableException e) {
-            tx.setStatus(PaymentTransactionStatus.FAILED);
-            tx.setProviderErrorCode("PAYMENT_PROVIDER_UNAVAILABLE");
-            tx.setProviderErrorMessage(e.getMessage());
-            paymentTransactionRepository.save(tx);
-            throw e;
-        } catch (RuntimeException e) {
-            tx.setStatus(PaymentTransactionStatus.FAILED);
-            tx.setProviderErrorCode("PAYMENT_PROVIDER_ERROR");
-            tx.setProviderErrorMessage(e.getMessage());
-            paymentTransactionRepository.save(tx);
-            throw e;
+            if (!isExpiredPendingApproval(booking, clock.instant())) {
+                throw new BusinessRuleException("BOOKING_INVALID_STATUS", "Booking is no longer an expired pending host approval");
+            }
+            validatePayment(payment);
+            validateHeldAvailabilityRows(availabilityRows, booking);
+        } catch (BusinessRuleException e) {
+            markUnsafe(tx, "CoreBank void succeeded but host approval expiry finalization was no longer safe");
+            throw new BusinessRuleException(
+                    "PAYMENT_FINALIZATION_UNSAFE",
+                    "Payment provider void succeeded but booking expiry could not be finalized safely");
         }
+    }
+
+    private boolean isExpiredPendingApproval(Booking booking, Instant now) {
+        return booking.getStatus() == BookingStatus.PENDING_HOST_APPROVAL
+                && booking.getHostApprovalExpiresAt() != null
+                && booking.getHostApprovalExpiresAt().isBefore(now);
     }
 
     private void validatePayment(BookingPayment payment) {
@@ -216,16 +275,53 @@ public class ExpireHostApprovalsProcessor {
         }
     }
 
-    private void markVoidRetryRequired(BookingPayment payment, RuntimeException e) {
+    private void markProviderFailureAndRetry(
+            PreparedExpiryContext prepared,
+            String errorCode,
+            String errorMessage) {
+        PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
+                .orElseThrow(() -> new PaymentNotFoundException(prepared.bookingId().toString()));
+        tx.setStatus(PaymentTransactionStatus.FAILED);
+        tx.setProviderErrorCode(errorCode);
+        tx.setProviderErrorMessage(errorMessage);
+        paymentTransactionRepository.save(tx);
+
+        BookingPayment payment = bookingPaymentRepository.findByBookingIdForUpdate(prepared.bookingId())
+                .orElseThrow(() -> new PaymentNotFoundException(prepared.bookingId().toString()));
+        markVoidRetryRequired(payment, errorMessage);
+    }
+
+    private void markVoidRetryRequired(BookingPayment payment, String errorMessage) {
         int nextCount = payment.getVoidRetryCount() == null ? 1 : payment.getVoidRetryCount() + 1;
         payment.setVoidRetryCount(nextCount);
         payment.setVoidRetryRequired(true);
-        payment.setVoidRetryLastError(e.getMessage());
+        payment.setVoidRetryLastError(errorMessage);
         payment.setVoidRetryNextAt(clock.instant().plusSeconds(backoffSeconds));
         payment.setProviderStatus("VOID_RETRY_REQUIRED");
         bookingPaymentRepository.save(payment);
     }
 
+    private void markUnsafe(PaymentTransaction tx, String errorMessage) {
+        tx.setStatus(PaymentTransactionStatus.FAILED);
+        tx.setProviderErrorCode("PAYMENT_FINALIZATION_UNSAFE");
+        tx.setProviderErrorMessage(errorMessage);
+        paymentTransactionRepository.save(tx);
+    }
+
     private record HostApprovalExpiryHashInput(UUID bookingId, Instant hostApprovalExpiresAt) {
+    }
+
+    private record ExpiredHostApprovalCandidate(
+            UUID bookingId,
+            UUID hostId,
+            Instant hostApprovalExpiresAt
+    ) {
+    }
+
+    private record PreparedExpiryContext(
+            UUID bookingId,
+            UUID transactionId,
+            VoidCommand command
+    ) {
     }
 }

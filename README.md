@@ -4,10 +4,12 @@ Car rental booking system backend — modular monolith REST API.
 
 ## Current Phase
 
-**Phase 1-9 baseline implemented; hardening and release-gate stabilization in progress.**
+**Phase 1-9 baseline implemented; frontend payment/admin product slice is in place; hardening and release-gate stabilization remain in progress.**
 
 Core backend flows for auth/user, vehicle/listing, availability, booking, payment,
 trip lifecycle, review, dispute, notification, outbox, and reporting are present.
+Frontend now includes public listing flows, host vehicle/listing/availability flows,
+customer booking detail/payment authorization, and admin listing/user management.
 Current focus is hardening and regression safety before release. See
 [`docs/roadmap.md`](docs/roadmap.md) for the latest implementation slices.
 
@@ -207,9 +209,9 @@ Base config remains strict outside `local`: non-local startup still requires exp
 - [x] Vehicle/listing lifecycle: host CRUD, state machines, admin listing approval.
 - [x] Search/availability: public listing search, availability calendar, host block/unblock.
 - [x] Booking core: HELD booking creation, idempotency, overlap prevention, availability locking, customer cancellation for HELD/pending/confirmed pre-pickup paths, hold expiry scheduler.
-- [x] Frontend shell: Next.js app, auth BFF, auth provider, API client, bookings and host/listing pages.
+- [x] Frontend shell: Next.js app, auth BFF, auth provider, API client, public listings, host pages, booking detail, payment authorization, and admin pages.
 
-Current priority: security hardening, scheduler/test stability, API consistency, and release evidence.
+Current priority: transaction hardening around booking cancellation/payment mutations, API/doc consistency, and release evidence.
 
 ## Troubleshooting
 
@@ -263,10 +265,9 @@ http://localhost:8087/actuator/health
 
 ## Upcoming
 
-- Security hardening and secret-management tightening.
-- Full regression gate for cancellation/payment-void retry contracts.
-- Integration test stabilization on Docker-enabled CI runners.
-- Frontend test environment and API contract sync.
+- Finish transaction hardening for `BookingService.cancelBooking()` and related payment mutation safety.
+- Refresh backend release-gate evidence after the remaining hardening slice lands.
+- Continue docs/API contract synchronization as backend state machines evolve.
 
 ## License
 

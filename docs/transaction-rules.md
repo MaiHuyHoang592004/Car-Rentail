@@ -210,8 +210,8 @@ No provider call needed. ✅
 ```
 
 **Lock order: idempotency → booking → payment → availability ✅**
-**⚠ VIOLATION: voidAuthorization provider call is made INSIDE the transaction while holding all locks.**
-Target for Slice 4 refactor.
+Provider call now runs outside the DB transaction using `prepare -> provider call -> finalize`.
+Finalize re-locks and revalidates booking/payment/availability before mutating local state. ✅
 
 ---
 
@@ -365,35 +365,39 @@ FAILED:
 | Operation | File/Method | Lock Order | Provider Call Outside TX? | Risk |
 |---|---|---|---|---|
 | **Authorize** | `CoreBankAuthorizeService.authorizeBookingPayment()` | ✅ idempotency → booking → payment → availability | ✅ Yes (split TX pattern) | LOW |
-| **Capture** | `CoreBankCaptureService.capture()` | ❌ payment BEFORE booking (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW-MEDIUM |
-| **Void** | `CoreBankVoidService.voidAuthorization()` | ❌ payment BEFORE booking (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW-MEDIUM |
-| **Refund** | `CoreBankRefundService.refund()` | ❌ payment BEFORE booking (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW-MEDIUM |
+| **Capture** | `CoreBankCaptureService.capture()` | ✅ booking → payment (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW |
+| **Void** | `CoreBankVoidService.voidAuthorization()` | ✅ booking → payment (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW |
+| **Refund** | `CoreBankRefundService.refund()` | ✅ booking → payment (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW |
 | **Cancel booking** | `BookingService.cancelBooking()` | ✅ booking → payment → availability | ❌ No — callCapture/callVoid INSIDE TX | **HIGH** |
 | **Host approve** | `HostBookingApprovalService.approveBooking()` | ✅ booking → payment → availability | ✅ No provider call | OK |
-| **Host reject** | `HostBookingApprovalService.rejectBooking()` | ✅ booking → payment → availability | ❌ No — voidAuthorization INSIDE TX | **HIGH** |
-| **Void retry** | `DefaultPaymentVoidRetryService.retrySingle()` | N/A (SKIP LOCKED on payment only) | ❌ No — provider call INSIDE TX while holding payment lock | MEDIUM |
-| **Trip checkout** | `TripPaymentCaptureService.captureRemainingForBooking()` | N/A (payment FOR UPDATE only) | ❌ No — provider call INSIDE TX while holding payment lock | MEDIUM |
+| **Host reject** | `HostBookingApprovalService.rejectBooking()` | ✅ booking → payment → availability | ✅ Yes (split TX pattern) | LOW |
+| **Void retry** | `DefaultPaymentVoidRetryService.retrySingle()` | ✅ payment lock only; prepare/finalize relock before mutation | ✅ Yes (between prepare/finalize) | LOW |
+| **Trip checkout** | `TripPaymentCaptureService.captureRemainingForBooking()` | ✅ payment lock only; prepare/finalize relock before mutation | ✅ Yes (between prepare/finalize) | LOW |
 | **Create booking** | `BookingService.createBooking()` | ✅ idempotency → availability | ✅ No provider call | OK |
 | **Expire HELD** | `BookingExpiryJob` | ✅ booking → availability | ✅ No provider call | OK |
-| **Expire host approval** | `ExpireHostApprovalsProcessor` | ✅ booking → payment → availability | ❌ No — voidAuthorization INSIDE TX (similar to host reject path) | **HIGH** |
+| **Expire host approval** | `ExpireHostApprovalsProcessor` | ✅ booking → payment → availability | ✅ Yes (split TX pattern) | LOW |
 
 ### Violation Summary
 
-**3 lock-order violations (reversed payment/booking):**
-- `CoreBankCaptureService.prepareCapture` / `finalizeCapture`
-- `CoreBankVoidService.prepareVoid` / `finalizeVoid`
-- `CoreBankRefundService.prepareRefund` / `finalizeRefund`
-
-Mitigating factor: capture/void/refund only happen on CONFIRMED bookings where booking state is already immutable.
-
-**4 provider-call-while-holding-locks violations:**
+**Remaining provider-call-while-holding-locks violations:**
 - `BookingService.cancelBooking` → `callCapture` + `callVoid`
-- `HostBookingApprovalService.rejectBooking` → `voidAuthorization`
-- `DefaultPaymentVoidRetryService.retrySingle` → provider call
-- `TripPaymentCaptureService.captureRemainingForBooking` → provider call
-- `ExpireHostApprovalsProcessor` → voidAuthorization (similar to host reject)
 
-Target files for Slice 3/4/5 refactor are listed above.
+All other payment/host-approval mutation paths listed in this matrix now follow:
+
+```text
+prepare (lock + validate + create PENDING payment_transaction)
+-> provider call outside DB TX
+-> finalize (re-lock + revalidate + mutate aggregate + mark transaction)
+```
+
+If provider success is followed by local state drift, finalize must:
+
+```text
+1. NOT overwrite booking/payment/availability state
+2. mark payment_transaction FAILED
+3. set provider_error_code = PAYMENT_FINALIZATION_UNSAFE
+4. surface a domain error for reconciliation / operator review
+```
 
 ---
 

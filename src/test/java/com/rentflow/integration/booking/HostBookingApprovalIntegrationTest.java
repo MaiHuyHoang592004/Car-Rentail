@@ -22,10 +22,13 @@ import com.rentflow.payment.entity.BookingPayment;
 import com.rentflow.payment.entity.PaymentMethod;
 import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
+import com.rentflow.payment.entity.PaymentTransactionStatus;
+import com.rentflow.payment.entity.PaymentTransactionType;
 import com.rentflow.payment.provider.corebank.CoreBankPaymentClient;
 import com.rentflow.payment.provider.corebank.CoreBankVoidHoldResponse;
 import com.rentflow.payment.provider.corebank.CoreBankVoidHoldResult;
 import com.rentflow.payment.repository.BookingPaymentRepository;
+import com.rentflow.payment.repository.PaymentTransactionRepository;
 import com.rentflow.scheduler.ExpireHostApprovalsProcessor;
 import com.rentflow.vehicle.entity.FuelType;
 import com.rentflow.vehicle.entity.TransmissionType;
@@ -49,6 +52,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -67,6 +71,7 @@ class HostBookingApprovalIntegrationTest extends BaseIntegrationTest {
     @Autowired private ListingRepository listingRepository;
     @Autowired private BookingRepository bookingRepository;
     @Autowired private BookingPaymentRepository bookingPaymentRepository;
+    @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private AvailabilityCalendarRepository availabilityRepository;
     @Autowired private IdempotencyKeyRepository idempotencyKeyRepository;
     @Autowired private JwtTokenProvider jwtTokenProvider;
@@ -84,6 +89,7 @@ class HostBookingApprovalIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         idempotencyKeyRepository.deleteAll();
+        paymentTransactionRepository.deleteAll();
         bookingPaymentRepository.deleteAll();
         availabilityRepository.deleteAll();
         bookingRepository.deleteAll();
@@ -170,6 +176,42 @@ class HostBookingApprovalIntegrationTest extends BaseIntegrationTest {
         AvailabilityCalendar first = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate())).orElseThrow();
         AvailabilityCalendar second = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate().plusDays(1))).orElseThrow();
         assertThat(List.of(first, second)).allSatisfy(row -> assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.FREE));
+    }
+
+    @Test
+    void timeoutProcessorMarksVoidRetryWhenProviderFails() {
+        Booking booking = savePendingHostApprovalBooking(host, listing, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 3));
+        booking.setHostApprovalExpiresAt(Instant.now().minusSeconds(60));
+        bookingRepository.save(booking);
+        doThrow(new RuntimeException("corebank unavailable"))
+                .when(coreBankPaymentClient).voidHold(any());
+
+        int processed = expireHostApprovalsProcessor.processBatch(100);
+
+        assertThat(processed).isZero();
+        Booking updatedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertThat(updatedBooking.getStatus()).isEqualTo(BookingStatus.PENDING_HOST_APPROVAL);
+
+        BookingPayment updatedPayment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        assertThat(updatedPayment.isVoidRetryRequired()).isTrue();
+        assertThat(updatedPayment.getVoidRetryCount()).isEqualTo(1);
+        assertThat(updatedPayment.getVoidRetryNextAt()).isNotNull();
+        assertThat(updatedPayment.getVoidRetryLastError()).contains("corebank unavailable");
+        assertThat(updatedPayment.getProviderStatus()).isEqualTo("VOID_RETRY_REQUIRED");
+
+        assertThat(paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(updatedPayment.getId()))
+                .anySatisfy(tx -> {
+                    assertThat(tx.getType()).isEqualTo(PaymentTransactionType.VOID);
+                    assertThat(tx.getStatus()).isEqualTo(PaymentTransactionStatus.FAILED);
+                    assertThat(tx.getProviderErrorCode()).isEqualTo("PAYMENT_PROVIDER_ERROR");
+                });
+
+        AvailabilityCalendar first = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate())).orElseThrow();
+        AvailabilityCalendar second = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate().plusDays(1))).orElseThrow();
+        assertThat(List.of(first, second)).allSatisfy(row -> {
+            assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.HOLD);
+            assertThat(row.getBookingId()).isEqualTo(booking.getId());
+        });
     }
 
     @Test

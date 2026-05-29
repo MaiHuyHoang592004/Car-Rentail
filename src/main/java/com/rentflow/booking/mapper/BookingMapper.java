@@ -26,15 +26,9 @@ public class BookingMapper {
     private final BookingPaymentRepository bookingPaymentRepository;
     private final ObjectMapper objectMapper;
 
-    public BookingMapper(ListingRepository listingRepository, ObjectMapper objectMapper) {
-        this(listingRepository, null, objectMapper);
-    }
-
     public BookingSummaryResponse toSummaryResponse(Booking booking) {
         JsonNode priceSnapshot = readTree(booking.getPriceSnapshot());
-        Optional<BookingPayment> payment = bookingPaymentRepository == null
-                ? Optional.empty()
-                : bookingPaymentRepository.findByBookingId(booking.getId());
+        Optional<BookingPayment> payment = bookingPaymentRepository.findByBookingId(booking.getId());
         return new BookingSummaryResponse(
                 booking.getId(),
                 booking.getStatus(),
@@ -55,9 +49,7 @@ public class BookingMapper {
     public BookingResponse toResponse(Booking booking) {
         JsonNode priceSnapshot = readTree(booking.getPriceSnapshot());
         JsonNode policySnapshot = readTree(booking.getPolicySnapshot());
-        Optional<BookingPayment> payment = bookingPaymentRepository == null
-                ? Optional.empty()
-                : bookingPaymentRepository.findByBookingId(booking.getId());
+        Optional<BookingPayment> payment = bookingPaymentRepository.findByBookingId(booking.getId());
         return new BookingResponse(
                 booking.getId(),
                 booking.getStatus(),
