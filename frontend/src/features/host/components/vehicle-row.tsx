@@ -1,8 +1,10 @@
-﻿import Link from "next/link";
+﻿"use client";
+
+import Link from "next/link";
+import { Car, ListPlus } from "lucide-react";
 
 import { StatusBadge } from "@/components/rentflow/status-badge";
-import { getTransmissionLabel, getVehicleStatusLabel } from "@/lib/display-labels";
-import { InfoBlock } from "@/components/rentflow/ui/info-block";
+import { getTransmissionLabel, getFuelTypeLabel, getVehicleStatusLabel } from "@/lib/display-labels";
 import type { HostVehicleViewModel } from "@/features/host/types";
 
 type VehicleRowProps = {
@@ -10,33 +12,56 @@ type VehicleRowProps = {
 };
 
 export function VehicleRow({ vehicle }: VehicleRowProps) {
+  const canCreateListing = vehicle.status === "ACTIVE";
+
   return (
     <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{vehicle.city}</p>
-          <h3 className="text-lg font-bold text-foreground">
+        {/* Left: vehicle info */}
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <Car className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {vehicle.city}
+            </p>
+          </div>
+          <h3 className="text-lg font-bold text-foreground truncate">
             {vehicle.make} {vehicle.model} ({vehicle.year})
           </h3>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <InfoBlock label="Loại" value={vehicle.category} />
-            <InfoBlock label="Hộp số" value={getTransmissionLabel(vehicle.transmission)} />
-            <InfoBlock label="Nhiên liệu" value={vehicle.fuelType} />
-            <InfoBlock label="Chỗ ngồi" value={vehicle.seats + " chỗ"} />
+            <span>{vehicle.category}</span>
+            <span>&bull;</span>
+            <span>{getTransmissionLabel(vehicle.transmission)}</span>
+            <span>&bull;</span>
+            <span>{getFuelTypeLabel(vehicle.fuelType)}</span>
+            <span>&bull;</span>
+            <span>{vehicle.seats} cho</span>
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <InfoBlock label="Biển số" value={vehicle.plateNumber} />
-            <InfoBlock label="VIN" value={vehicle.vin} />
+          <div className="text-xs text-muted-foreground">
+            <span>Bien so: <strong className="text-foreground">{vehicle.plateNumber}</strong></span>
+            {vehicle.vin ? (
+              <span className="ml-3">VIN: <strong className="text-foreground">{vehicle.vin}</strong></span>
+            ) : null}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Right: status + actions */}
+        <div className="flex items-center gap-2 shrink-0">
           <StatusBadge status={vehicle.status} label={getVehicleStatusLabel(vehicle.status)} />
+          {canCreateListing ? (
+            <Link
+              href="/host/listings/new"
+              className="flex items-center gap-1 rounded-full border border-secondary bg-background px-3 py-1.5 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-accent"
+            >
+              <ListPlus className="h-3.5 w-3.5" />
+              Tao tin dang
+            </Link>
+          ) : null}
           <Link
             href={`/host/vehicles/${vehicle.id}`}
             className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
-            Quản lý
+            Quan ly
           </Link>
         </div>
       </div>

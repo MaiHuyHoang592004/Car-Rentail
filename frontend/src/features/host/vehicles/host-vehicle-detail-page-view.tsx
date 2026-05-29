@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,15 +6,21 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { ArrowLeft, Save, Trash2 } from "lucide-react";
 
-import { AppShell } from "@/components/rentflow/app-shell";
-import { PageHeader } from "@/components/rentflow/page-header";
+import { WorkspaceSidebar } from "@/components/rentflow/workspace-sidebar";
+import { HostWorkspaceNav } from "@/features/host/components/host-workspace-nav";
 import { StatusBadge } from "@/components/rentflow/status-badge";
 import { vehicleFormSchema, type VehicleFormState } from "@/features/host/forms";
 import { HostActionDialog } from "@/features/host/components/host-action-dialog";
 import { VehicleFormFields } from "@/features/host/vehicles/vehicle-form-fields";
 import { buildVehicleFormFromViewModel } from "@/features/host/vehicles/vehicle-form-utils";
-import { archiveHostVehicle, getHostVehicleById, updateHostVehicle } from "@/features/host/vehicles/api";
+import {
+  archiveHostVehicle,
+  getHostVehicleById,
+  updateHostVehicle,
+} from "@/features/host/vehicles/api";
+import { getVehicleStatusLabel } from "@/lib/display-labels";
 
 type HostVehicleDetailPageViewProps = {
   vehicleId: string;
@@ -46,10 +52,10 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
       updateHostVehicle(vehicleId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["host", "vehicles", vehicleId] });
-      setBanner("Vehicle details saved.");
+      setBanner("Da luu thong tin xe thanh cong.");
     },
     onError: () => {
-      toast.error("Failed to save vehicle. Please try again.");
+      toast.error("Loi khi luu xe. Vui long thu lai.");
     },
   });
 
@@ -58,40 +64,40 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["host", "vehicles", vehicleId] });
       queryClient.invalidateQueries({ queryKey: ["host", "vehicles"] });
-      setBanner("Vehicle archived.");
+      setBanner("Da luu kho xe thanh cong.");
       setArchiveOpen(false);
     },
     onError: () => {
-      toast.error("Failed to archive vehicle. Please try again.");
+      toast.error("Loi khi luu kho xe. Vui long thu lai.");
     },
   });
 
   if (loadingVehicle) {
     return (
-      <AppShell activePath="/host/vehicles">
+      <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/vehicles">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">Loading vehicle...</p>
+          <p className="text-sm text-muted-foreground">Dang tai thong tin xe...</p>
         </section>
-      </AppShell>
+      </WorkspaceSidebar>
     );
   }
 
   if (!vehicle) {
     return (
-      <AppShell activePath="/host/vehicles">
+      <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/vehicles">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <h1 className="text-3xl font-bold text-foreground">Vehicle not found</h1>
+          <h1 className="text-2xl font-bold text-foreground">Khong tim thay xe</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This vehicle does not exist or you do not have access.
+            Xe nay khong ton tai hoac ban khong co quyen truy cap.
           </p>
           <Link
             href="/host/vehicles"
             className="mt-4 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
-            Back to vehicles
+            Quay lai danh sach xe
           </Link>
         </section>
-      </AppShell>
+      </WorkspaceSidebar>
     );
   }
 
@@ -117,20 +123,30 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
   const canArchive = vehicle.status !== "ARCHIVED";
 
   return (
-    <AppShell activePath="/host/vehicles">
+    <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/vehicles">
       <div className="space-y-6">
-        <PageHeader
-          title={`Vehicle Detail: ${vehicle.id}`}
-          description="Update vehicle details or archive this vehicle."
-          actions={
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <Link
               href="/host/vehicles"
-              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Back to vehicles
+              <ArrowLeft className="h-4 w-4" />
+              Quay lai
             </Link>
-          }
-        />
+            <span className="text-muted-foreground">|</span>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-foreground">
+                {vehicle.make} {vehicle.model}
+              </h1>
+              <StatusBadge
+                status={vehicle.status}
+                label={getVehicleStatusLabel(vehicle.status)}
+              />
+            </div>
+          </div>
+        </div>
 
         {banner ? (
           <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
@@ -138,32 +154,41 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
           </section>
         ) : null}
 
-        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {vehicle.make} {vehicle.model} ({vehicle.year})
+        {/* Form */}
+        <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="mb-4 rounded-lg border border-border bg-background p-3">
+            <p className="text-xs text-muted-foreground">
+              Bien so: <strong className="text-foreground">{vehicle.plateNumber}</strong>
+              {vehicle.vin ? (
+                <span className="ml-3">VIN: <strong className="text-foreground">{vehicle.vin}</strong></span>
+              ) : null}
             </p>
-            <StatusBadge status={vehicle.status} />
           </div>
 
-          <form onSubmit={form.handleSubmit(handleSave)} noValidate className="space-y-4">
-            <VehicleFormFields register={form.register} errors={form.formState.errors} />
+          <form onSubmit={form.handleSubmit(handleSave)} noValidate className="space-y-6">
+            <VehicleFormFields
+              register={form.register}
+              errors={form.formState.errors}
+              hideStatus={false}
+            />
 
             <div className="flex flex-wrap gap-2">
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {saving ? "Saving..." : "Save changes"}
+                <Save className="h-4 w-4" />
+                {saving ? "Dang luu..." : "Luu thay doi"}
               </button>
               <button
                 type="button"
                 onClick={() => setArchiveOpen(true)}
                 disabled={!canArchive || archiving}
-                className="rounded-full bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
+                className="flex items-center gap-2 rounded-full bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
               >
-                {archiving ? "Archiving..." : "Archive vehicle"}
+                <Trash2 className="h-4 w-4" />
+                {archiving ? "Dang luu kho..." : "Luu kho xe"}
               </button>
             </div>
           </form>
@@ -172,13 +197,13 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
 
       <HostActionDialog
         open={archiveOpen}
-        title="Archive Vehicle"
-        description="This vehicle and its listings will be archived. Existing bookings will not be affected."
-        confirmLabel="Confirm archive"
+        title="Luu kho xe"
+        description="Xe nay va cac tin dang lien quan se duoc luu kho. Cac don dat xe hien tai khong bi anh huong."
+        confirmLabel="Xac nhan luu kho"
         tone="danger"
         onClose={() => setArchiveOpen(false)}
         onConfirm={handleArchive}
       />
-    </AppShell>
+    </WorkspaceSidebar>
   );
 }
