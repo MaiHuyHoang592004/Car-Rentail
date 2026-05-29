@@ -26,7 +26,7 @@
 | AUTH_ACCOUNT_LOCKED | 423 | Account locked due to too many failed login attempts; `Retry-After` header included |
 | INVALID_TOKEN | 409 | Reset/verification token is missing, expired, or already used |
 | ACCESS_DENIED | 403 | User lacks permission |
-| EMAIL_NOT_VERIFIED | 403 | Email must be verified before this action |
+| EMAIL_NOT_VERIFIED | 403 | Email must be verified before booking creation or payment authorization |
 | USER_EMAIL_EXISTS | 409 | Email already registered |
 | DRIVER_LICENSE_NOT_APPROVED | 403 | Customer is not eligible to book |
 | ALREADY_SUBMITTED | 409 | Verification already pending/approved |
@@ -35,12 +35,12 @@
 | LISTING_NOT_FOUND | 404 | Listing not found or not visible |
 | LISTING_NOT_AVAILABLE | 409 | Listing unavailable for selected dates |
 | BOOKING_OVERLAP_CUSTOMER | 409 | Customer has overlapping booking |
-| BOOKING_INVALID_STATUS | 409 | Action not allowed for current booking status |
+| BOOKING_INVALID_STATUS | 409 | Action not allowed for current booking status or cancellation time window |
 | IDEMPOTENCY_KEY_REQUIRED | 400 | Idempotency-Key required |
 | IDEMPOTENCY_KEY_CONFLICT | 409 | Same key used with different body |
 | REQUEST_ALREADY_PROCESSING | 409 | Request with same key is still processing |
 | PAYMENT_FAILED | 402 | Payment operation failed |
-| PAYMENT_VOID_RETRY_REQUIRED | 202 | Cancellation done but void retry required |
+| PAYMENT_VOID_RETRY_REQUIRED | 202 | Booking cancellation was accepted, but payment void must be retried asynchronously |
 | VALIDATION_ERROR | 400 | Request validation failed |
 | RATE_LIMIT_EXCEEDED | 429 | Rate limit exceeded |
 | INTERNAL_ERROR | 500 | Unexpected server error |

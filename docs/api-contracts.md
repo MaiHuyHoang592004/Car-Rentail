@@ -185,6 +185,7 @@ Response `200`:
 {
   "id": "uuid",
   "email": "user@example.com",
+  "emailVerified": false,
   "roles": ["CUSTOMER"],
   "fullName": "Nguyen Van A",
   "phone": "0900000000",
@@ -193,6 +194,8 @@ Response `200`:
   "driverVerificationStatus": "NOT_SUBMITTED"
 }
 ```
+
+When `emailVerified=false`, current-state policy blocks `POST /api/v1/bookings` and `POST /api/v1/bookings/{id}/payments/authorize` with `403 EMAIL_NOT_VERIFIED`.
 
 ### Update Profile
 
@@ -619,20 +622,47 @@ Request:
 { "reason": "Change of plan" }
 ```
 
-Response `200`:
+Current-state behavior depends on booking status:
+
+- `HELD` -> cancel immediately, release held availability, return `200`
+- `PENDING_HOST_APPROVAL` -> attempt payment void, then cancel booking:
+  - void success -> `200`
+  - void provider failure -> booking still becomes `CANCELLED`, availability is released, and API returns `202` with retry metadata
+- `CONFIRMED` before pickup -> apply cancellation policy:
+  - full refund path -> void authorization, then `200`
+  - partial/no-refund path -> capture penalty, void remainder, then `200`
+  - if provider void fails after capture/void attempt -> booking still becomes `CANCELLED` and API returns `202` with retry metadata
+- `CONFIRMED` after pickup time, or any unsupported status -> `409 BOOKING_INVALID_STATUS`
+
+Example response `200`:
 
 ```json
 {
   "id": "booking-id",
   "status": "CANCELLED",
-  "cancellationReason": "Change of plan"
+  "cancellationReason": "Change of plan",
+  "cancelled": true,
+  "voidRetryRequired": false,
+  "code": null,
+  "paymentRetryState": null
 }
 ```
 
-**Phase 5 limitation:** cancellation is only allowed when status is `HELD`.
-Any other status (e.g. `PENDING_HOST_APPROVAL`, `CONFIRMED`) returns
-`409 BOOKING_INVALID_STATUS`. Cancellation of approved/confirmed bookings
-— including refund/void/penalty behavior — is delivered in Phase 7.
+Example response `202` when provider void must be retried asynchronously:
+
+```json
+{
+  "id": "booking-id",
+  "status": "CANCELLED",
+  "cancellationReason": "Late cancel",
+  "cancelled": true,
+  "voidRetryRequired": true,
+  "code": "PAYMENT_VOID_RETRY_REQUIRED",
+  "paymentRetryState": "VOID_RETRY_REQUIRED"
+}
+```
+
+`Idempotency-Key` remains required. Replays with the same key/body return the same terminal response, including the accepted/retry-required shape when cancellation has already been persisted.
 
 ## Error Codes Important For Frontend
 
@@ -648,7 +678,9 @@ Any other status (e.g. `PENDING_HOST_APPROVAL`, `CONFIRMED`) returns
 | `LISTING_NOT_FOUND` | Show listing unavailable/not found |
 | `LISTING_NOT_AVAILABLE` | Refresh calendar and ask user to choose dates again |
 | `BOOKING_OVERLAP_CUSTOMER` | Link to my bookings |
-| `BOOKING_INVALID_STATUS` | Refresh booking status |
+| `BOOKING_INVALID_STATUS` | Refresh booking status; cancel is only blocked for unsupported states or invalid time windows |
+| `PAYMENT_VOID_RETRY_REQUIRED` | Show cancellation accepted, explain payment void will be retried in background |
+| `EMAIL_NOT_VERIFIED` | Route user to profile and resend verification before retrying booking/payment |
 | `IDEMPOTENCY_KEY_REQUIRED` | Client bug; regenerate request flow |
 | `IDEMPOTENCY_KEY_CONFLICT` | Do not retry with same key |
 | `REQUEST_ALREADY_PROCESSING` | Keep submit disabled and poll/fetch status |

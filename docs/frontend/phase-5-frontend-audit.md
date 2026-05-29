@@ -1,5 +1,7 @@
 # RentFlow Frontend Audit (Phase 5)
 
+> Historical / audit snapshot only. Tài liệu này mô tả assumptions ở thời điểm 2026-05-12 và không còn là source-of-truth current-state cho frontend hiện tại.
+
 Date: 2026-05-12
 
 ## Scope Baseline
@@ -20,7 +22,7 @@ Date: 2026-05-12
   - `docs/frontend-requirements (1).md`
   - `docs/ui-user-flow-spec (1).md`
 
-## Locked Implementation Decisions
+## Locked Implementation Decisions (historical)
 
 - Frontend location: `frontend/`
 - Stack:

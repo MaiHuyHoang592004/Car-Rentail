@@ -1,13 +1,13 @@
 # Booking Flow — Frontend Specification
 
-> **Status**: Sprint 2 / Clarify-only. Không thay đổi code. Tài liệu này thống nhất luồng booking giữa FE static hiện tại và BE Phase 5 đã hoàn tất, làm input cho Sprint 2-wire (replace mocks bằng BFF calls).
+> **Status**: Historical / planning snapshot. Tài liệu này phản ánh giai đoạn FE static-to-wire cũ và không còn là source-of-truth current-state. Dùng để tham khảo quyết định lịch sử; hành vi hiện tại phải đối chiếu với code trong `frontend/src/features/bookings/*`, `frontend/src/features/listings/*`, và `docs/roadmap.md`.
 >
 > **Nguồn sự thật BE**:
 > - `src/main/java/com/rentflow/booking/controller/BookingController.java`
 > - `src/main/java/com/rentflow/booking/service/BookingService.java`
 > - `docs/error-codes.md`, `docs/phase-05-booking-core-executable-spec.md`
 >
-> **Nguồn sự thật FE hiện tại**:
+> **Nguồn tham chiếu FE thời điểm tài liệu được viết**:
 > - `frontend/src/features/bookings/*.tsx`, `frontend/src/features/bookings/types.ts`
 > - `frontend/src/mocks/bookings.ts`, `frontend/src/mocks/listings.ts`
 > - `frontend/src/lib/api-client.ts`, `frontend/src/lib/idempotency.ts`, `frontend/src/lib/server/backend.ts`
@@ -37,7 +37,9 @@ stateDiagram-v2
 
 **Phase 5 actually implements**: tạo `HELD`, cancel `HELD`, expire `HELD` (background scheduler, `SKIP LOCKED`), PATCH location ở `HELD/PENDING_HOST_APPROVAL/CONFIRMED` (`BookingService.java:55-58`).
 
-**Sprint 2-wire FE viewpoint**: chỉ tương tác được với `HELD`. Các trạng thái khác (`CONFIRMED`, `IN_PROGRESS`, `COMPLETED`, `REJECTED`, `PENDING_HOST_APPROVAL`) là **read-only badges** — list + detail có hiển thị, nhưng action button bị disable theo bảng ở mục 1.2.
+**Current backend reality**: backend hiện đã support cancel `PENDING_HOST_APPROVAL` và `CONFIRMED` với void/capture/policy/retry behavior; tài liệu phase cũ trong repo có thể vẫn mô tả đó là Phase 7.
+
+**Current frontend exposure note**: nếu UI hiện tại chưa expose đầy đủ cancel actions ngoài `HELD`, đó là gap ở lớp frontend action exposure chứ không phải backend chưa hỗ trợ.
 
 ---
 
@@ -54,7 +56,7 @@ stateDiagram-v2
                             └─ submit ok → [/bookings/:id] ← banner + countdown
                                             │
                                             ├─ "Edit locations" (HELD|PENDING|CONFIRMED) → PATCH → refetch
-                                            ├─ "Cancel"        (HELD only)                → modal → POST cancel
+                                            ├─ "Cancel"        (frontend current exposure may still be HELD-first; backend supports more states) → modal → POST cancel
                                             ├─ countdown=0                                 → refetch ⇒ EXPIRED
                                             └─ "Pay now"       [Phase 6 — disabled w/ tooltip]
                                             
@@ -89,13 +91,13 @@ stateDiagram-v2
 | Status                 | Edit locations | Cancel | Pay now             |
 |------------------------|:--------------:|:------:|:-------------------:|
 | HELD                   |       ✅       |   ✅   | disabled + tooltip  |
-| PENDING_HOST_APPROVAL  |       ✅       |   ❌   | ❌                  |
-| CONFIRMED              |       ✅       |   ❌   | ❌                  |
+| PENDING_HOST_APPROVAL  |       ✅       | backend-supported; FE exposure may still be pending | ❌ |
+| CONFIRMED              |       ✅       | backend-supported before pickup; FE exposure may still be pending | ❌ |
 | IN_PROGRESS            |       ❌       |   ❌   | ❌                  |
 | COMPLETED              |       ❌       |   ❌   | ❌                  |
 | CANCELLED / REJECTED / EXPIRED | ❌     |   ❌   | ❌                  |
 
-> **"Pay now" copy chuẩn** (Sprint 2-wire): button text `"Pay now"`, state `disabled`, tooltip `"Thanh toán sẽ khả dụng ở Phase 6 (sắp ra mắt)"`. Lý do: ẩn hoàn toàn sẽ làm user CONFIRMED tưởng không còn action nào → tăng support load. Disabled + tooltip set expectation rõ. Hiển thị trên các status mà payment hợp lệ về mặt logic (HELD, PENDING_HOST_APPROVAL, CONFIRMED).
+> **Historical note**: copy được chốt ở thời điểm tài liệu này viết đã cũ. Wording current-state phải theo code hiện tại, không theo placeholder payment tooltip trong doc này.
 
 #### `/me/bookings` — My bookings list
 | Field | Value |
@@ -182,7 +184,8 @@ Mapping codes (theo `docs/error-codes.md` + handler thực tế):
 | Request đang process                   | 409  | `REQUEST_ALREADY_PROCESSING`  | Spinner + auto-retry sau 1.5s (tối đa 2 lần)                  |
 | Listing không khả dụng (overlap dates) | 409  | `LISTING_NOT_AVAILABLE`       | Banner đỏ trên form, gợi ý đổi ngày                          |
 | Customer đã có booking overlap         | 409  | `BOOKING_OVERLAP_CUSTOMER`    | Banner đỏ + link đến `/me/bookings`                           |
-| Status không hợp lệ cho action         | 409  | `BOOKING_INVALID_STATUS`      | Toast + refetch detail (UI tự sync state mới)                |
+| Status/time window không hợp lệ cho cancel | 409  | `BOOKING_INVALID_STATUS`   | Toast + refetch detail (UI tự sync state mới)                |
+| Cancel accepted nhưng void cần retry   | 202  | `PAYMENT_VOID_RETRY_REQUIRED` | Show accepted-state banner; booking đã cancel, payment void sẽ retry nền |
 | Driver chưa verify                     | 403  | `DRIVER_LICENSE_NOT_APPROVED` | Redirect `/me/profile` kèm toast (Phase 8A; Sprint 2-wire chỉ cần hiển thị message vì flag `require-driver-verification=false` mặc định) |
 | Access denied (không phải owner)       | 403  | `ACCESS_DENIED`               | Redirect `/forbidden`                                         |
 | Booking không tồn tại                  | 404  | `LISTING_NOT_FOUND` / 404 chung | Empty state "Booking not found" (đã có ở mock) + link list |
@@ -228,7 +231,7 @@ Lý do: BE expire qua scheduler nên có thể chậm vài giây so với client
 **Exact copy**:
 - button text: `"Pay now"`
 - state: `disabled`
-- tooltip: `"Thanh toán sẽ khả dụng ở Phase 6 (sắp ra mắt)"`
+- tooltip: historical payment-placeholder copy at the time this document was written
 
 Lý do: ẩn hoàn toàn → user CONFIRMED thấy không có action gì nữa, sẽ hỏi support. Disabled + tooltip set expectation rõ và giảm support load.
 
@@ -274,7 +277,7 @@ Confirm OK. Tách thành plan riêng:
 
 ## Out of scope (đẩy plan/sprint riêng)
 
-- Implement BFF routes / replace mocks → **Sprint 2-wire** (plan kế tiếp).
+- Implement BFF routes / replace mocks → historical sprint planning item.
 - Listings + search FE wiring (Phase 3/4) → plan riêng; phải xong trước E2E flow.
 - **Sprint 3 — Host bookings dashboard**: `/host/bookings`, `/host/bookings/:id` (approve/reject `PENDING_HOST_APPROVAL`).
 - **Sprint 4+ — Admin booking view** — plan riêng.
