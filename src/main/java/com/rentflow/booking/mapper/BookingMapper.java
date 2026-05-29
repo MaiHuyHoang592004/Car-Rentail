@@ -9,6 +9,8 @@ import com.rentflow.booking.service.BookingSummaryResponse;
 import com.rentflow.common.web.PageResponse;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.payment.entity.BookingPayment;
+import com.rentflow.payment.repository.BookingPaymentRepository;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,10 +23,18 @@ import org.springframework.stereotype.Component;
 public class BookingMapper {
 
     private final ListingRepository listingRepository;
+    private final BookingPaymentRepository bookingPaymentRepository;
     private final ObjectMapper objectMapper;
+
+    public BookingMapper(ListingRepository listingRepository, ObjectMapper objectMapper) {
+        this(listingRepository, null, objectMapper);
+    }
 
     public BookingSummaryResponse toSummaryResponse(Booking booking) {
         JsonNode priceSnapshot = readTree(booking.getPriceSnapshot());
+        Optional<BookingPayment> payment = bookingPaymentRepository == null
+                ? Optional.empty()
+                : bookingPaymentRepository.findByBookingId(booking.getId());
         return new BookingSummaryResponse(
                 booking.getId(),
                 booking.getStatus(),
@@ -35,12 +45,19 @@ public class BookingMapper {
                 booking.getHoldExpiresAt(),
                 amountFromSnapshot(priceSnapshot, "totalAmount"),
                 textFromSnapshot(priceSnapshot, "currency"),
-                booking.getCreatedAt());
+                booking.getCreatedAt(),
+                payment.map(BookingPayment::isVoidRetryRequired).orElse(false),
+                payment.filter(BookingPayment::isVoidRetryRequired)
+                        .map(BookingPayment::getProviderStatus)
+                        .orElse(null));
     }
 
     public BookingResponse toResponse(Booking booking) {
         JsonNode priceSnapshot = readTree(booking.getPriceSnapshot());
         JsonNode policySnapshot = readTree(booking.getPolicySnapshot());
+        Optional<BookingPayment> payment = bookingPaymentRepository == null
+                ? Optional.empty()
+                : bookingPaymentRepository.findByBookingId(booking.getId());
         return new BookingResponse(
                 booking.getId(),
                 booking.getStatus(),
@@ -57,7 +74,11 @@ public class BookingMapper {
                 textFromSnapshot(priceSnapshot, "currency"),
                 priceSnapshot,
                 policySnapshot,
-                booking.getCreatedAt());
+                booking.getCreatedAt(),
+                payment.map(BookingPayment::isVoidRetryRequired).orElse(false),
+                payment.filter(BookingPayment::isVoidRetryRequired)
+                        .map(BookingPayment::getProviderStatus)
+                        .orElse(null));
     }
 
     public PageResponse<BookingSummaryResponse> toSummaryPage(Page<Booking> page) {

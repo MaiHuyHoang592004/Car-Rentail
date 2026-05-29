@@ -18,6 +18,7 @@ const authedSession = {
   user: {
     id: "u-1",
     email: "u@e.com",
+    emailVerified: false,
     roles: ["CUSTOMER"],
     fullName: "U",
     phone: null,
@@ -55,6 +56,8 @@ const samplePage = {
       holdExpiresAt: null,
       totalAmount: 2280000,
       currency: "VND",
+      voidRetryRequired: false,
+      paymentRetryState: null,
       createdAt: "2026-06-01T00:00:00Z",
     },
   ],
@@ -116,5 +119,45 @@ describe("BookingsListPageView", () => {
     await waitFor(() => {
       expect(within(container).getByText("Chưa có booking nào")).toBeInTheDocument();
     });
+  });
+
+  it("shows retry-state marker for cancelled bookings pending payment cleanup", async () => {
+    fetchSpy.mockResolvedValue(
+      jsonResponse({
+        ...samplePage,
+        content: [
+          {
+            ...samplePage.content[0],
+            status: "CANCELLED",
+            voidRetryRequired: true,
+            paymentRetryState: "VOID_RETRY_REQUIRED",
+          },
+        ],
+      }),
+    );
+    wrap(<BookingsListPageView />);
+
+    expect(
+      await screen.findByText("Đang xử lý hoàn tiền hoặc void trong nền"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show retry-state marker for ordinary cancelled bookings", async () => {
+    fetchSpy.mockResolvedValue(
+      jsonResponse({
+        ...samplePage,
+        content: [
+          {
+            ...samplePage.content[0],
+            status: "CANCELLED",
+            voidRetryRequired: false,
+            paymentRetryState: null,
+          },
+        ],
+      }),
+    );
+    wrap(<BookingsListPageView />);
+    await screen.findByText("Toyota Vios 2022");
+    expect(screen.queryByText("Đang xử lý hoàn tiền hoặc void trong nền")).not.toBeInTheDocument();
   });
 });

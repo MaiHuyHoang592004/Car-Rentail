@@ -17,5 +17,33 @@ public record BookingSummaryResponse(
         Instant holdExpiresAt,
         BigDecimal totalAmount,
         String currency,
-        Instant createdAt) {
+        Instant createdAt,
+        boolean voidRetryRequired,
+        String paymentRetryState) {
+
+    public BookingSummaryResponse(
+            UUID id,
+            BookingStatus status,
+            UUID listingId,
+            String listingTitle,
+            LocalDate pickupDate,
+            LocalDate returnDate,
+            Instant holdExpiresAt,
+            BigDecimal totalAmount,
+            String currency,
+            Instant createdAt) {
+        this(
+                id,
+                status,
+                listingId,
+                listingTitle,
+                pickupDate,
+                returnDate,
+                holdExpiresAt,
+                totalAmount,
+                currency,
+                createdAt,
+                false,
+                null);
+    }
 }

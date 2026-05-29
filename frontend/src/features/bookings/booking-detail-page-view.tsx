@@ -43,6 +43,24 @@ const PAY_NOW_TOOLTIP = "Thanh toán sẽ sớm có mặt.";
 const MAX_EXPIRE_RETRIES = 3;
 const EXPIRE_RETRY_DELAY_MS = 5000;
 
+function getTodayDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatPaymentRetryState(state?: string) {
+  if (!state) {
+    return "Hệ thống đang tiếp tục xử lý hoàn tiền hoặc void trong nền.";
+  }
+  if (state === "VOID_RETRY_REQUIRED") {
+    return "Hệ thống đang retry thao tác void thanh toán trong nền.";
+  }
+  return `Trạng thái xử lý thanh toán hiện tại: ${state}.`;
+}
+
 type BookingDetailPageViewProps = {
   bookingId: string;
 };
@@ -75,13 +93,20 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
   const cancelMutation = useMutation({
     mutationFn: (input: { reason?: string; idempotencyKey: string }) =>
       cancelBooking(bookingId, { reason: input.reason }, input.idempotencyKey),
-    onSuccess: () => {
-      toast.success("Đã hủy booking");
+    onSuccess: (result) => {
+      if (result.voidRetryRequired) {
+        toast.success("Đã hủy booking; hoàn tiền hoặc void sẽ được xử lý tiếp trong nền");
+      } else {
+        toast.success("Đã hủy booking");
+      }
       queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
       queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
       cancelKeyRef.current = null;
     },
     onError: (error: unknown) => {
+      if (error instanceof ApiError && error.code === "BOOKING_INVALID_STATUS") {
+        queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
+      }
       const message =
         error instanceof ApiError ? error.message : "Hủy booking thất bại";
       toast.error(message);
@@ -145,8 +170,19 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
   }
 
   const canEditLocations = LOCATION_EDITABLE_STATUSES.includes(booking.status);
-  const canCancel = booking.status === "HELD";
+  const canCancel =
+    booking.status === "HELD" ||
+    booking.status === "PENDING_HOST_APPROVAL" ||
+    (booking.status === "CONFIRMED" && booking.pickupDate > getTodayDateString());
   const showPayNow = PAY_NOW_VISIBLE_STATUSES.includes(booking.status);
+  const cancelHint =
+    booking.status === "CONFIRMED" && !canCancel
+      ? "Booking đã đến hoặc qua ngày nhận xe nên không còn hủy được từ giao diện này."
+      : booking.status === "PENDING_HOST_APPROVAL"
+        ? "Hủy booking này có thể kích hoạt void thanh toán đang chờ xử lý."
+        : booking.status === "CONFIRMED"
+          ? "Hủy booking này sẽ áp dụng chính sách hiện tại và có thể xử lý thanh toán liên quan."
+          : null;
 
   function openCancelDialog() {
     if (!cancelKeyRef.current) {
@@ -222,6 +258,13 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
             </div>
           ) : null}
 
+          {booking.status === "CANCELLED" && booking.voidRetryRequired ? (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">Booking đã được hủy, nhưng thanh toán vẫn đang được xử lý tiếp.</p>
+              <p className="mt-1">{formatPaymentRetryState(booking.paymentRetryState)}</p>
+            </div>
+          ) : null}
+
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -235,6 +278,7 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
               type="button"
               disabled={!canCancel || cancelMutation.isPending}
               onClick={openCancelDialog}
+              title={!canCancel ? cancelHint ?? undefined : undefined}
               className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
             >
               Hủy booking
@@ -250,6 +294,9 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
               </button>
             ) : null}
           </div>
+          {cancelHint ? (
+            <p className="mt-3 text-sm text-muted-foreground">{cancelHint}</p>
+          ) : null}
         </section>
 
         <LocationSummary pickupLocation={booking.pickupLocation} returnLocation={booking.returnLocation} />
@@ -274,6 +321,7 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
       <CancelBookingDialog
         key={`${booking.id}:${booking.status}:${cancelOpen ? "open" : "closed"}`}
         open={cancelOpen}
+        status={canCancel ? booking.status : null}
         onClose={handleCancelClose}
         onConfirm={handleCancelConfirm}
       />

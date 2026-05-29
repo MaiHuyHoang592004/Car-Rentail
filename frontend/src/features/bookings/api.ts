@@ -43,6 +43,8 @@ type RawBookingResponse = {
   priceSnapshot: unknown;
   policySnapshot: unknown;
   cancellationReason?: string | null;
+  voidRetryRequired?: boolean;
+  paymentRetryState?: string | null;
   createdAt: string;
 };
 
@@ -56,6 +58,8 @@ type RawSummaryResponse = {
   holdExpiresAt: string | null;
   totalAmount: number | string;
   currency: string;
+  voidRetryRequired?: boolean;
+  paymentRetryState?: string | null;
   createdAt: string;
 };
 
@@ -79,6 +83,10 @@ export type CancelBookingResult = {
   id: string;
   status: BookingStatus;
   cancellationReason: string | null;
+  cancelled: boolean;
+  voidRetryRequired: boolean;
+  code: string | null;
+  paymentRetryState: string | null;
 };
 
 function toNumber(value: number | string | null | undefined): number {
@@ -157,6 +165,8 @@ function mapBookingResponse(raw: RawBookingResponse): BookingDetailViewModel {
     totalAmount: toNumber(raw.totalAmount),
     currency: raw.currency,
     cancellationReason: raw.cancellationReason ?? undefined,
+    voidRetryRequired: raw.voidRetryRequired ?? false,
+    paymentRetryState: raw.paymentRetryState ?? undefined,
     priceSnapshot: parsePriceSnapshot(raw.priceSnapshot, raw.currency),
     policySnapshot: parsePolicySnapshot(raw.policySnapshot),
   };
@@ -173,6 +183,8 @@ function mapSummaryResponse(raw: RawSummaryResponse): BookingSummaryViewModel {
     holdExpiresAt: raw.holdExpiresAt ?? undefined,
     totalAmount: toNumber(raw.totalAmount),
     currency: raw.currency,
+    voidRetryRequired: raw.voidRetryRequired ?? false,
+    paymentRetryState: raw.paymentRetryState ?? undefined,
   };
 }
 
@@ -246,11 +258,19 @@ export async function cancelBooking(
     id: string;
     status: BookingStatus;
     cancellationReason: string | null;
+    cancelled?: boolean;
+    voidRetryRequired?: boolean;
+    code?: string | null;
+    paymentRetryState?: string | null;
   }>(`/bookings/${id}/cancel`, { reason: input.reason ?? null }, { idempotencyKey });
   return {
     id: raw.id,
     status: raw.status,
     cancellationReason: raw.cancellationReason,
+    cancelled: raw.cancelled ?? raw.status === "CANCELLED",
+    voidRetryRequired: raw.voidRetryRequired ?? false,
+    code: raw.code ?? null,
+    paymentRetryState: raw.paymentRetryState ?? null,
   };
 }
 
