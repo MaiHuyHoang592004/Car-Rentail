@@ -58,10 +58,12 @@ public class UserService implements AuthUserProfilePort {
     @Override
     @Transactional(readOnly = true)
     public AuthUserProfileResponse getProfile(UUID userId, String email, List<Role> roles) {
+        AuthUser user = authUserRepository.findById(userId).orElseThrow();
         UserProfile profile = userProfileRepository.findByUserId(userId).orElseThrow();
         return new AuthUserProfileResponse(
                 userId,
                 email,
+                Boolean.TRUE.equals(user.getEmailVerified()),
                 roles.stream().map(Role::name).toList(),
                 profile.getFullName(),
                 profile.getPhone(),
@@ -78,7 +80,12 @@ public class UserService implements AuthUserProfilePort {
                 .stream().map(ur -> ur.getRole()).toList();
         UserProfile profile = userProfileRepository.findByUserId(userId).orElseThrow();
 
-        return UserProfileResponse.from(userId, user.getEmail(), roles, profile);
+        return UserProfileResponse.from(
+                userId,
+                user.getEmail(),
+                Boolean.TRUE.equals(user.getEmailVerified()),
+                roles,
+                profile);
     }
 
     @Transactional
@@ -107,7 +114,12 @@ public class UserService implements AuthUserProfilePort {
 
         log.info("Profile updated for user: {}", user.getEmail());
 
-        return UserProfileResponse.from(userId, user.getEmail(), roles, profile);
+        return UserProfileResponse.from(
+                userId,
+                user.getEmail(),
+                Boolean.TRUE.equals(user.getEmailVerified()),
+                roles,
+                profile);
     }
 
     @Transactional(readOnly = true)

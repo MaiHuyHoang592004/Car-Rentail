@@ -47,7 +47,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @Tag("integration")
 @TestPropertySource(properties = {
-        "rentflow.payment.require-email-verification=true",
         "rentflow.payment.bank-transfer.account-number=1234567890",
         "rentflow.payment.bank-transfer.account-name=RENTFLOW ESCROW",
         "rentflow.payment.bank-transfer.transfer-content-prefix=RENTFLOW"

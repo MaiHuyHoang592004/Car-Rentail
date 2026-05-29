@@ -70,6 +70,7 @@ class UserIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.email").value("me@example.com"))
+                .andExpect(jsonPath("$.emailVerified").value(false))
                 .andExpect(jsonPath("$.fullName").value("Me User"))
                 .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"))
                 .andExpect(jsonPath("$.driverVerificationStatus").value("NOT_SUBMITTED"))
@@ -120,6 +121,7 @@ class UserIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("Patched Name"))
                 .andExpect(jsonPath("$.phone").value("0909000000"))
+                .andExpect(jsonPath("$.emailVerified").value(false))
                 .andExpect(jsonPath("$.addressLine").value("New Address"));
     }
 
@@ -161,6 +163,7 @@ class UserIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("Allowed Name"))
                 .andExpect(jsonPath("$.email").value("protected-fields@example.com"))
+                .andExpect(jsonPath("$.emailVerified").value(false))
                 .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"))
                 .andExpect(jsonPath("$.driverVerificationStatus").value("NOT_SUBMITTED"));
     }

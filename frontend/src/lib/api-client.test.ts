@@ -3,10 +3,8 @@ import {
   api,
   apiFetch,
   createApiClient,
-  registerAccessTokenGetter,
-  registerAuthFailedHandler,
-  registerRefreshHandler,
   resetApiClient,
+  setActiveApiClient,
 } from "./api-client";
 import { ApiError } from "./api-error";
 
@@ -32,7 +30,9 @@ describe("api-client", () => {
     fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     resetApiClient();
-    registerRefreshHandler(async () => false);
+    const client = createApiClient();
+    client.setRefreshHandler(async () => false);
+    setActiveApiClient(client);
   });
 
   afterEach(() => {
@@ -48,7 +48,9 @@ describe("api-client", () => {
   });
 
   it("attaches Bearer when token getter returns a token", async () => {
-    registerAccessTokenGetter(() => "tok-123");
+    const client = createApiClient();
+    client.setAccessTokenGetter(() => "tok-123");
+    setActiveApiClient(client);
     fetchSpy.mockResolvedValue(mockResponse(200, { ok: true }));
     await api.get("/users/me");
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
@@ -56,7 +58,9 @@ describe("api-client", () => {
   });
 
   it("skips Authorization when skipAuth=true", async () => {
-    registerAccessTokenGetter(() => "tok-123");
+    const client = createApiClient();
+    client.setAccessTokenGetter(() => "tok-123");
+    setActiveApiClient(client);
     fetchSpy.mockResolvedValue(mockResponse(200, { ok: true }));
     await apiFetch("/auth/login", { method: "POST", body: { a: 1 }, skipAuth: true });
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
@@ -79,9 +83,11 @@ describe("api-client", () => {
   });
 
   it("retries once after a successful refresh on 401", async () => {
-    registerAccessTokenGetter(() => "tok-1");
+    const client = createApiClient();
+    client.setAccessTokenGetter(() => "tok-1");
     const refresh = vi.fn().mockResolvedValue(true);
-    registerRefreshHandler(refresh);
+    client.setRefreshHandler(refresh);
+    setActiveApiClient(client);
 
     fetchSpy
       .mockResolvedValueOnce(mockResponse(401, { code: "AUTH", message: "expired" }))
@@ -94,10 +100,12 @@ describe("api-client", () => {
   });
 
   it("calls authFailed handler when refresh fails on 401", async () => {
+    const client = createApiClient();
     const refresh = vi.fn().mockResolvedValue(false);
     const onFail = vi.fn();
-    registerRefreshHandler(refresh);
-    registerAuthFailedHandler(onFail);
+    client.setRefreshHandler(refresh);
+    client.setAuthFailedHandler(onFail);
+    setActiveApiClient(client);
 
     fetchSpy.mockResolvedValue(mockResponse(401, { code: "AUTH", message: "expired" }));
 
@@ -106,8 +114,10 @@ describe("api-client", () => {
   });
 
   it("does not retry when skipRefresh=true", async () => {
+    const client = createApiClient();
     const refresh = vi.fn().mockResolvedValue(true);
-    registerRefreshHandler(refresh);
+    client.setRefreshHandler(refresh);
+    setActiveApiClient(client);
     fetchSpy.mockResolvedValue(mockResponse(401, { code: "AUTH", message: "x" }));
 
     await expect(apiFetch("/users/me", { skipRefresh: true })).rejects.toBeInstanceOf(ApiError);
@@ -159,7 +169,9 @@ describe("api-client", () => {
   });
 
   it("resetApiClient clears the default client's token getter", async () => {
-    registerAccessTokenGetter(() => "tok-X");
+    const client = createApiClient();
+    client.setAccessTokenGetter(() => "tok-X");
+    setActiveApiClient(client);
     resetApiClient();
     fetchSpy.mockResolvedValue(mockResponse(200, { ok: true }));
     await api.get("/me");

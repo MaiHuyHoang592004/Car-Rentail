@@ -24,6 +24,10 @@ type BookingCreatePageViewProps = {
   isGuest: boolean;
 };
 
+type VerificationGateState = {
+  message: string;
+};
+
 export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageViewProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -44,6 +48,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
   });
   const [overlap, setOverlap] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
+  const [verificationGate, setVerificationGate] = useState<VerificationGateState | null>(null);
   const selectedExtraIds = form.watch("selectedExtraIds");
   const pickupDate = form.watch("pickupDate");
   const errors = form.formState.errors;
@@ -63,6 +68,10 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
     onError: (err: unknown) =>
       handleApiError(err, {
         onCode: {
+          EMAIL_NOT_VERIFIED: (e) =>
+            setVerificationGate({
+              message: e.message || "Bạn cần xác minh email trước khi tạo booking.",
+            }),
           BOOKING_OVERLAP_CUSTOMER: (e) =>
             setOverlap(e.message || "Bạn đã có booking trùng thời gian."),
           LISTING_NOT_AVAILABLE: (e) =>
@@ -95,7 +104,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <h1 className="text-3xl font-bold text-foreground">Không tìm thấy xe</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Listing này hiện không có trong mock data tạm thời (Phase 3 sẽ wire BE).
+            Listing này hiện không khả dụng hoặc đã bị gỡ khỏi hệ thống.
           </p>
         </section>
       </AppShell>
@@ -118,6 +127,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
 
     setOverlap(null);
     setSubmitError(null);
+    setVerificationGate(null);
     createMutation.mutate({
       listingId: listingData.id,
       pickupDate: values.pickupDate,
@@ -159,6 +169,19 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
               className="mt-3 inline-flex rounded-full bg-rose-700 px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
             >
               Xem các booking đang active của bạn
+            </Link>
+          </section>
+        ) : null}
+
+        {verificationGate ? (
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+            <p className="text-sm font-semibold">Email chưa được xác minh</p>
+            <p className="mt-1 text-sm">{verificationGate.message}</p>
+            <Link
+              href="/me/profile"
+              className="mt-3 inline-flex rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              Đi đến hồ sơ để xác minh email
             </Link>
           </section>
         ) : null}

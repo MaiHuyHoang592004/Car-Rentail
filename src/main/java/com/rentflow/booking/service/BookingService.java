@@ -119,7 +119,7 @@ public class BookingService {
             AdminNotificationService adminNotificationService,
             Clock clock,
             @Value("${rentflow.booking.hold-duration-minutes:15}") long holdDurationMinutes,
-            @Value("${rentflow.booking.require-email-verification:false}") boolean requireEmailVerification) {
+            @Value("${rentflow.booking.require-email-verification:true}") boolean requireEmailVerification) {
         this.bookingRepository = bookingRepository;
         this.bookingExtraRepository = bookingExtraRepository;
         this.listingRepository = listingRepository;

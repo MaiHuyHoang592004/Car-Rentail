@@ -14,9 +14,8 @@ import {
 
 import { ApiError } from "@/lib/api-error";
 import {
-  registerAccessTokenGetter,
-  registerAuthFailedHandler,
-  registerRefreshHandler,
+  createApiClient,
+  setActiveApiClient,
 } from "@/lib/api-client";
 
 export type AuthRole = "CUSTOMER" | "HOST" | "ADMIN";
@@ -24,6 +23,7 @@ export type AuthRole = "CUSTOMER" | "HOST" | "ADMIN";
 export type AuthUser = {
   id: string;
   email: string;
+  emailVerified: boolean;
   roles: string[];
   fullName: string;
   phone: string | null;
@@ -105,6 +105,7 @@ export function AuthProvider({
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(initialSession?.user ?? null);
   const [status, setStatus] = useState<AuthStatus>(initialSession ? "authenticated" : "loading");
+  const apiClientRef = useRef(createApiClient());
   const accessTokenRef = useRef<string | null>(initialSession?.accessToken ?? null);
   const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
 
@@ -181,11 +182,16 @@ export function AuthProvider({
   );
 
   useEffect(() => {
-    registerAccessTokenGetter(() => accessTokenRef.current);
-    registerRefreshHandler(refresh);
-    registerAuthFailedHandler(() => {
+    const apiClient = apiClientRef.current;
+    apiClient.setAccessTokenGetter(() => accessTokenRef.current);
+    apiClient.setRefreshHandler(refresh);
+    apiClient.setAuthFailedHandler(() => {
       clearSession();
     });
+    setActiveApiClient(apiClient);
+    return () => {
+      apiClient.reset();
+    };
   }, [refresh, clearSession]);
 
   useEffect(() => {

@@ -49,7 +49,7 @@ rentflow:
     client-ip:
       trusted-proxies: ${RENTFLOW_AUTH_TRUSTED_PROXIES:}
   payment:
-    require-email-verification: ${RENTFLOW_PAYMENT_REQUIRE_EMAIL_VERIFICATION:false}
+    require-email-verification: ${RENTFLOW_PAYMENT_REQUIRE_EMAIL_VERIFICATION:true}
     bank-transfer:
       account-number: ${RENTFLOW_BANK_TRANSFER_ACCOUNT_NUMBER:1234567890}
       account-name: ${RENTFLOW_BANK_TRANSFER_ACCOUNT_NAME:RENTFLOW ESCROW}
@@ -96,7 +96,7 @@ rentflow:
       limit: ${RENTFLOW_PUBLIC_RATE_LIMIT:60}
       window: ${RENTFLOW_PUBLIC_RATE_WINDOW:PT1M}
   booking:
-    require-email-verification: ${RENTFLOW_BOOKING_REQUIRE_EMAIL_VERIFICATION:false}
+    require-email-verification: ${RENTFLOW_BOOKING_REQUIRE_EMAIL_VERIFICATION:true}
     require-driver-verification: ${RENTFLOW_BOOKING_REQUIRE_DRIVER_VERIFICATION:false}
   file:
     signed-url:

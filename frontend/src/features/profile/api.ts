@@ -4,6 +4,7 @@ import type { ProfileViewModel } from "@/features/profile/types";
 interface UserProfileResponse {
   id: string;
   email: string;
+  emailVerified: boolean;
   roles: string[];
   fullName: string;
   phone: string;
@@ -23,6 +24,7 @@ function mapProfile(raw: UserProfileResponse): ProfileViewModel {
   return {
     id: raw.id,
     email: raw.email,
+    emailVerified: raw.emailVerified,
     roles: raw.roles as ProfileViewModel["roles"],
     fullName: raw.fullName,
     phone: raw.phone,
@@ -38,4 +40,8 @@ export async function getProfile(): Promise<ProfileViewModel> {
 
 export async function updateProfile(body: UpdateProfileInput): Promise<ProfileViewModel> {
   return mapProfile(await api.patch<UserProfileResponse>("/users/me", body));
+}
+
+export async function resendVerificationEmail(): Promise<void> {
+  await api.post("/users/me/resend-verification");
 }

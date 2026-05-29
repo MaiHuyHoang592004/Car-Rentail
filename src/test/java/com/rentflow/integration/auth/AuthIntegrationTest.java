@@ -156,6 +156,7 @@ class AuthIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.refreshTokenExpiresAt").exists())
                 .andExpect(jsonPath("$.user.id").exists())
                 .andExpect(jsonPath("$.user.email").value("bob@example.com"))
+                .andExpect(jsonPath("$.user.emailVerified").value(false))
                 .andReturn();
 
         String rawRefreshToken = parseJson(result).get("refreshToken").asText();

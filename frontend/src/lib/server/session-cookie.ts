@@ -59,6 +59,7 @@ export function clearRoleCookie(response: NextResponse) {
 export type SessionUser = {
   id: string;
   email: string;
+  emailVerified: boolean;
   roles: string[];
   fullName: string;
   phone: string | null;

@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/rentflow/page-header";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { StatusBadge } from "@/components/rentflow/status-badge";
 import type { ProfileFormErrors, ProfileFormState } from "@/features/profile/types";
-import { getProfile, updateProfile } from "@/features/profile/api";
+import { getProfile, resendVerificationEmail, updateProfile } from "@/features/profile/api";
 
 function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
   const errors: ProfileFormErrors = {};
@@ -52,6 +52,15 @@ export function ProfilePageView() {
     },
     onError: () => {
       toast.error("Không thể lưu hồ sơ. Vui lòng thử lại.");
+    },
+  });
+  const { mutate: resendVerification, isPending: resendingVerification } = useMutation({
+    mutationFn: resendVerificationEmail,
+    onSuccess: () => {
+      toast.success("Đã gửi lại email xác minh. Vui lòng kiểm tra hộp thư của bạn.");
+    },
+    onError: () => {
+      toast.error("Không thể gửi lại email xác minh. Vui lòng thử lại.");
     },
   });
 
@@ -124,6 +133,23 @@ export function ProfilePageView() {
         {banner ? (
           <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
             {banner}
+          </section>
+        ) : null}
+
+        {!profile.emailVerified ? (
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+            <p className="text-sm font-semibold">Email của bạn chưa được xác minh</p>
+            <p className="mt-1 text-sm">
+              Bạn cần xác minh email trước khi tạo booking hoặc thực hiện thanh toán.
+            </p>
+            <button
+              type="button"
+              onClick={() => resendVerification()}
+              disabled={resendingVerification}
+              className="mt-3 rounded-full bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {resendingVerification ? "Đang gửi..." : "Gửi lại email xác minh"}
+            </button>
           </section>
         ) : null}
 

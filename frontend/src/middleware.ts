@@ -59,12 +59,12 @@ export function middleware(request: NextRequest) {
   const roleCookie = request.cookies.get(ROLE_COOKIE_NAME)?.value;
   const roles = parseRoles(roleCookie);
 
-  if (requirement.roles === null) {
-    return NextResponse.next();
-  }
-
   if (roles.length === 0) {
     return redirectToLogin(request, true);
+  }
+
+  if (requirement.roles === null) {
+    return NextResponse.next();
   }
 
   const allowed = requirement.roles.some((r) => roles.includes(r));
