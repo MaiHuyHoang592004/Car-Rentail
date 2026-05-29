@@ -206,7 +206,7 @@ Base config remains strict outside `local`: non-local startup still requires exp
 - [x] Auth/user basics: register, login, refresh rotation, logout, JWT, RBAC, profile.
 - [x] Vehicle/listing lifecycle: host CRUD, state machines, admin listing approval.
 - [x] Search/availability: public listing search, availability calendar, host block/unblock.
-- [x] Booking core: HELD booking creation, idempotency, overlap prevention, availability locking, cancel HELD booking, hold expiry scheduler.
+- [x] Booking core: HELD booking creation, idempotency, overlap prevention, availability locking, customer cancellation for HELD/pending/confirmed pre-pickup paths, hold expiry scheduler.
 - [x] Frontend shell: Next.js app, auth BFF, auth provider, API client, bookings and host/listing pages.
 
 Current priority: security hardening, scheduler/test stability, API consistency, and release evidence.

@@ -39,7 +39,7 @@ stateDiagram-v2
 
 **Current backend reality**: backend hiện đã support cancel `PENDING_HOST_APPROVAL` và `CONFIRMED` với void/capture/policy/retry behavior; tài liệu phase cũ trong repo có thể vẫn mô tả đó là Phase 7.
 
-**Current frontend exposure note**: nếu UI hiện tại chưa expose đầy đủ cancel actions ngoài `HELD`, đó là gap ở lớp frontend action exposure chứ không phải backend chưa hỗ trợ.
+**Current frontend reality**: booking detail UI hiện đã expose cancel cho `HELD`, `PENDING_HOST_APPROVAL`, và `CONFIRMED` trước pickup. Frontend chỉ gate coarse theo `pickupDate`; backend vẫn là authority cuối cùng cho `BOOKING_INVALID_STATUS`.
 
 ---
 
@@ -56,7 +56,7 @@ stateDiagram-v2
                             └─ submit ok → [/bookings/:id] ← banner + countdown
                                             │
                                             ├─ "Edit locations" (HELD|PENDING|CONFIRMED) → PATCH → refetch
-                                            ├─ "Cancel"        (frontend current exposure may still be HELD-first; backend supports more states) → modal → POST cancel
+                                            ├─ "Cancel"        (`HELD`, `PENDING_HOST_APPROVAL`, `CONFIRMED` trước pickup) → modal → POST cancel
                                             ├─ countdown=0                                 → refetch ⇒ EXPIRED
                                             └─ "Pay now"       [Phase 6 — disabled w/ tooltip]
                                             
@@ -91,8 +91,8 @@ stateDiagram-v2
 | Status                 | Edit locations | Cancel | Pay now             |
 |------------------------|:--------------:|:------:|:-------------------:|
 | HELD                   |       ✅       |   ✅   | disabled + tooltip  |
-| PENDING_HOST_APPROVAL  |       ✅       | backend-supported; FE exposure may still be pending | ❌ |
-| CONFIRMED              |       ✅       | backend-supported before pickup; FE exposure may still be pending | ❌ |
+| PENDING_HOST_APPROVAL  |       ✅       | ✅ | ❌ |
+| CONFIRMED              |       ✅       | ✅ trước pickup; sau pickup disabled và backend vẫn là authority cuối cùng | ❌ |
 | IN_PROGRESS            |       ❌       |   ❌   | ❌                  |
 | COMPLETED              |       ❌       |   ❌   | ❌                  |
 | CANCELLED / REJECTED / EXPIRED | ❌     |   ❌   | ❌                  |

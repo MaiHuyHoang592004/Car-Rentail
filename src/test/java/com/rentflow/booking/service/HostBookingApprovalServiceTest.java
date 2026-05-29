@@ -23,6 +23,7 @@ import com.rentflow.payment.entity.BookingPayment;
 import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
 import com.rentflow.payment.entity.PaymentTransaction;
+import com.rentflow.payment.entity.PaymentTransactionStatus;
 import com.rentflow.payment.provider.PaymentProvider;
 import com.rentflow.payment.provider.PaymentProviderRouter;
 import com.rentflow.payment.provider.VoidResult;
@@ -33,6 +34,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -47,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -98,6 +104,30 @@ class HostBookingApprovalServiceTest {
         when(correlationIdHelper.getOrGenerate()).thenReturn("corr-1");
         when(paymentProviderRouter.route(PaymentProviderType.COREBANK)).thenReturn(paymentProvider);
         when(paymentTransactionRepository.save(any(PaymentTransaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentTransactionRepository.findByIdForUpdate(any())).thenAnswer(invocation -> {
+            UUID txId = invocation.getArgument(0);
+            PaymentTransaction tx = new PaymentTransaction();
+            tx.setId(txId);
+            return Optional.of(tx);
+        });
+        PlatformTransactionManager transactionManager = new AbstractPlatformTransactionManager() {
+            @Override
+            protected Object doGetTransaction() {
+                return new Object();
+            }
+
+            @Override
+            protected void doBegin(Object transaction, TransactionDefinition definition) {
+            }
+
+            @Override
+            protected void doCommit(DefaultTransactionStatus status) {
+            }
+
+            @Override
+            protected void doRollback(DefaultTransactionStatus status) {
+            }
+        };
 
         service = new HostBookingApprovalService(
                 bookingRepository,
@@ -111,7 +141,8 @@ class HostBookingApprovalServiceTest {
                 paymentProviderRouter,
                 correlationIdHelper,
                 objectMapper,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                transactionManager);
     }
 
     @Test
@@ -250,6 +281,118 @@ class HostBookingApprovalServiceTest {
         verify(paymentProvider, never()).voidAuthorization(any());
     }
 
+    @Test
+    void rejectFinalizeRevalidatesBookingStatusBeforeOverwriting() {
+        when(securityContext.currentUserId()).thenReturn(HOST_ID);
+        when(idempotencyService.computeHash(any())).thenReturn("hash");
+        when(idempotencyService.resolve(HOST_ID, IdempotencyScope.HOST_REJECT_BOOKING, IDEMPOTENCY_KEY, "hash"))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+
+        Booking prepareBooking = pendingBooking();
+        Booking racedBooking = pendingBooking();
+        racedBooking.setStatus(BookingStatus.CONFIRMED);
+        racedBooking.setHostApprovalExpiresAt(null);
+        racedBooking.setHoldToken(null);
+        racedBooking.setHoldExpiresAt(null);
+
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID))
+                .thenReturn(Optional.of(prepareBooking), Optional.of(racedBooking));
+
+        BookingPayment preparePayment = authorizedPayment();
+        BookingPayment finalizePayment = authorizedPayment();
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID))
+                .thenReturn(Optional.of(preparePayment), Optional.of(finalizePayment));
+
+        List<AvailabilityCalendar> prepareRows = heldRows();
+        List<AvailabilityCalendar> finalizeRows = heldRows();
+        when(availabilityReserver.lockForBooking(prepareBooking)).thenReturn(prepareRows);
+        when(availabilityReserver.lockForBooking(racedBooking)).thenReturn(finalizeRows);
+
+        when(paymentProvider.voidAuthorization(any())).thenReturn(new VoidResult("VOIDED", "{\"status\":\"VOIDED\"}"));
+
+        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "PAYMENT_FINALIZATION_UNSAFE");
+
+        assertThat(racedBooking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(finalizePayment.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
+        assertUnsafeFinalizationRecorded();
+        verify(availabilityReserver, never()).saveRows(finalizeRows);
+        verify(bookingRepository, never()).save(racedBooking);
+        verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_ID);
+        verify(idempotencyService, never()).complete(eq(IDEMPOTENCY_ID), eq(200), any());
+        verify(bookingMapper, never()).toResponse(any());
+    }
+
+    @Test
+    void rejectFinalizeRevalidatesPaymentStatusBeforeOverwriting() {
+        when(securityContext.currentUserId()).thenReturn(HOST_ID);
+        when(idempotencyService.computeHash(any())).thenReturn("hash");
+        when(idempotencyService.resolve(HOST_ID, IdempotencyScope.HOST_REJECT_BOOKING, IDEMPOTENCY_KEY, "hash"))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+
+        Booking prepareBooking = pendingBooking();
+        Booking finalizeBooking = pendingBooking();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID))
+                .thenReturn(Optional.of(prepareBooking), Optional.of(finalizeBooking));
+
+        BookingPayment preparePayment = authorizedPayment();
+        BookingPayment finalizedPayment = authorizedPayment();
+        finalizedPayment.setStatus(PaymentStatus.VOIDED);
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID))
+                .thenReturn(Optional.of(preparePayment), Optional.of(finalizedPayment));
+
+        List<AvailabilityCalendar> prepareRows = heldRows();
+        List<AvailabilityCalendar> finalizeRows = heldRows();
+        when(availabilityReserver.lockForBooking(prepareBooking)).thenReturn(prepareRows);
+        when(availabilityReserver.lockForBooking(finalizeBooking)).thenReturn(finalizeRows);
+        when(paymentProvider.voidAuthorization(any())).thenReturn(new VoidResult("VOIDED", "{\"status\":\"VOIDED\"}"));
+
+        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "PAYMENT_FINALIZATION_UNSAFE");
+
+        assertThat(finalizeBooking.getStatus()).isEqualTo(BookingStatus.PENDING_HOST_APPROVAL);
+        assertThat(finalizedPayment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
+        assertUnsafeFinalizationRecorded();
+        verify(availabilityReserver, never()).saveRows(finalizeRows);
+        verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_ID);
+    }
+
+    @Test
+    void rejectFinalizeRevalidatesAvailabilityBeforeOverwriting() {
+        when(securityContext.currentUserId()).thenReturn(HOST_ID);
+        when(idempotencyService.computeHash(any())).thenReturn("hash");
+        when(idempotencyService.resolve(HOST_ID, IdempotencyScope.HOST_REJECT_BOOKING, IDEMPOTENCY_KEY, "hash"))
+                .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
+
+        Booking prepareBooking = pendingBooking();
+        Booking finalizeBooking = pendingBooking();
+        when(bookingRepository.findByIdForUpdate(BOOKING_ID))
+                .thenReturn(Optional.of(prepareBooking), Optional.of(finalizeBooking));
+
+        BookingPayment preparePayment = authorizedPayment();
+        BookingPayment finalizePayment = authorizedPayment();
+        when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID))
+                .thenReturn(Optional.of(preparePayment), Optional.of(finalizePayment));
+
+        List<AvailabilityCalendar> prepareRows = heldRows();
+        List<AvailabilityCalendar> finalizeRows = mismatchedHeldRows();
+        when(availabilityReserver.lockForBooking(prepareBooking)).thenReturn(prepareRows);
+        when(availabilityReserver.lockForBooking(finalizeBooking)).thenReturn(finalizeRows);
+        when(paymentProvider.voidAuthorization(any())).thenReturn(new VoidResult("VOIDED", "{\"status\":\"VOIDED\"}"));
+
+        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "PAYMENT_FINALIZATION_UNSAFE");
+
+        assertThat(finalizeBooking.getStatus()).isEqualTo(BookingStatus.PENDING_HOST_APPROVAL);
+        assertThat(finalizePayment.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
+        assertUnsafeFinalizationRecorded();
+        verify(availabilityReserver, never()).saveRows(finalizeRows);
+        verify(idempotencyFailureMarker).markFailed(IDEMPOTENCY_ID);
+    }
+
     private Booking pendingBooking() {
         Booking booking = new Booking();
         booking.setId(BOOKING_ID);
@@ -288,6 +431,26 @@ class HostBookingApprovalServiceTest {
         second.setStatus(AvailabilityStatus.HOLD);
         second.setBookingId(BOOKING_ID);
         return List.of(first, second);
+    }
+
+    private List<AvailabilityCalendar> mismatchedHeldRows() {
+        AvailabilityCalendar first = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 6, 1));
+        first.setStatus(AvailabilityStatus.FREE);
+        first.setBookingId(null);
+        AvailabilityCalendar second = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 6, 2));
+        second.setStatus(AvailabilityStatus.HOLD);
+        second.setBookingId(BOOKING_ID);
+        return List.of(first, second);
+    }
+
+    private void assertUnsafeFinalizationRecorded() {
+        ArgumentCaptor<PaymentTransaction> txCaptor = ArgumentCaptor.forClass(PaymentTransaction.class);
+        verify(paymentTransactionRepository, atLeast(2)).save(txCaptor.capture());
+        assertThat(txCaptor.getAllValues())
+                .anySatisfy(tx -> {
+                    assertThat(tx.getStatus()).isEqualTo(PaymentTransactionStatus.FAILED);
+                    assertThat(tx.getProviderErrorCode()).isEqualTo("PAYMENT_FINALIZATION_UNSAFE");
+                });
     }
 
     private BookingResponse bookingResponse(BookingStatus status) {

@@ -96,6 +96,29 @@ class VehicleLifecycleIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void createVehicle_blankCity_returnsValidationError() throws Exception {
+        mockMvc.perform(post("/api/v1/host/vehicles")
+                .header("Authorization", "Bearer " + hostToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "category": "SEDAN",
+                      "make": "Toyota",
+                      "model": "Camry",
+                      "year": 2020,
+                      "plateNumber": "ABC-123",
+                      "vin": "1HGBH41JXMN109186",
+                      "transmission": "AUTO",
+                      "fuelType": "PETROL",
+                      "seats": 5,
+                      "city": "   "
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     void listVehicles_returnsAllVehicles() throws Exception {
         String vehicleId = createVehicle("SEDAN", "BMW", "3 Series", 2022, "AA-1", "AUTO", "PETROL", 5);
 

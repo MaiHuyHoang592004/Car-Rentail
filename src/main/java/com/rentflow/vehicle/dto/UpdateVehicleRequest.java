@@ -6,6 +6,7 @@ import com.rentflow.vehicle.entity.VehicleCategory;
 import com.rentflow.vehicle.entity.VehicleStatus;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record UpdateVehicleRequest(
@@ -31,6 +32,7 @@ public record UpdateVehicleRequest(
 
     VehicleStatus status,
 
+    @Pattern(regexp = "^(?!\\s*$).+", message = "City must not be blank")
     @Size(max = 100, message = "City must be at most 100 characters")
     String city
 ) {}

@@ -113,9 +113,14 @@ public class CoreBankVoidService {
             UUID paymentId,
             UUID idempotencyKeyId,
             String clientIdempotencyKey) {
-        BookingPayment payment = bookingPaymentRepository.findByIdForUpdate(paymentId)
+        // 1. Read payment to get bookingId (no lock yet)
+        BookingPayment payment = bookingPaymentRepository.findById(paymentId)
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(paymentId)));
+        // 2. Lock booking first (canonical order)
         Booking booking = bookingRepository.findByIdForUpdate(payment.getBookingId())
+                .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(paymentId)));
+        // 3. Lock payment second (canonical order)
+        payment = bookingPaymentRepository.findByIdForUpdate(paymentId)
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(paymentId)));
         requireCanMutate(actorId, booking);
         validateVoid(payment);
@@ -146,9 +151,10 @@ public class CoreBankVoidService {
     }
 
     private PaymentDetailResponse finalizeVoid(PreparedVoidContext prepared, VoidResult result) {
-        BookingPayment payment = bookingPaymentRepository.findByIdForUpdate(prepared.paymentId())
-                .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
+        // Lock booking before payment (canonical order)
         Booking booking = bookingRepository.findByIdForUpdate(prepared.bookingId())
+                .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
+        BookingPayment payment = bookingPaymentRepository.findByIdForUpdate(prepared.paymentId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));

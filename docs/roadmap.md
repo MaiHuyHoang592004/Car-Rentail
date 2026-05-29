@@ -20,7 +20,7 @@ Code hiện tại không còn ở Phase 1-5 thuần. Backend đã có:
 - User/profile basics.
 - Vehicle/listing lifecycle.
 - Availability generation, public/host availability, block/unblock.
-- Booking core: create booking, cancel HELD booking, patch location, idempotency, customer overlap, availability locking.
+- Booking core: create booking, customer cancellation across `HELD` / `PENDING_HOST_APPROVAL` / `CONFIRMED` (pre-pickup) paths, patch location, idempotency, customer overlap, availability locking.
 - Payment baseline: authorize/capture/void/refund flows, provider routing, reconciliation state.
 - Phase 9 baseline slices: files metadata, trip lifecycle, reviews, disputes, reports, outbox publisher, CI/observability.
 
@@ -64,7 +64,6 @@ Frontend đã tồn tại trong `frontend/` với:
 | Issue | Category | Severity | Evidence | Status | Suggested phase |
 |---|---|---:|---|---|---|
 | Docs/code drift | Docs | Critical | README/roadmap cũ nói Phase 1 nhưng code có auth/booking/frontend | Confirmed | Immediate |
-| Cancel booking chỉ cho `HELD` | Feature | Important | `BookingService.cancelBooking()` check `booking.getStatus() != BookingStatus.HELD` | Confirmed | Phase 7 |
 | JWT key rotation/JWK | Security | Nice | Chỉ thấy HS/JWT config, chưa thấy multi-key/JWK | Spec-only | Future |
 | Kafka/outbox publisher | Backend/Ops | Nice | SRS/roadmap có nhưng chưa cần trước DB outbox | Spec-only | Phase 9 |
 | Full i18n | UX | Nice | Cần sau khi UI text được thống nhất | Spec-only | Later |
@@ -177,8 +176,8 @@ Frontend đã tồn tại trong `frontend/` với:
 
 ### Transaction boundaries and state machine
 
-- Keep Phase 5 cancel limited to HELD but document clearly.
-- Current backend already supports cancel `PENDING_HOST_APPROVAL` and `CONFIRMED` with payment void/capture/retry behavior; remaining work is current-state doc sync, frontend action exposure, and timeline/audit breadth.
+- Current backend already supports cancel `HELD`, `PENDING_HOST_APPROVAL`, and `CONFIRMED` before pickup with payment void/capture/retry behavior.
+- Current frontend customer detail already exposes cancel for those supported states with a coarse pickup-date gate; remaining work is timeline/audit breadth and UX polish rather than cancellation capability.
 - Decide whether booking PATCH needs idempotency once timeline/audit exists.
 
 ### Exception handling
