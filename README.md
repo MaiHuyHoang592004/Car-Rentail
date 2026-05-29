@@ -47,6 +47,20 @@ com.rentflow
 
 ## How to Run
 
+### Quick Start (PowerShell / Windows)
+
+Preferred local backend workflow:
+
+```powershell
+.\scripts\dev-backend.ps1
+```
+
+This script:
+- checks Docker CLI and daemon availability
+- starts `postgres` and `redis` with `docker compose up -d` when needed
+- waits for `localhost:5433` and `localhost:6379`
+- runs `mvnw.cmd spring-boot:run`
+
 ### Prerequisites
 
 - Java 17
@@ -56,10 +70,12 @@ com.rentflow
 ### Start Infrastructure
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Run Application (local)
+
+The default Spring profile is `local`. After infrastructure is up, start the backend with:
 
 ```bash
 mvn spring-boot:run
@@ -71,14 +87,21 @@ Or with the Maven wrapper (once generated with `mvn wrapper:wrapper`):
 ./mvnw spring-boot:run
 ```
 
+Manual fallback:
+
+```powershell
+docker compose up -d
+.\mvnw.cmd spring-boot:run
+```
+
 ### Access Points
 
 | URL | Description |
 |---|---|
-| http://localhost:8086/swagger-ui.html | API Documentation |
-| http://localhost:8086/api-docs | OpenAPI JSON |
-| http://localhost:8086/api/v1/health | Health Check |
-| http://localhost:8086/actuator/health | Actuator Health |
+| http://localhost:8087/swagger-ui.html | API Documentation |
+| http://localhost:8087/api-docs | OpenAPI JSON |
+| http://localhost:8087/api/v1/health | Health Check |
+| http://localhost:8087/actuator/health | Actuator Health |
 
 ## How to Run Tests
 
@@ -145,6 +168,25 @@ Migrations are in `src/main/resources/db/migration/`. Flyway runs automatically 
 | DB_PASSWORD | rentflow | Database password |
 | SPRING_PROFILES_ACTIVE | local | Spring profile |
 
+### Local profile defaults
+
+The `local` profile is intended to boot without manually exporting secrets on a new machine. These defaults are for local development only and can still be overridden with environment variables:
+
+| Setting | Local default |
+|---|---|
+| `JWT_SECRET` | embedded dev-only value in `application-local.yml` |
+| `ENCRYPTION_SECRET_KEY` | Base64 32-byte dev key in `application-local.yml` |
+| `RENTFLOW_FILE_SIGNED_URL_SECRET` | `rentflow-local-file-signed-url-secret-1234567890` |
+
+Base config remains strict outside `local`: non-local startup still requires explicit JWT, encryption, and signed-url secrets.
+
+### Local helper scripts
+
+| Script | Purpose |
+|---|---|
+| `.\scripts\dev-preflight.ps1` | Verify Docker daemon, container state, and port reachability for PostgreSQL/Redis |
+| `.\scripts\dev-backend.ps1` | Run preflight, auto-start infra if needed, then start the backend |
+
 ## API Response Format
 
 ```json
@@ -202,12 +244,20 @@ If port 5433 is already in use on your machine, either:
 mvn spring-boot:run
 ```
 
+Expected local health endpoint:
+
+```text
+http://localhost:8087/actuator/health
+```
+
 ### Common Issues
 
 | Issue | Solution |
 |---|---|
 | `password authentication failed` | Reset Docker volumes with `docker compose down -v` |
 | `Connection refused` | Ensure Docker Compose is running (`docker compose up -d`) |
+| `failed to connect to the docker API` | Start Docker Desktop and wait until the daemon is fully available, then rerun `.\scripts\dev-backend.ps1` |
+| `Docker CLI was not found in PATH` | Install Docker Desktop or fix your PATH before running the local scripts |
 | Port 5432/5433 in use | Stop local PostgreSQL or change Docker external port |
 | Old data persists | Use `docker compose down -v` to remove volumes |
 
