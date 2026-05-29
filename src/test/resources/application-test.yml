@@ -24,8 +24,19 @@ encryption:
   secret: Q6iaj8bzwS3UjXZTvgin7MChtBS6lhUZmj19bHF6z1o=
 
 rentflow:
+  file:
+    signed-url:
+      secret: test-signed-url-secret-1234567890-abcdef
   scheduler:
     expire-held-bookings:
       enabled: false
+    expire-host-approvals:
+      enabled: false
+    expire-driver-verifications:
+      enabled: false
     idempotency-cleanup:
+      enabled: false
+    void-retry:
+      enabled: false
+    outbox-publisher:
       enabled: false
