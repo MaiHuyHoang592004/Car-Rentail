@@ -4,12 +4,12 @@ Car rental booking system backend — modular monolith REST API.
 
 ## Current Phase
 
-**Phase 1-5 partially implemented; Phase 6+ planned.**
+**Phase 1-9 baseline implemented; hardening and release-gate stabilization in progress.**
 
-The codebase is no longer a foundation-only skeleton. Backend auth/user, vehicle/listing,
-availability, and booking core are implemented, with hardening/refactor work tracked in
-[`docs/roadmap.md`](docs/roadmap.md). Frontend exists under `frontend/` and is partially
-integrated with the API, but some public/host listing flows still use mocks.
+Core backend flows for auth/user, vehicle/listing, availability, booking, payment,
+trip lifecycle, review, dispute, notification, outbox, and reporting are present.
+Current focus is hardening and regression safety before release. See
+[`docs/roadmap.md`](docs/roadmap.md) for the latest implementation slices.
 
 ## Tech Stack
 
@@ -34,10 +34,14 @@ com.rentflow
 ├── listing       # Listing lifecycle, search, admin approval
 ├── availability  # Availability calendar and host block/unblock
 ├── booking       # Booking hold creation, cancellation, idempotency, locking
-├── payment       # Payment stub (future)
-├── notification  # Notifications (future)
-├── audit         # Audit logging (future)
-├── outbox        # Outbox events (future)
+├── payment       # Authorization/capture/void/refund + reconciliation state
+├── trip          # Check-in/check-out lifecycle and capture trigger
+├── review        # Booking review and listing rating aggregation
+├── dispute       # Customer dispute and admin resolution workflow
+├── notification  # In-app notification flows
+├── audit         # Audit trail for sensitive actions
+├── outbox        # Transactional outbox + publisher retries
+├── report        # Admin revenue / host earning reports
 └── common       # Shared: config, exception, security, web
 ```
 
@@ -163,7 +167,7 @@ Migrations are in `src/main/resources/db/migration/`. Flyway runs automatically 
 - [x] Booking core: HELD booking creation, idempotency, overlap prevention, availability locking, cancel HELD booking, hold expiry scheduler.
 - [x] Frontend shell: Next.js app, auth BFF, auth provider, API client, bookings and host/listing pages.
 
-Current priority: harden Phase 1-5 correctness/security/frontend integration before building Phase 6 payment.
+Current priority: security hardening, scheduler/test stability, API consistency, and release evidence.
 
 ## Troubleshooting
 
@@ -209,12 +213,10 @@ mvn spring-boot:run
 
 ## Upcoming
 
-- Phase 1-5 hardening: idempotency transaction boundaries, auth security baseline, frontend API integration, docs/source-of-truth cleanup.
-- Phase 6: Payment — authorize, capture, void, refund.
-- Phase 7: Cancellation + Audit + Timeline
-- Phase 8A: Driver Verification
-- Phase 8B: Hardening + Notifications + Rate Limiting
-- Phase 9: P2 Extensions
+- Security hardening and secret-management tightening.
+- Full regression gate for cancellation/payment-void retry contracts.
+- Integration test stabilization on Docker-enabled CI runners.
+- Frontend test environment and API contract sync.
 
 ## License
 
