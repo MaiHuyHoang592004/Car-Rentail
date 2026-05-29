@@ -17,17 +17,21 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     Page<Review> findByListingIdOrderByCreatedAtDesc(UUID listingId, Pageable pageable);
 
-    @Query("SELECT AVG(r.rating), COUNT(r) FROM Review r WHERE r.listingId = :listingId")
-    Object[] aggregateRatingByListingId(@Param("listingId") UUID listingId);
+    long countByListingId(UUID listingId);
+
+    @Query("SELECT COALESCE(AVG(r.rating), 0) FROM Review r WHERE r.listingId = :listingId")
+    BigDecimal averageRatingByListingId(@Param("listingId") UUID listingId);
 
     default RatingAggregate loadRatingAggregate(UUID listingId) {
-        Object[] tuple = aggregateRatingByListingId(listingId);
-        if (tuple == null || tuple.length < 2 || tuple[1] == null) {
+        long count = countByListingId(listingId);
+        if (count == 0) {
             return new RatingAggregate(BigDecimal.ZERO, 0);
         }
-        BigDecimal average = tuple[0] == null ? BigDecimal.ZERO : new BigDecimal(tuple[0].toString());
-        Number countNumber = (Number) tuple[1];
-        return new RatingAggregate(average, countNumber.intValue());
+        BigDecimal average = averageRatingByListingId(listingId);
+        if (average == null) {
+            average = BigDecimal.ZERO;
+        }
+        return new RatingAggregate(average, Math.toIntExact(count));
     }
 
     record RatingAggregate(BigDecimal averageRating, int reviewCount) {

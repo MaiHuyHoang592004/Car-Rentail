@@ -2,6 +2,7 @@ package com.rentflow.vehicle.controller;
 
 import com.rentflow.common.web.PageResponse;
 import com.rentflow.common.web.PageableValidation;
+import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.security.UserPrincipal;
 import com.rentflow.vehicle.dto.CreateVehicleRequest;
 import com.rentflow.vehicle.dto.UpdateVehicleRequest;
@@ -54,7 +55,8 @@ public class VehicleController {
         if (status != null && !status.isBlank()) {
             try {
                 statusEnum = VehicleStatus.valueOf(status.toUpperCase());
-            } catch (IllegalArgumentException ignored) {
+            } catch (IllegalArgumentException ex) {
+                throw new ValidationException("Invalid vehicle status: " + status);
             }
         }
 

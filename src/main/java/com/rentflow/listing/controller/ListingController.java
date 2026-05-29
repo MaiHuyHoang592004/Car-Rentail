@@ -1,6 +1,7 @@
 package com.rentflow.listing.controller;
 
 import com.rentflow.common.security.UserPrincipal;
+import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.web.PageResponse;
 import com.rentflow.common.web.PageableValidation;
 import com.rentflow.listing.dto.ListingResponse;
@@ -54,7 +55,8 @@ public class ListingController {
         if (status != null && !status.isBlank()) {
             try {
                 statusEnum = ListingStatus.valueOf(status.toUpperCase());
-            } catch (IllegalArgumentException ignored) {
+            } catch (IllegalArgumentException ex) {
+                throw new ValidationException("Invalid listing status: " + status);
             }
         }
 
