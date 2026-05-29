@@ -1,13 +1,15 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { ArrowLeft, CalendarDays, Save, Trash2 } from "lucide-react";
 
-import { AppShell } from "@/components/rentflow/app-shell";
-import { PageHeader } from "@/components/rentflow/page-header";
+import { WorkspaceSidebar } from "@/components/rentflow/workspace-sidebar";
+import { HostWorkspaceNav } from "@/features/host/components/host-workspace-nav";
 import { StatusBadge } from "@/components/rentflow/status-badge";
 import { listingFormSchema, type HostListingFormState } from "@/features/host/forms";
 import { HostActionDialog } from "@/features/host/components/host-action-dialog";
@@ -20,6 +22,8 @@ import {
   ListingTransitionError,
 } from "@/features/host/listings/api";
 import type { HostListingViewModel } from "@/features/host/types";
+import { getListingStatusLabel } from "@/lib/display-labels";
+import { formatMoney } from "@/lib/formatters";
 
 type HostListingDetailPageViewProps = {
   listingId: string;
@@ -69,10 +73,10 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
     mutationFn: () => submitListingSafe(listingId),
     onSuccess: (updated) => {
       queryClient.setQueryData(["host", "listings", listingId], updated);
-      setBanner({ type: "success", message: "Listing submitted for approval." });
+      setBanner({ type: "success", message: "Da gui yeu cau duyet thanh cong." });
     },
     onError: (err: ListingTransitionError) => {
-      setBanner({ type: "error", message: err.message || "Failed to submit listing." });
+      setBanner({ type: "error", message: err.message || "Loi khi gui duyet." });
     },
   });
 
@@ -80,11 +84,11 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
     mutationFn: () => archiveListingSafe(listingId),
     onSuccess: (updated) => {
       queryClient.setQueryData(["host", "listings", listingId], updated);
-      setBanner({ type: "success", message: "Listing archived." });
+      setBanner({ type: "success", message: "Da luu kho tin dang thanh cong." });
       setArchiveOpen(false);
     },
     onError: (err: ListingTransitionError) => {
-      setBanner({ type: "error", message: err.message || "Failed to archive listing." });
+      setBanner({ type: "error", message: err.message || "Loi khi luu kho." });
       setArchiveOpen(false);
     },
   });
@@ -93,41 +97,41 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
     mutationFn: () => reactivateListingSafe(listingId),
     onSuccess: (updated) => {
       queryClient.setQueryData(["host", "listings", listingId], updated);
-      setBanner({ type: "success", message: "Listing reactivated." });
+      setBanner({ type: "success", message: "Da kich hoat lai tin dang." });
       setReactivateOpen(false);
     },
     onError: (err: ListingTransitionError) => {
-      setBanner({ type: "error", message: err.message || "Failed to reactivate listing." });
+      setBanner({ type: "error", message: err.message || "Loi khi kich hoat." });
       setReactivateOpen(false);
     },
   });
 
   if (isLoading) {
     return (
-      <AppShell activePath="/host/listings">
+      <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/listings">
         <div className="flex items-center justify-center p-20">
-          <p className="text-sm text-muted-foreground">Loading listing...</p>
+          <p className="text-sm text-muted-foreground">Dang tai thong tin tin dang...</p>
         </div>
-      </AppShell>
+      </WorkspaceSidebar>
     );
   }
 
   if (isError || !listing) {
     return (
-      <AppShell activePath="/host/listings">
+      <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/listings">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <h1 className="text-3xl font-bold text-foreground">Listing not found</h1>
+          <h1 className="text-2xl font-bold text-foreground">Khong tim thay tin dang</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            The listing does not exist or you do not have permission to view it.
+            Tin dang nay khong ton tai hoac ban khong co quyen truy cap.
           </p>
           <Link
             href="/host/listings"
             className="mt-4 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
-            Back to listings
+            Quay lai danh sach
           </Link>
         </section>
-      </AppShell>
+      </WorkspaceSidebar>
     );
   }
 
@@ -141,38 +145,41 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
     if (!canEdit) {
       return;
     }
-    setBanner(null);
-    setBanner({ type: "success", message: "Save is read-only in this implementation. Use the API to update listings." });
-  }
-
-  function handleSubmitForApproval() {
-    submitMutation.mutate();
-  }
-
-  function handleArchive() {
-    archiveMutation.mutate();
-  }
-
-  function handleReactivate() {
-    reactivateMutation.mutate();
+    setBanner({ type: "success", message: "Chinh sua tin dang se duoc bo sung o phien ban sau." });
   }
 
   return (
-    <AppShell activePath="/host/listings">
-      <div className="space-y-6">
-        <PageHeader
-          title={`Listing Detail: ${listingId}`}
-          description="Manage listing information and lifecycle actions."
-          actions={
+    <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/listings">
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <Link
-              href={`/host/listings/${listingId}/availability`}
-              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+              href="/host/listings"
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Availability
+              <ArrowLeft className="h-4 w-4" />
+              Quay lai
             </Link>
-          }
-        />
+            <span className="text-muted-foreground">|</span>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-foreground truncate max-w-sm">{currentListing.title}</h1>
+              <StatusBadge
+                status={currentListing.status}
+                label={getListingStatusLabel(currentListing.status)}
+              />
+            </div>
+          </div>
+          <Link
+            href={`/host/listings/${listingId}/availability`}
+            className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm font-semibold text-foreground hover:bg-accent"
+          >
+            <CalendarDays className="h-4 w-4" />
+            Lich xe
+          </Link>
+        </div>
 
+        {/* Banner */}
         {banner ? (
           <section
             className={`rounded-xl border px-4 py-3 text-sm ${
@@ -185,43 +192,59 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
           </section>
         ) : null}
 
+        {/* Listing card */}
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          {/* Price summary */}
+          <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-background p-3">
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Current status</p>
-              <div className="mt-1">
-                <StatusBadge status={currentListing.status} />
-              </div>
+              <p className="text-xs text-muted-foreground">Gia / ngay</p>
+              <p className="text-lg font-bold text-foreground">
+                {formatMoney(currentListing.basePricePerDay, currentListing.currency)}
+              </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={!canSubmit || submitMutation.isPending}
-                onClick={handleSubmitForApproval}
-                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
-              >
-                {submitMutation.isPending ? "Submitting..." : "Submit"}
-              </button>
-              <button
-                type="button"
-                disabled={!canArchive || archiveMutation.isPending}
-                onClick={() => setArchiveOpen(true)}
-                className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
-              >
-                {archiveMutation.isPending ? "Archiving..." : "Archive"}
-              </button>
-              <button
-                type="button"
-                disabled={!canReactivate || reactivateMutation.isPending}
-                onClick={() => setReactivateOpen(true)}
-                className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:bg-accent"
-              >
-                {reactivateMutation.isPending ? "Reactivating..." : "Reactivate"}
-              </button>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">{currentListing.city}</p>
+              <p className="text-sm text-foreground">{currentListing.vehicleLabel}</p>
             </div>
           </div>
 
-          <form onSubmit={form.handleSubmit(handleSave)} noValidate className="space-y-4">
+          {/* Action bar */}
+          <div className="flex flex-wrap gap-2">
+            {canSubmit ? (
+              <button
+                type="button"
+                disabled={submitMutation.isPending}
+                onClick={() => submitMutation.mutate()}
+                className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
+              >
+                {submitMutation.isPending ? "Dang gui..." : "Gui duyet"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={!canArchive || archiveMutation.isPending}
+              onClick={() => setArchiveOpen(true)}
+              className="flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
+            >
+              <Trash2 className="h-4 w-4" />
+              {archiveMutation.isPending ? "Dang luu kho..." : "Luu kho"}
+            </button>
+            {canReactivate ? (
+              <button
+                type="button"
+                disabled={reactivateMutation.isPending}
+                onClick={() => setReactivateOpen(true)}
+                className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+              >
+                {reactivateMutation.isPending ? "Dang kich hoat..." : "Kich hoat lai"}
+              </button>
+            ) : null}
+          </div>
+        </section>
+
+        {/* Form */}
+        <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <form onSubmit={form.handleSubmit(handleSave)} noValidate className="space-y-6">
             <ListingFormFields
               register={form.register}
               errors={form.formState.errors}
@@ -232,43 +255,44 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
               readOnly={!canEdit}
               listing={currentListing}
             />
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="submit"
-                disabled={!canEdit}
-                className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
-              >
-                Save changes
-              </button>
-              <Link
-                href="/host/listings"
-                className="rounded-full border border-border bg-background px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-accent"
-              >
-                Back to listings
-              </Link>
-            </div>
+
+            {canEdit ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                >
+                  <Save className="h-4 w-4" />
+                  Luu thay doi
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+                Chinh sua tin dang se duoc bo sung o phien ban sau.
+              </div>
+            )}
           </form>
         </section>
       </div>
 
       <HostActionDialog
         open={archiveOpen}
-        title="Archive Listing"
-        description="This listing will be moved to archived status. It will no longer be visible to renters."
-        confirmLabel="Confirm archive"
+        title="Luu kho tin dang"
+        description="Tin dang se bi chuyen sang trang thai luu kho. No se khong con hien thi voi khach thue."
+        confirmLabel="Xac nhan luu kho"
         tone="danger"
         onClose={() => setArchiveOpen(false)}
-        onConfirm={handleArchive}
+        onConfirm={() => archiveMutation.mutate()}
       />
 
       <HostActionDialog
         open={reactivateOpen}
-        title="Reactivate Listing"
-        description="This archived listing will be reset to DRAFT status, allowing you to edit and resubmit."
-        confirmLabel="Reactivate"
+        title="Kich hoat lai tin dang"
+        description="Tin dang da luu kho se duoc dat lai ve trang thai nhap, cho phep ban chinh sua va gui duyet lai."
+        confirmLabel="Kich hoat"
         onClose={() => setReactivateOpen(false)}
-        onConfirm={handleReactivate}
+        onConfirm={() => reactivateMutation.mutate()}
       />
-    </AppShell>
+    </WorkspaceSidebar>
   );
 }

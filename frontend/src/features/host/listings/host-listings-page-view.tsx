@@ -1,20 +1,26 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 
-import { AppShell } from "@/components/rentflow/app-shell";
+import { WorkspaceSidebar } from "@/components/rentflow/workspace-sidebar";
+import { HostWorkspaceNav } from "@/features/host/components/host-workspace-nav";
 import { EmptyState } from "@/components/rentflow/empty-state";
 import { FormError } from "@/components/rentflow/form-error";
-import { PageHeader } from "@/components/rentflow/page-header";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { HostListingRow } from "@/features/host/components/host-listing-row";
-import {
-  getHostListings,
-  HOST_LISTING_STATUS_FILTERS,
-  type HostListingFilterValue,
-} from "@/features/host/listings/api";
+import { getHostListings, type HostListingFilterValue } from "@/features/host/listings/api";
+
+const FILTERS: { value: HostListingFilterValue; label: string }[] = [
+  { value: "ALL", label: "Tat ca" },
+  { value: "DRAFT", label: "Nhap" },
+  { value: "PENDING_APPROVAL", label: "Cho duyet" },
+  { value: "ACTIVE", label: "Hoat dong" },
+  { value: "SUSPENDED", label: "Tam ngung" },
+  { value: "ARCHIVED", label: "Luu kho" },
+];
 
 export function HostListingsPageView() {
   const [statusFilter, setStatusFilter] = useState<HostListingFilterValue>("ALL");
@@ -27,52 +33,56 @@ export function HostListingsPageView() {
   const listings = data?.listings ?? [];
 
   return (
-    <AppShell activePath="/host/listings">
-      <div className="space-y-6">
-        <PageHeader
-          title="Tin đăng của tôi"
-          description="Quản lý tin đăng xe theo trạng thái vòng đời."
-          actions={
-            <Link
-              href="/host/listings/new"
-              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-            >
-              Tạo tin đăng
-            </Link>
-          }
-        />
-
-        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex flex-wrap gap-2">
-            {HOST_LISTING_STATUS_FILTERS.map((status) => {
-              const active = statusFilter === status;
-              return (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setStatusFilter(status)}
-                  className={[
-                    "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                    active
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-background text-foreground hover:bg-accent",
-                  ].join(" ")}
-                >
-                  {status}
-                </button>
-              );
-            })}
+    <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/listings">
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Tin dang cua toi</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Quan ly tin dang xe theo trang thai.
+            </p>
           </div>
-        </section>
+          <Link
+            href="/host/listings/new"
+            className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" />
+            Tao tin dang
+          </Link>
+        </div>
 
+        {/* Filter chips */}
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((filter) => {
+            const active = statusFilter === filter.value;
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setStatusFilter(filter.value)}
+                className={[
+                  "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                  active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-accent",
+                ].join(" ")}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Listing list */}
         {isLoading ? (
-          <PageSkeleton message="Đang tải tin đăng..." />
+          <PageSkeleton message="Dang tai tin dang..." />
         ) : isError ? (
-          <FormError>Không tải được danh sách tin đăng. Vui lòng thử lại.</FormError>
+          <FormError>Khong tai duoc danh sach tin dang. Vui long thu lai.</FormError>
         ) : listings.length === 0 ? (
           <EmptyState
-            title="Chưa có tin đăng nào"
-            description="Đổi bộ lọc hoặc tạo tin đăng mới để tiếp tục."
+            title="Chua co tin dang nao"
+            description="Doi bo loc hoac tao tin dang moi de tiep tuc."
           />
         ) : (
           <div className="space-y-3">
@@ -82,6 +92,6 @@ export function HostListingsPageView() {
           </div>
         )}
       </div>
-    </AppShell>
+    </WorkspaceSidebar>
   );
 }
