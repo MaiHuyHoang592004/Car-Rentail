@@ -1,6 +1,7 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import { BookingStatusBadge } from "@/features/bookings/booking-status-badge";
+import { formatDateRange, formatMoney } from "@/lib/formatters";
 import type { BookingSummaryViewModel } from "@/features/bookings/types";
 
 type BookingSummaryCardProps = {
@@ -16,11 +17,9 @@ export function BookingSummaryCard({ booking }: BookingSummaryCardProps) {
             Booking {booking.id}
           </p>
           <h3 className="text-lg font-bold text-foreground">{booking.listingTitle}</h3>
-          <p className="text-sm text-muted-foreground">
-            {booking.pickupDate} to {booking.returnDate}
-          </p>
+          <p className="text-sm text-muted-foreground">{formatDateRange(booking.pickupDate, booking.returnDate)}</p>
           <p className="text-sm font-semibold text-foreground">
-            {booking.totalAmount.toLocaleString("en-US")} {booking.currency}
+            {formatMoney(booking.totalAmount, booking.currency)}
           </p>
           {booking.status === "CANCELLED" && booking.voidRetryRequired ? (
             <p className="text-sm font-medium text-amber-700">
@@ -35,7 +34,7 @@ export function BookingSummaryCard({ booking }: BookingSummaryCardProps) {
             href={`/bookings/${booking.id}`}
             className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
-            View detail
+            Xem chi tiết
           </Link>
         </div>
       </div>

@@ -1,29 +1,7 @@
+﻿import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-type StatusKind =
-  | "HELD"
-  | "PENDING_HOST_APPROVAL"
-  | "CONFIRMED"
-  | "IN_PROGRESS"
-  | "COMPLETED"
-  | "CANCELLED"
-  | "REJECTED"
-  | "EXPIRED"
-  | "ACTIVE"
-  | "DRAFT"
-  | "MAINTENANCE"
-  | "ARCHIVED"
-  | "PENDING_APPROVAL"
-  | "PENDING"
-  | "SUSPENDED"
-  | "APPROVED"
-  | "BLOCKED"
-  | "HOLD"
-  | "BOOKED"
-  | "UNAVAILABLE"
-  | "FREE";
-
-const PILL_STYLES: Record<StatusKind, string> = {
+const PILL_STYLES: Record<string, string> = {
   HELD: "bg-indigo-100 text-indigo-800",
   PENDING_HOST_APPROVAL: "bg-amber-100 text-amber-800",
   CONFIRMED: "bg-cyan-100 text-cyan-800",
@@ -47,25 +25,47 @@ const PILL_STYLES: Record<StatusKind, string> = {
   FREE: "bg-emerald-100 text-emerald-800",
 };
 
-type StatusBadgeProps = {
-  status: StatusKind | string;
-  label?: string;
+export type StatusPillProps = {
+  label: string;
+  style?: string;
   className?: string;
+  icon?: ReactNode;
 };
 
-export function StatusBadge({ status, label, className }: StatusBadgeProps) {
-  const key = status.toUpperCase() as StatusKind;
-  const style = PILL_STYLES[key] ?? "bg-zinc-200 text-zinc-700";
-
+export function StatusPill({ label, style, className, icon }: StatusPillProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide",
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide",
         style,
         className,
       )}
     >
-      {label ?? status}
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+export type EnumStatusPillProps = {
+  value: string;
+  label: string;
+  className?: string;
+  icon?: ReactNode;
+};
+
+export function EnumStatusPill({ value, label, className, icon }: EnumStatusPillProps) {
+  const bgClass = PILL_STYLES[value.toUpperCase()] ?? "bg-zinc-200 text-zinc-700";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide",
+        bgClass,
+        className,
+      )}
+    >
+      {icon}
+      {label}
     </span>
   );
 }
