@@ -38,8 +38,6 @@ const PAY_NOW_VISIBLE_STATUSES: BookingStatus[] = [
   "CONFIRMED",
 ];
 
-const PAY_NOW_TOOLTIP = "Thanh toán sẽ sớm có mặt.";
-
 const MAX_EXPIRE_RETRIES = 3;
 const EXPIRE_RETRY_DELAY_MS = 5000;
 
@@ -183,6 +181,13 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
         : booking.status === "CONFIRMED"
           ? "Hủy booking này sẽ áp dụng chính sách hiện tại và có thể xử lý thanh toán liên quan."
           : null;
+  const cancelDialogStatus =
+    canCancel &&
+    (booking.status === "HELD" ||
+      booking.status === "PENDING_HOST_APPROVAL" ||
+      booking.status === "CONFIRMED")
+      ? booking.status
+      : null;
 
   function openCancelDialog() {
     if (!cancelKeyRef.current) {
@@ -284,14 +289,12 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
               Hủy booking
             </button>
             {showPayNow ? (
-              <button
-                type="button"
-                disabled
-                title={PAY_NOW_TOOLTIP}
-                className="rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground opacity-50"
+              <Link
+                href={`/bookings/${booking.id}/payment`}
+                className="rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90"
               >
-                Pay now
-              </button>
+                Thanh toán
+              </Link>
             ) : null}
           </div>
           {cancelHint ? (
@@ -321,7 +324,7 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
       <CancelBookingDialog
         key={`${booking.id}:${booking.status}:${cancelOpen ? "open" : "closed"}`}
         open={cancelOpen}
-        status={canCancel ? booking.status : null}
+        status={cancelDialogStatus}
         onClose={handleCancelClose}
         onConfirm={handleCancelConfirm}
       />

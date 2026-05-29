@@ -1,4 +1,4 @@
-import { RoutePlaceholder } from "@/components/rentflow/route-placeholder";
+import { AdminListingDetailPageView } from "@/features/admin/listings/admin-listing-detail-page-view";
 
 type AdminListingDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -6,12 +6,5 @@ type AdminListingDetailPageProps = {
 
 export default async function AdminListingDetailPage({ params }: AdminListingDetailPageProps) {
   const { id } = await params;
-
-  return (
-    <RoutePlaceholder
-      title={`Admin Listing Review: ${id}`}
-      description="Static detail shell for listing moderation actions."
-      activePath="/admin/listings"
-    />
-  );
+  return <AdminListingDetailPageView listingId={id} />;
 }

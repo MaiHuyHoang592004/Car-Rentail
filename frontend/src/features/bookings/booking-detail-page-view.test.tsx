@@ -113,13 +113,12 @@ describe("BookingDetailPageView", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders detail and Pay-now disabled with tooltip", async () => {
+  it("renders detail and Pay-now links to payment page", async () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse(bookingHELD));
     wrap(<BookingDetailPageView bookingId="bk-1" />);
     await screen.findByText("Toyota Vios 2022");
-    const payButton = screen.getByRole("button", { name: "Pay now" });
-    expect(payButton).toBeDisabled();
-    expect(payButton.getAttribute("title")).toContain("Thanh toán sẽ sớm có mặt");
+    const payLink = screen.getByRole("link", { name: "Thanh toán" });
+    expect(payLink).toHaveAttribute("href", "/bookings/bk-1/payment");
   });
 
   it("PATCH locations shows success toast and refetches", async () => {

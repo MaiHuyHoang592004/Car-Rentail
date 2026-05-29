@@ -1,11 +1,5 @@
-import { RoutePlaceholder } from "@/components/rentflow/route-placeholder";
+import { AdminUsersPageView } from "@/features/admin/users/admin-users-page-view";
 
 export default function AdminUsersPage() {
-  return (
-    <RoutePlaceholder
-      title="Người dùng"
-      description="Giao diện quản lý người dùng tĩnh với bộ lọc theo trạng thái/vai trò."
-      activePath="/admin/users"
-    />
-  );
+  return <AdminUsersPageView />;
 }
