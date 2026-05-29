@@ -1,6 +1,7 @@
 export type ProfileViewModel = {
   id: string;
   email: string;
+  emailVerified: boolean;
   roles: ("CUSTOMER" | "HOST" | "ADMIN")[];
   fullName: string;
   phone: string;

@@ -6,7 +6,7 @@
 >
 > Effort: **XS** (< 2h) | **S** (2-4h) | **M** (4-8h) | **L** (8-16h) | **XL** (> 16h)
 >
-> Last updated: 2026-05-23
+> Last updated: 2026-05-30
 >
 > Completed: `C01-C07`, `I01-I15` (sans `I16`), `I17-I19`, `I22`, `I24`, `I26`, `I27`, `I28`, `I30`, `I31`, `I32`, `I34`, `I35`, `I36`, `I37`, `I38`, `I39`, `I40`, `I41`, `I42`, `I43`, `I44`, `I46`, `I47`.
 
@@ -231,13 +231,13 @@ if (userOpt.isEmpty()) {
 **Status:** Done | **Evidence:** Roadmap requires, need verify code | **Effort:** M | **Fix:** Verified — `BookingRepository.findExpiredHeldBookingsForUpdate` uses bounded `LIMIT :batchSize` + `FOR UPDATE SKIP LOCKED` + `ORDER BY id`; processor handles race-condition skip and matching-token availability release; covered by 5 processor + 2 job unit tests.
 
 ## I34 — Frontend API Client Singleton
-**Status:** Done | **Evidence:** `api-client.ts` module-level mutable `let accessTokenGetter` | **Effort:** M | **Fix:** Added `createApiClient()` factory (isolated instances) and `resetApiClient()` for test isolation; default singleton preserved for back-compat.
+**Status:** Done | **Evidence:** `api-client.ts` module-level mutable `let accessTokenGetter` | **Effort:** M | **Fix:** Added `createApiClient()` factory and moved runtime auth ownership to an instance managed by `AuthProvider`; feature APIs still import the stable `api` facade, but the active client now owns token getter / refresh / auth-failed handlers instead of module-global mutable auth state. `resetApiClient()` remains for test isolation.
 
 ## I35 — BFF vs Direct API Undocumented
 **Status:** Done | **Evidence:** Auth via BFF, others via rewrite | **Effort:** XS | **Fix:** Added `docs/frontend/bff-architecture.md` describing 2 flows + criteria for adding new BFF endpoints.
 
 ## I36 — Middleware No Role Check
-**Status:** Done | **Evidence:** `middleware.ts` previously only checked `refreshCookie` presence | **Effort:** M | **Fix:** Added companion httpOnly cookie `rentflow_role` set by BFF login/register/session (cleared on logout + refresh/session error). Middleware now matches per-prefix role requirements (`/admin`→ADMIN, `/host`→HOST, `/bookings` & `/listings/:id/book` & `/me/bookings`→CUSTOMER, `/me`→any authed) and redirects to `/forbidden` on role mismatch. `parseRoles` + cookie names live in Edge-safe `src/lib/session-cookie-shared.ts`.
+**Status:** Done | **Evidence:** `middleware.ts` previously only checked `refreshCookie` presence | **Effort:** M | **Fix:** Added companion httpOnly cookie `rentflow_role` set by BFF login/register/session/refresh (cleared on logout + refresh/session error). Middleware now matches per-prefix role requirements (`/admin`→ADMIN, `/host`→HOST, `/bookings` & `/listings/:id/book` & `/me/bookings`→CUSTOMER, `/me`→any authed), redirects to `/forbidden` on role mismatch, and treats refresh-cookie-without-role-cookie as an invalid session that is redirected to `/login` with auth cookies cleared. `parseRoles` + cookie names live in Edge-safe `src/lib/session-cookie-shared.ts`.
 
 ## I37 — RoleGuard Flash Content
 **Status:** Done | **Evidence:** `role-guard.tsx` previously used useEffect for redirect → flash | **Effort:** M | **Fix:** Converted `app/host/layout.tsx` and `app/admin/layout.tsx` to server components that read the role cookie and `redirect()` server-side before render. Removed `RoleGuard` wrappers from booking page views (middleware enforces CUSTOMER). Deleted `src/features/auth/role-guard.tsx`. **Depends:** I36.
@@ -294,10 +294,16 @@ if (userOpt.isEmpty()) {
 
 # Summary
 
+This file is now primarily a historical record of completed refactors and deferred nice-to-have items.
+For active release-hardening work, treat [`docs/roadmap.md`](docs/roadmap.md) and `docs/transaction-rules.md`
+as the source of truth. Current active gap: `BookingService.cancelBooking()` still needs the same
+provider-call-outside-transaction hardening already applied to host reject, void retry, trip checkout,
+and host-approval expiry.
+
 | Category | Count | Effort |
 |---|---|---|
-| Critical (C01-C07) | 7 | ~40-60h |
-| Important Backend (I01-I32) | ~20 | ~80-120h |
-| Important Frontend (I34-I47) | ~12 | ~60-80h |
+| Critical (C01-C07) | 0 open | Historical |
+| Important Backend (I01-I32) | 0 open in this file | Historical |
+| Important Frontend (I34-I47) | 0 open in this file | Historical |
 | Nice (N01-N14) | 14 | Defer |
-| **Total actionable** | **~39** | **~180-260h** |
+| **Total actionable** | **14 spec-only / deferred** | **No current open refactor items tracked here** |

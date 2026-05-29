@@ -27,6 +27,7 @@ export const BOOKING_SUMMARIES: BookingSummaryViewModel[] = [
     totalAmount: 2280000,
     currency: "VND",
     holdExpiresAt: "2026-05-12T21:45:00+07:00",
+    voidRetryRequired: false,
   },
   {
     id: "bk-1002",
@@ -37,6 +38,7 @@ export const BOOKING_SUMMARIES: BookingSummaryViewModel[] = [
     returnDate: "2026-06-12",
     totalAmount: 2800000,
     currency: "VND",
+    voidRetryRequired: false,
   },
   {
     id: "bk-1003",
@@ -47,6 +49,7 @@ export const BOOKING_SUMMARIES: BookingSummaryViewModel[] = [
     returnDate: "2026-05-30",
     totalAmount: 1500000,
     currency: "VND",
+    voidRetryRequired: false,
   },
   {
     id: "bk-1004",
@@ -57,6 +60,7 @@ export const BOOKING_SUMMARIES: BookingSummaryViewModel[] = [
     returnDate: "2026-06-27",
     totalAmount: 4050000,
     currency: "VND",
+    voidRetryRequired: false,
   },
 ];
 
@@ -73,6 +77,7 @@ export const BOOKING_DETAILS: BookingDetailViewModel[] = [
     totalAmount: 2280000,
     currency: "VND",
     holdExpiresAt: "2026-05-12T21:45:00+07:00",
+    voidRetryRequired: false,
     priceSnapshot: {
       rentalDays: 3,
       basePricePerDay: 700000,
@@ -117,6 +122,7 @@ export const BOOKING_DETAILS: BookingDetailViewModel[] = [
     totalAmount: 2800000,
     currency: "VND",
     cancellationReason: "Change of plan",
+    voidRetryRequired: false,
     priceSnapshot: {
       rentalDays: 2,
       basePricePerDay: 1250000,
@@ -160,6 +166,7 @@ export const BOOKING_DETAILS: BookingDetailViewModel[] = [
     returnLocation: "District 1, Ho Chi Minh City",
     totalAmount: 1500000,
     currency: "VND",
+    voidRetryRequired: false,
     priceSnapshot: {
       rentalDays: 2,
       basePricePerDay: 700000,
@@ -195,6 +202,7 @@ export const BOOKING_DETAILS: BookingDetailViewModel[] = [
     returnLocation: "Da Nang International Airport",
     totalAmount: 4050000,
     currency: "VND",
+    voidRetryRequired: false,
     priceSnapshot: {
       rentalDays: 3,
       basePricePerDay: 1250000,

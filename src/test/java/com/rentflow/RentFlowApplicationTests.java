@@ -21,7 +21,13 @@ import org.springframework.test.context.TestPropertySource;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-        "rentflow.scheduler.expire-held-bookings.enabled=false"
+        "jwt.secret=test-jwt-secret-key-for-unit-tests-only-minimum-64-bytes-required-for-hs512-123456789",
+        "rentflow.scheduler.expire-held-bookings.enabled=false",
+        "rentflow.scheduler.void-retry.enabled=false",
+        "rentflow.scheduler.outbox-publisher.enabled=false",
+        "rentflow.scheduler.idempotency-cleanup.enabled=false",
+        "rentflow.file.signed-url.secret=test-signed-url-secret-1234567890-abcdef",
+        "encryption.secret-key=Q6iaj8bzwS3UjXZTvgin7MChtBS6lhUZmj19bHF6z1o="
 })
 class RentFlowApplicationTests {
 

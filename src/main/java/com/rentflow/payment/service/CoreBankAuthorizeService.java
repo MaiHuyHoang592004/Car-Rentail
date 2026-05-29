@@ -90,7 +90,7 @@ public class CoreBankAuthorizeService {
             ObjectMapper objectMapper,
             Clock clock,
             PlatformTransactionManager transactionManager,
-            @org.springframework.beans.factory.annotation.Value("${rentflow.payment.require-email-verification:false}")
+            @org.springframework.beans.factory.annotation.Value("${rentflow.payment.require-email-verification:true}")
             boolean requireEmailVerification) {
         this.bookingRepository = bookingRepository;
         this.bookingPaymentRepository = bookingPaymentRepository;

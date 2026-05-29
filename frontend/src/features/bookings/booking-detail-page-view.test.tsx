@@ -30,6 +30,7 @@ const authedSession = {
   user: {
     id: "u-1",
     email: "u@e.com",
+    emailVerified: false,
     roles: ["CUSTOMER"],
     fullName: "U",
     phone: null,
@@ -71,7 +72,31 @@ const bookingHELD = {
   currency: "VND",
   priceSnapshot: null,
   policySnapshot: null,
+  voidRetryRequired: false,
+  paymentRetryState: null,
   createdAt: "2026-06-01T00:00:00Z",
+};
+
+const bookingPending = {
+  ...bookingHELD,
+  status: "PENDING_HOST_APPROVAL",
+  holdExpiresAt: null,
+};
+
+const bookingConfirmedFuture = {
+  ...bookingHELD,
+  status: "CONFIRMED",
+  pickupDate: "2099-01-02",
+  returnDate: "2099-01-04",
+  holdExpiresAt: null,
+};
+
+const bookingConfirmedPast = {
+  ...bookingHELD,
+  status: "CONFIRMED",
+  pickupDate: "2020-01-02",
+  returnDate: "2020-01-04",
+  holdExpiresAt: null,
 };
 
 describe("BookingDetailPageView", () => {
@@ -88,13 +113,12 @@ describe("BookingDetailPageView", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders detail and Pay-now disabled with tooltip", async () => {
+  it("renders detail and Pay-now links to payment page", async () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse(bookingHELD));
     wrap(<BookingDetailPageView bookingId="bk-1" />);
     await screen.findByText("Toyota Vios 2022");
-    const payButton = screen.getByRole("button", { name: "Pay now" });
-    expect(payButton).toBeDisabled();
-    expect(payButton.getAttribute("title")).toContain("Thanh toán sẽ sớm có mặt");
+    const payLink = screen.getByRole("link", { name: "Thanh toán" });
+    expect(payLink).toHaveAttribute("href", "/bookings/bk-1/payment");
   });
 
   it("PATCH locations shows success toast and refetches", async () => {
@@ -143,5 +167,93 @@ describe("BookingDetailPageView", () => {
     expect(headers.get("Idempotency-Key")).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     );
+  });
+
+  it("shows cancel enabled for PENDING_HOST_APPROVAL", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse(bookingPending));
+    wrap(<BookingDetailPageView bookingId="bk-1" />);
+    await screen.findByText("Toyota Vios 2022");
+    expect(screen.getByRole("button", { name: /Hủy booking/ })).toBeEnabled();
+  });
+
+  it("shows cancel enabled for CONFIRMED before pickup date", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse(bookingConfirmedFuture));
+    wrap(<BookingDetailPageView bookingId="bk-1" />);
+    await screen.findByText("Toyota Vios 2022");
+    expect(screen.getByRole("button", { name: /Hủy booking/ })).toBeEnabled();
+  });
+
+  it("disables cancel for CONFIRMED after pickup date", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse(bookingConfirmedPast));
+    wrap(<BookingDetailPageView bookingId="bk-1" />);
+    await screen.findByText("Toyota Vios 2022");
+    const cancelButton = screen.getByRole("button", { name: /Hủy booking/ });
+    expect(cancelButton).toBeDisabled();
+    expect(
+      screen.getByText(/Booking đã đến hoặc qua ngày nhận xe nên không còn hủy được/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows accepted-success message when cancel requires background void retry", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(jsonResponse(bookingPending))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            id: "bk-1",
+            status: "CANCELLED",
+            cancellationReason: "test",
+            cancelled: true,
+            voidRetryRequired: true,
+            code: "PAYMENT_VOID_RETRY_REQUIRED",
+            paymentRetryState: "VOID_RETRY_REQUIRED",
+          },
+          202,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...bookingPending,
+          status: "CANCELLED",
+          voidRetryRequired: true,
+          paymentRetryState: "VOID_RETRY_REQUIRED",
+        }),
+      );
+    wrap(<BookingDetailPageView bookingId="bk-1" />);
+    await screen.findByText("Toyota Vios 2022");
+
+    await userEvent.click(screen.getByRole("button", { name: /Hủy booking/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Confirm cancel/ }));
+
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        "Đã hủy booking; hoàn tiền hoặc void sẽ được xử lý tiếp trong nền",
+      ),
+    );
+    expect(
+      await screen.findByText(/Booking đã được hủy, nhưng thanh toán vẫn đang được xử lý tiếp/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Hệ thống đang retry thao tác void thanh toán trong nền/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders persistent retry-state banner from booking detail data", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        ...bookingPending,
+        status: "CANCELLED",
+        voidRetryRequired: true,
+        paymentRetryState: "VOID_RETRY_REQUIRED",
+      }),
+    );
+    wrap(<BookingDetailPageView bookingId="bk-1" />);
+
+    expect(
+      await screen.findByText(/Booking đã được hủy, nhưng thanh toán vẫn đang được xử lý tiếp/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Hệ thống đang retry thao tác void thanh toán trong nền/),
+    ).toBeInTheDocument();
   });
 });

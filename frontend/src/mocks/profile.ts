@@ -3,6 +3,7 @@ import type { ProfileViewModel } from "@/features/profile/types";
 const MOCK_PROFILE: ProfileViewModel = {
   id: "usr-customer",
   email: "minh.nguyen@rentflow.vn",
+  emailVerified: true,
   roles: ["CUSTOMER"],
   fullName: "Minh Nguyen",
   phone: "0902001888",

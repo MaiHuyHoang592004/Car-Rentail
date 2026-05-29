@@ -11,6 +11,7 @@ import java.util.UUID;
 public record UserProfileResponse(
         UUID id,
         String email,
+        boolean emailVerified,
         List<String> roles,
         String fullName,
         String phone,
@@ -18,10 +19,16 @@ public record UserProfileResponse(
         String addressLine,
         String driverVerificationStatus
 ) {
-    public static UserProfileResponse from(UUID id, String email, List<Role> roles, UserProfile profile) {
+    public static UserProfileResponse from(
+            UUID id,
+            String email,
+            boolean emailVerified,
+            List<Role> roles,
+            UserProfile profile) {
         return new UserProfileResponse(
                 id,
                 email,
+                emailVerified,
                 roles.stream().map(Role::name).toList(),
                 profile.getFullName(),
                 profile.getPhone(),

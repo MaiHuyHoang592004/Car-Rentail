@@ -11,11 +11,27 @@ import {
 
 type CancelBookingDialogProps = {
   open: boolean;
+  status: "HELD" | "PENDING_HOST_APPROVAL" | "CONFIRMED" | null;
   onClose: () => void;
   onConfirm: (next: CancelBookingFormState) => void;
 };
 
-export function CancelBookingDialog({ open, onClose, onConfirm }: CancelBookingDialogProps) {
+function buildCancelDescription(status: CancelBookingDialogProps["status"]) {
+  if (status === "PENDING_HOST_APPROVAL") {
+    return "Booking sẽ được hủy và hệ thống sẽ thử void khoản thanh toán đang chờ xác nhận.";
+  }
+  if (status === "CONFIRMED") {
+    return "Booking sẽ được hủy theo chính sách hiện tại. Hệ thống có thể void hoặc capture khoản thanh toán liên quan.";
+  }
+  return "Booking sẽ được hủy ngay nếu trạng thái hiện tại còn cho phép.";
+}
+
+export function CancelBookingDialog({
+  open,
+  status,
+  onClose,
+  onConfirm,
+}: CancelBookingDialogProps) {
   const form = useForm<CancelBookingFormState>({
     resolver: zodResolver(cancelBookingSchema),
     defaultValues: { reason: "" },
@@ -41,7 +57,7 @@ export function CancelBookingDialog({ open, onClose, onConfirm }: CancelBookingD
       >
         <h3 className="text-lg font-bold text-foreground">Cancel Booking</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          This static action updates local UI state to `CANCELLED`.
+          {buildCancelDescription(status)}
         </p>
 
         <form onSubmit={form.handleSubmit(handleConfirm)}>

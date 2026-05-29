@@ -22,8 +22,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -54,10 +58,12 @@ public class UserService implements AuthUserProfilePort {
     @Override
     @Transactional(readOnly = true)
     public AuthUserProfileResponse getProfile(UUID userId, String email, List<Role> roles) {
+        AuthUser user = authUserRepository.findById(userId).orElseThrow();
         UserProfile profile = userProfileRepository.findByUserId(userId).orElseThrow();
         return new AuthUserProfileResponse(
                 userId,
                 email,
+                Boolean.TRUE.equals(user.getEmailVerified()),
                 roles.stream().map(Role::name).toList(),
                 profile.getFullName(),
                 profile.getPhone(),
@@ -74,7 +80,12 @@ public class UserService implements AuthUserProfilePort {
                 .stream().map(ur -> ur.getRole()).toList();
         UserProfile profile = userProfileRepository.findByUserId(userId).orElseThrow();
 
-        return UserProfileResponse.from(userId, user.getEmail(), roles, profile);
+        return UserProfileResponse.from(
+                userId,
+                user.getEmail(),
+                Boolean.TRUE.equals(user.getEmailVerified()),
+                roles,
+                profile);
     }
 
     @Transactional
@@ -103,26 +114,34 @@ public class UserService implements AuthUserProfilePort {
 
         log.info("Profile updated for user: {}", user.getEmail());
 
-        return UserProfileResponse.from(userId, user.getEmail(), roles, profile);
+        return UserProfileResponse.from(
+                userId,
+                user.getEmail(),
+                Boolean.TRUE.equals(user.getEmailVerified()),
+                roles,
+                profile);
     }
 
     @Transactional(readOnly = true)
-    public Page<UserSummaryResponse> listUsers(UserStatus status, String role, Pageable pageable) {
-        Role roleEnum = null;
-        if (role != null && !role.isBlank()) {
-            try {
-                roleEnum = Role.valueOf(role.toUpperCase());
-            } catch (IllegalArgumentException ignored) {
-            }
+    public Page<UserSummaryResponse> listUsers(UserStatus status, Role role, Pageable pageable) {
+        Page<AuthUser> users = authUserRepository.findAllWithFilters(status, role, pageable);
+        if (users.isEmpty()) {
+            return users.map(user -> UserSummaryResponse.from(user, createMinimalProfile(user), List.of()));
         }
 
-        Page<AuthUser> users = authUserRepository.findAllWithFilters(status, roleEnum, pageable);
+        List<UUID> userIds = users.getContent().stream()
+                .map(AuthUser::getId)
+                .toList();
+        Map<UUID, UserProfile> profilesByUserId = userProfileRepository.findByUserIdIn(userIds).stream()
+                .collect(Collectors.toMap(UserProfile::getUserId, Function.identity()));
+        Map<UUID, List<Role>> rolesByUserId = userRoleRepository.findByUserIdIn(userIds).stream()
+                .collect(Collectors.groupingBy(
+                        ur -> ur.getUser().getId(),
+                        Collectors.mapping(ur -> ur.getRole(), Collectors.toCollection(ArrayList::new))));
 
         return users.map(user -> {
-            UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
-            List<Role> roles = userRoleRepository.findByUserId(user.getId())
-                    .stream().map(ur -> ur.getRole()).toList();
-
+            UserProfile profile = profilesByUserId.get(user.getId());
+            List<Role> roles = rolesByUserId.getOrDefault(user.getId(), List.of());
             UserProfile actualProfile = profile != null ? profile : createMinimalProfile(user);
             return UserSummaryResponse.from(user, actualProfile, roles);
         });

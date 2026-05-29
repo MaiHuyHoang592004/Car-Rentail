@@ -128,6 +128,8 @@ describe("booking api network calls", () => {
             holdExpiresAt: null,
             totalAmount: "1400000",
             currency: "VND",
+            voidRetryRequired: true,
+            paymentRetryState: "VOID_RETRY_REQUIRED",
             createdAt: "2026-06-01T00:00:00Z",
           },
         ],
@@ -139,6 +141,8 @@ describe("booking api network calls", () => {
     );
     const result = await listMyBookings({ status: "ALL", page: 0 });
     expect(result.content[0].totalAmount).toBe(1400000);
+    expect(result.content[0].voidRetryRequired).toBe(true);
+    expect(result.content[0].paymentRetryState).toBe("VOID_RETRY_REQUIRED");
     const url = fetchSpy.mock.calls[0][0] as string;
     expect(url).not.toContain("status=");
     expect(url).toContain("page=0");
@@ -165,7 +169,15 @@ describe("booking api network calls", () => {
 
   it("cancelBooking forwards idempotency key and reason", async () => {
     fetchSpy.mockResolvedValueOnce(
-      jsonResponse({ id: "bk-1", status: "CANCELLED", cancellationReason: "change of plan" }),
+      jsonResponse({
+        id: "bk-1",
+        status: "CANCELLED",
+        cancellationReason: "change of plan",
+        cancelled: true,
+        voidRetryRequired: true,
+        code: "PAYMENT_VOID_RETRY_REQUIRED",
+        paymentRetryState: "VOID_RETRY_REQUIRED",
+      }),
     );
     const result = await cancelBooking(
       "bk-1",
@@ -173,6 +185,10 @@ describe("booking api network calls", () => {
       "11111111-1111-4111-8111-111111111111",
     );
     expect(result.status).toBe("CANCELLED");
+    expect(result.cancelled).toBe(true);
+    expect(result.voidRetryRequired).toBe(true);
+    expect(result.code).toBe("PAYMENT_VOID_RETRY_REQUIRED");
+    expect(result.paymentRetryState).toBe("VOID_RETRY_REQUIRED");
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/v1/bookings/bk-1/cancel");
     const headers = new Headers(init.headers);

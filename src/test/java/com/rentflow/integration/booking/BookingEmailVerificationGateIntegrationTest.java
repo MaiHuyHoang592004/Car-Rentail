@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -43,10 +42,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Tag("integration")
-@TestPropertySource(properties = {
-        "rentflow.booking.require-email-verification=true",
-        "rentflow.scheduler.expire-held-bookings.enabled=false"
-})
 class BookingEmailVerificationGateIntegrationTest extends BaseIntegrationTest {
 
     private static final LocalDate PICKUP_DATE = LocalDate.of(2026, 6, 10);

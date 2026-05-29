@@ -45,6 +45,19 @@ describe("middleware role-based auth", () => {
     expect(sc).toContain(ROLE_COOKIE_NAME);
   });
 
+  it("redirects authenticated-only route to /login when refresh exists but role cookie is empty", () => {
+    const res = middleware(
+      makeRequest("/me/profile", {
+        [REFRESH_COOKIE_NAME]: "r",
+        [ROLE_COOKIE_NAME]: "",
+      }),
+    ) as Response;
+    expect(locationHeader(res)).toContain("/login");
+    const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc).toContain(REFRESH_COOKIE_NAME);
+    expect(sc).toContain(ROLE_COOKIE_NAME);
+  });
+
   it("redirects CUSTOMER to /forbidden when accessing /host", () => {
     const res = middleware(
       makeRequest("/host/listings", {

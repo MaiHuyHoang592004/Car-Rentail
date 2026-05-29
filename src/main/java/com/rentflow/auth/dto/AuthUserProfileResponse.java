@@ -7,6 +7,7 @@ import java.util.UUID;
 public record AuthUserProfileResponse(
         UUID id,
         String email,
+        boolean emailVerified,
         List<String> roles,
         String fullName,
         String phone,

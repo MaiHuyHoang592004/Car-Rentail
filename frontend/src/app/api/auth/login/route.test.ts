@@ -23,6 +23,7 @@ const tokenResponse = {
   user: {
     id: "u-1",
     email: "u@e.com",
+    emailVerified: false,
     roles: ["CUSTOMER"],
     fullName: "U",
     phone: null,

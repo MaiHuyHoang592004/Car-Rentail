@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from "./auth-context";
 const sessionUser = {
   id: "u-1",
   email: "u@e.com",
+  emailVerified: false,
   roles: ["CUSTOMER"],
   fullName: "U",
   phone: null,

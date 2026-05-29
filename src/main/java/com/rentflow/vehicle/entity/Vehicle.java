@@ -52,7 +52,7 @@ public class Vehicle extends BaseEntity {
     @Column(nullable = false, length = 20)
     private VehicleStatus status = VehicleStatus.ACTIVE;
 
-    @Column(name = "city", length = 100)
+    @Column(name = "city", nullable = false, length = 100)
     private String city;
 
     public Vehicle() {

@@ -14,15 +14,17 @@ Quy ước trạng thái:
 
 ### Backend
 
-Code hiện tại không còn ở Phase 1 thuần. Backend đã có:
+Code hiện tại không còn ở Phase 1-5 thuần. Backend đã có:
 
 - Auth: register, login, refresh, logout, JWT, refresh token DB, BCrypt.
 - User/profile basics.
 - Vehicle/listing lifecycle.
 - Availability generation, public/host availability, block/unblock.
-- Booking core: create booking, cancel HELD booking, patch location, idempotency, customer overlap, availability locking.
+- Booking core: create booking, customer cancellation across `HELD` / `PENDING_HOST_APPROVAL` / `CONFIRMED` (pre-pickup) paths, patch location, idempotency, customer overlap, availability locking.
+- Payment baseline: authorize/capture/void/refund flows, provider routing, reconciliation state.
+- Phase 9 baseline slices: files metadata, trip lifecycle, reviews, disputes, reports, outbox publisher, CI/observability.
 
-=> Current practical state: **Phase 1–5 partially implemented; Phase 6+ planned**.
+=> Current practical state: **Phase 1–9 baseline implemented; current work is hardening, contract cleanup, and release evidence.**
 
 ### Frontend
 
@@ -47,6 +49,12 @@ Frontend đã tồn tại trong `frontend/` với:
 - Outbox publisher `9.6`: scheduler + retry/backoff/max-attempt persistence has been implemented with unit coverage and integration evidence for retry progression/idempotent send behavior.
 - CI/observability baseline `9.7`: GitHub Actions CI (`unit/package` + `integration profile`) and actuator metrics/prometheus exposure with secured access are now wired.
 - Release stabilization `9.8`: CoreBank external-order query param assertion is now semantic (decoded key/value), and `mvn clean verify` gate is green.
+- Frontend auth hardening `FE-AUTH-2`: `api-client` runtime ownership is now instance-first via `AuthProvider`, BFF refresh re-syncs `rentflow_role` via `/users/me`, and middleware treats missing/empty role cookie as an invalid session.
+- Email verification enforcement `AUTH-VERIFY-3`: booking creation and payment authorization now reject unverified accounts with `403 EMAIL_NOT_VERIFIED`, and frontend maps that state to profile/resend-verification UX.
+- Frontend UX/integration hardening: mobile nav drawer, Vietnamese-first copy, real listing/profile API wiring, and local startup preflight/one-command backend scripts are now in place.
+- Transaction correctness hardening `TX-HARDEN-1`: host reject, trip checkout capture, void retry, and host-approval expiry now use `prepare -> provider call outside TX -> finalize` with finalize-time revalidation and `PAYMENT_FINALIZATION_UNSAFE` evidence on drift.
+- Remaining transaction gap for this track: `BookingService.cancelBooking()` still performs provider capture/void work while holding DB locks and remains the primary release-correctness follow-up.
+- Integration gate recovery `TX-HARDEN-1A`: `BookingMapper` bean wiring was normalized to a single runtime constructor, restoring Spring app-context boot for booking/trip integration tests and unblocking full `mvn test` gate.
 
 ### Docs/code drift
 
@@ -54,42 +62,24 @@ Frontend đã tồn tại trong `frontend/` với:
 - Roadmap cũ chưa có refactor/hardening track.
 - Java version cần đồng bộ giữa `pom.xml`, README và SRS.
 
-### Audit table
+### Open Audit Table
 
 | Issue | Category | Severity | Evidence | Status | Suggested phase |
 |---|---|---:|---|---|---|
-| Idempotency failure marker chưa tách transaction | Backend | Critical | `IdempotencyService.fail()` có `@Transactional` mặc định; `BookingService` có TODO `REQUIRES_NEW failure marker` | Confirmed | Critical / Phase 5 hardening |
-| Auth login timing enumeration risk | Auth/Security | Critical | `AuthService.login()` trả lỗi ngay nếu email không tồn tại, chỉ BCrypt khi user tồn tại | Confirmed | Auth hardening |
-| Refresh token reuse detection chưa có | Auth/Security | Critical | `RefreshTokenService.findActiveByToken()` chỉ tìm active token; revoked token reuse trả null | Confirmed | Auth hardening |
-| Frontend listings search vẫn mock | Frontend | Critical | `listings-page-view.tsx` import `LISTING_CARDS` từ `@/mocks/listings` | Confirmed | Frontend API migration |
-| Host listing lifecycle fake ở client | Frontend | Critical | `host-listing-detail-page-view.tsx` import `archiveListingTransition`, `submitListingTransition` từ mocks | Confirmed | Frontend API migration |
 | Docs/code drift | Docs | Critical | README/roadmap cũ nói Phase 1 nhưng code có auth/booking/frontend | Confirmed | Immediate |
-| Cancel booking chỉ cho `HELD` | Feature | Important | `BookingService.cancelBooking()` check `booking.getStatus() != BookingStatus.HELD` | Confirmed | Phase 7 |
-| `GlobalExceptionHandler` phình to | Backend | Important | Handler riêng cho Vehicle/Listing/Booking not found, đã có `ResourceNotFoundException` | Confirmed | Backend hardening |
-| Data integrity handler dò message string | Backend | Important | `message.contains("uq_listings_one_active_per_vehicle")` | Confirmed | Backend hardening |
-| IdempotencyException map HTTP status bằng string code | Backend | Important | `handleIdempotency()` so sánh `ex.getCode()` để chọn 400/409 | Confirmed | Backend hardening |
-| `SecurityContext` interface annotate `@Component` | Backend | Important | `@Component public interface SecurityContext` | Confirmed | Backend cleanup |
-| Swagger/docs permitAll | Security | Important | `SecurityConfig` permitAll `/swagger-ui/**`, `/api-docs/**` | Confirmed | Ops hardening |
-| CORS credentials không validate wildcard origin | Security | Important | `setAllowedOrigins(origins)` + `setAllowCredentials(true)` | Confirmed | Security hardening |
-| `JwtAuthenticationEntryPoint` dùng reflection | Security/Exception | Important | reflection `getMethod("getCode")`; `/api/v1/host/` trả 403 | Confirmed | Auth cleanup |
-| Listing search native SQL + dead Specification | Backend/Search | Important | `ListingSearchRepositoryCustomImpl` build SQL string và có `buildSpecification()` không dùng | Confirmed | Search hardening |
-| Availability generation N+1-ish | Backend/Performance | Important | loop 365 ngày và gọi `existsByListingIdAndAvailableDate` từng ngày | Confirmed | Availability hardening |
-| Vehicle archive save từng listing | Backend/Performance | Important | loop `listingRepository.save(listing)` | Confirmed | Vehicle hardening |
-| Frontend API client singleton | Frontend | Important | globals `accessTokenGetter`, `refreshHandler` trong `api-client.ts` | Confirmed | Frontend hardening |
-| Middleware chỉ check cookie tồn tại | Frontend/Auth | Important | `middleware.ts`: nếu có refresh cookie thì `NextResponse.next()` | Confirmed | Route hardening |
-| Mobile nav thiếu hamburger | UX | Important | `AppShell` có nav `hidden md:flex`, chưa có replacement mobile | Confirmed | UX hardening |
-| UI mix Vietnamese/English | UX | Important | Listings/host text English, nav/auth nhiều tiếng Việt | Confirmed | UX cleanup |
-| Forgot/reset/change password | Auth | Important | Không thấy endpoint/code trong auth module hiện tại | Confirmed | Auth hardening |
-| Email verification chưa enforce | Auth | Important | Register set `emailVerified=false`; login không check email verified | Confirmed | Auth hardening |
 | JWT key rotation/JWK | Security | Nice | Chỉ thấy HS/JWT config, chưa thấy multi-key/JWK | Spec-only | Future |
 | Kafka/outbox publisher | Backend/Ops | Nice | SRS/roadmap có nhưng chưa cần trước DB outbox | Spec-only | Phase 9 |
 | Full i18n | UX | Nice | Cần sau khi UI text được thống nhất | Spec-only | Later |
 
 ---
 
-## 1. Critical Refactor Before New Features
+## 1. Remaining Work Before New Features
 
-### C1. Harden idempotency failure handling
+### Closed Critical Refactors (Release Evidence)
+
+#### C1. Idempotency failure handling
+
+**Status**: Done in code; kept here only as release-evidence reference.
 
 **Problem**: `fail()` chưa dùng transaction riêng; `BookingService` đã có TODO nhưng chưa đóng.
 
@@ -116,7 +106,11 @@ Frontend đã tồn tại trong `frontend/` với:
 - Không còn TODO `REQUIRES_NEW failure marker`.
 - Test idempotency failure/retry pass.
 
-### C2. Auth security baseline
+### Active Remaining Gaps
+
+#### C2. Auth security baseline
+
+**Status**: Done in code; remaining auth work has moved to future enhancements such as key rotation/MFA rather than baseline security gaps.
 
 **Problem**: auth thiếu một số hardening tối thiểu.
 
@@ -135,7 +129,7 @@ Frontend đã tồn tại trong `frontend/` với:
 - Redis rate limit login + booking create.
 - Refresh token reuse detection + revoke active tokens for user/session family.
 - Forgot/reset/change password minimal flow.
-- Email verification gate for booking/payment or sensitive actions.
+- Email verification gate for booking/payment is now enforced; unverified users receive `403 EMAIL_NOT_VERIFIED`.
 
 **Test/verification**:
 
@@ -147,32 +141,6 @@ Frontend đã tồn tại trong `frontend/` với:
 
 - Auth hardening tests pass.
 - README documents current auth limitations.
-
-### C3. Remove production dependency on frontend mocks
-
-**Problem**: important frontend flows still use mocks and fake state transitions.
-
-**Evidence**:
-
-- `listings-page-view.tsx` uses `LISTING_CARDS`.
-- `host-listing-detail-page-view.tsx` uses mock transition functions.
-
-**Risk**: frontend logic drifts from backend rules; API wiring later becomes expensive.
-
-**Fix direction**:
-
-- Create `features/listings/api.ts`, `features/host/vehicles/api.ts`, `features/host/listings/api.ts`.
-- Use React Query for server state.
-- Keep mocks only behind adapter/env flag.
-
-**Test/verification**:
-
-- Listings page calls backend search API.
-- Host listing actions call backend lifecycle endpoints.
-
-**Definition of Done**:
-
-- Main production page views no longer import `@/mocks/*` directly.
 
 ### C4. Align docs with code
 
@@ -200,14 +168,8 @@ Frontend đã tồn tại trong `frontend/` với:
 
 ### Auth/security
 
-- Constant-time login behavior.
-- Login/booking rate limiting.
-- Refresh token reuse detection.
-- Forgot/reset/change password.
-- Email verification policy.
-- Swagger protected/disabled in prod.
-- CORS wildcard validation when credentials are enabled.
-- `JwtAuthenticationEntryPoint` cleanup.
+- Future security enhancements: JWT key rotation/JWK, MFA/2FA, OAuth/social login.
+- Current baseline already includes constant-time login behavior, login/booking rate limiting, refresh token reuse detection, forgot/reset/change password, email verification enforcement for booking/payment, Swagger prod gating, CORS origin validation, and typed JWT auth errors.
 
 ### Idempotency
 
@@ -217,8 +179,8 @@ Frontend đã tồn tại trong `frontend/` với:
 
 ### Transaction boundaries and state machine
 
-- Keep Phase 5 cancel limited to HELD but document clearly.
-- Phase 7 extends cancel to `PENDING_HOST_APPROVAL` and `CONFIRMED` with payment behavior.
+- Current backend already supports cancel `HELD`, `PENDING_HOST_APPROVAL`, and `CONFIRMED` before pickup with payment void/capture/retry behavior.
+- Current frontend customer detail already exposes cancel for those supported states with a coarse pickup-date gate; remaining work is timeline/audit breadth and UX polish rather than cancellation capability.
 - Decide whether booking PATCH needs idempotency once timeline/audit exists.
 
 ### Exception handling
@@ -229,9 +191,8 @@ Frontend đã tồn tại trong `frontend/` với:
 
 ### Search/availability performance
 
-- Clean `ListingSearchRepositoryCustomImpl`: choose native SQL path or Specification path, not both.
-- Replace 365-day availability generation loop with native `generate_series` insert.
-- Replace vehicle archive listing loop with batch update.
+- Current backend has already converged on native listing search, `generate_series` availability generation, and batch listing archive updates.
+- Remaining search/availability work is contract stability and UX refinement, not known backend performance debt.
 
 ### Scheduler / audit / timeline / outbox
 
@@ -245,29 +206,21 @@ Frontend đã tồn tại trong `frontend/` với:
 
 ### Mock -> real API migration
 
-Order:
+This migration is complete for the current MVP surface:
 
-1. Public listings search/detail.
-2. Host vehicles CRUD.
-3. Host listings CRUD + submit/archive/reactivate.
-4. Admin listing approval.
-5. Profile page.
-
-Rules:
-
-- Page views must not import mocks directly.
-- Add API layer per feature.
-- Use React Query for server state.
-- Remove “static UI” banners from production views.
+- Public listings, host vehicles/listings/availability, bookings, and profile flows are wired to real APIs.
+- Production page views no longer depend on `@/mocks/*` imports.
+- React Query + feature API modules are the current pattern for server state.
 
 ### Auth state
 
-Current singleton `api-client.ts` is acceptable short-term, but should later become instance/context-based or at least expose test reset helpers.
+`api-client.ts` now remains feature-facing through the stable `api` export, but runtime auth state ownership is instance-first and supplied by `AuthProvider` through the active client.
 
 ### Route protection
 
 - Short term: backend remains authoritative.
-- Medium: central route policy table shared by `middleware.ts` and `RoleGuard`.
+- Medium: central route policy table shared by server layouts and `middleware.ts`.
+- Middleware now treats refresh-cookie-without-role-cookie as an invalid session, not authenticated state.
 - Avoid fetching sensitive SSR data before role validation.
 
 ### Form validation
@@ -292,8 +245,7 @@ Decision for MVP: keep hybrid.
 ### UX consistency
 
 - Vietnamese primary UI for now.
-- Replace English copy in listings/host/admin pages.
-- Add mobile nav drawer/hamburger.
+- Keep remaining copy review incremental; large-scale i18n remains deferred.
 - Do not add full i18n framework yet.
 
 ---
@@ -313,36 +265,30 @@ Exit criteria:
 
 ### Phase 2 — Auth + User
 
-**Status**: Mostly implemented; needs hardening.
+**Status**: Implemented with baseline hardening complete.
 
 Remaining:
 
-- Constant-time login.
-- Rate limiting.
-- Refresh token reuse detection.
-- Forgot/reset/change password.
-- Email verification policy.
+- JWT key rotation/JWK if production key management requirements expand.
+- MFA/SSO/OAuth only after current auth model is considered stable enough to broaden.
 
 ### Phase 3 — Vehicle + Listing
 
-**Status**: Implemented enough for P0; needs cleanup.
+**Status**: Implemented enough for P0; remaining work is feature expansion rather than known baseline cleanup.
 
 Remaining:
 
-- Batch archive listing update.
 - Verify state machine tests.
 - Normalize response/pagination where needed.
-- Wire frontend host pages to API.
+- Extend admin/host flows only when product scope requires new behavior.
 
 ### Phase 4 — Search + Availability
 
-**Status**: Backend exists; frontend still mock-heavy.
+**Status**: Backend exists and public listings frontend is wired; remaining work is doc cleanup and UX refinement.
 
 Remaining:
 
-- Clean search repository.
-- Optimize availability generation.
-- Wire public search/detail frontend.
+- Keep public search/detail frontend aligned with current API contract.
 
 ### Phase 5 — Booking Core
 
@@ -350,11 +296,8 @@ Remaining:
 
 Remaining:
 
-- Idempotency failure marker. _(Done — C01)_
 - Verify concurrent booking test.
-- Verify HELD expiry job. _(Done — I32)_
-- Document cancel limitation. _(Done — I01)_
-- Idempotency cleanup scheduler. _(Done — I31)_
+- Keep cancellation docs/frontend exposure aligned with the backend contract that already covers `PENDING_HOST_APPROVAL` and `CONFIRMED`.
 
 ### Phase 6 — Payment Stub
 
@@ -373,7 +316,7 @@ Scope:
 Scope:
 
 - Cancellation policy calculator.
-- Cancel `PENDING_HOST_APPROVAL` and `CONFIRMED`.
+- Extend timeline/audit/UX around the cancellation flows that already exist in backend code.
 - Void/refund/capture penalty behavior.
 - Booking timeline.
 - Audit logs.
@@ -420,7 +363,7 @@ Scope:
 5. Concurrent booking test: 10 requests -> exactly 1 success.
 6. Idempotency replay: same key/body returns same response; same key/different body conflicts.
 7. Payment authorization stub: HELD -> CONFIRMED, HOLD -> BOOKED.
-8. Cancellation policy: HELD release now; CONFIRMED policy in Phase 7.
+8. Cancellation policy: HELD and payment-backed cancellation paths already exist; demo focus is validating confirmed/pending flows and provider retry handling.
 
 ---
 

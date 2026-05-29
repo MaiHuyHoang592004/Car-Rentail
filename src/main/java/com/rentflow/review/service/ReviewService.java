@@ -64,6 +64,7 @@ public class ReviewService {
         review.setRating(request.rating());
         review.setContent(request.content());
         review = reviewRepository.save(review);
+        reviewRepository.flush();
 
         refreshListingAggregate(booking.getListingId());
         return ReviewResponse.from(review);

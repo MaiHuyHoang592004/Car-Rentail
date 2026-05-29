@@ -14,5 +14,7 @@ public interface UserRoleRepository extends JpaRepository<UserRole, UserRoleId> 
 
     List<UserRole> findByUserId(UUID userId);
 
+    List<UserRole> findByUserIdIn(List<UUID> userIds);
+
     boolean existsByUserIdAndRole(UUID userId, Role role);
 }

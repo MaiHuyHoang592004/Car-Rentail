@@ -1,9 +1,9 @@
 # RentFlow API Contracts
 
-Version: 2026-05-11  
+Version: 2026-05-30  
 Source: current backend code plus `docs/srs.md`, `docs/error-codes.md`, and phase docs.  
 Base URL: `/api/v1`  
-Status: frontend preparation document only.
+Status: current backend/frontend alignment document.
 
 ## Ground Rules
 
@@ -32,6 +32,12 @@ X-Correlation-Id: <client-generated-or-empty>
 ```http
 POST /api/v1/bookings
 POST /api/v1/bookings/{id}/cancel
+POST /api/v1/bookings/{id}/payments/authorize
+POST /api/v1/payments/{paymentId}/capture
+POST /api/v1/payments/{paymentId}/void
+POST /api/v1/payments/{paymentId}/refund
+POST /api/v1/host/bookings/{id}/approve
+POST /api/v1/host/bookings/{id}/reject
 ```
 
 The value must be UUID-v4. Reuse the same key only for retrying the exact same request body.
@@ -53,7 +59,7 @@ The value must be UUID-v4. Reuse the same key only for retrying the exact same r
 
 ### Custom PageResponse
 
-Used by public listing search and booking list.
+Used by public listing search, booking list, host/admin list endpoints, and host booking list.
 
 ```json
 {
@@ -65,8 +71,6 @@ Used by public listing search and booking list.
   "pageNumber": 0
 }
 ```
-
-Some host/admin endpoints return Spring `Page<T>` directly. Frontend should tolerate both `PageResponse<T>` and Spring page objects until API is normalized.
 
 ## Enums
 
@@ -83,6 +87,9 @@ type CancellationPolicy = "FLEXIBLE" | "MODERATE" | "STRICT";
 type PricingType = "PER_DAY" | "PER_TRIP";
 type AvailabilityStatus = "FREE" | "HOLD" | "BOOKED" | "BLOCKED";
 type BookingStatus = "HELD" | "PENDING_HOST_APPROVAL" | "CONFIRMED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "REJECTED" | "EXPIRED";
+type PaymentMethod = "BANK_TRANSFER_QR" | "COREBANK_TRANSFER" | "STUB";
+type PaymentProviderType = "VIETQR_MANUAL" | "COREBANK" | "STUB";
+type PaymentStatus = "UNPAID" | "PENDING_TRANSFER" | "AUTHORIZED" | "CAPTURED" | "PARTIALLY_REFUNDED" | "REFUNDED" | "VOIDED" | "FAILED" | "RECONCILIATION_REQUIRED";
 ```
 
 ## Auth
@@ -185,6 +192,7 @@ Response `200`:
 {
   "id": "uuid",
   "email": "user@example.com",
+  "emailVerified": false,
   "roles": ["CUSTOMER"],
   "fullName": "Nguyen Van A",
   "phone": "0900000000",
@@ -193,6 +201,8 @@ Response `200`:
   "driverVerificationStatus": "NOT_SUBMITTED"
 }
 ```
+
+When `emailVerified=false`, current-state policy blocks `POST /api/v1/bookings` and `POST /api/v1/bookings/{id}/payments/authorize` with `403 EMAIL_NOT_VERIFIED`.
 
 ### Update Profile
 
@@ -340,7 +350,7 @@ Response `201`: `VehicleResponse`.
 
 `GET /api/v1/host/vehicles?status=ACTIVE&page=0&size=20`
 
-Response `200`: Spring `Page<VehicleResponse>`.
+Response `200`: `PageResponse<VehicleResponse>`.
 
 ### Get Vehicle
 
@@ -406,7 +416,7 @@ Response `201`: `ListingResponse`.
 
 `GET /api/v1/host/listings?status=DRAFT&page=0&size=20`
 
-Response `200`: Spring `Page<ListingSummaryResponse>`.
+Response `200`: `PageResponse<ListingSummaryResponse>`.
 
 ### Get, Update, Submit, Archive, Reactivate
 
@@ -508,7 +518,25 @@ Admin detail response:
 
 `GET /api/v1/admin/users?status=ACTIVE&role=CUSTOMER&page=0&size=20`
 
-Response `200`: Spring `Page<UserSummaryResponse>`.
+Response `200`: `PageResponse<UserSummaryResponse>`.
+
+## Host Bookings
+
+```http
+GET  /api/v1/host/bookings?status=PENDING_HOST_APPROVAL&page=0&size=20
+POST /api/v1/host/bookings/{id}/approve
+POST /api/v1/host/bookings/{id}/reject
+```
+
+`GET` response `200`: `PageResponse<BookingSummaryResponse>`.
+
+`POST /approve` and `POST /reject` both require:
+
+```http
+Idempotency-Key: UUID-v4
+```
+
+Response `200`: `BookingResponse`.
 
 ## Bookings
 
@@ -572,8 +600,6 @@ Response `201`:
 }
 ```
 
-Current booking creation only creates `HELD`; payment/confirmation is planned later.
-
 ### My Bookings
 
 `GET /api/v1/bookings/me?status=HELD&page=0&size=20`
@@ -619,20 +645,253 @@ Request:
 { "reason": "Change of plan" }
 ```
 
-Response `200`:
+Current-state behavior depends on booking status:
+
+- `HELD` -> cancel immediately, release held availability, return `200`
+- `PENDING_HOST_APPROVAL` -> attempt payment void, then cancel booking:
+  - void success -> `200`
+  - void provider failure -> booking still becomes `CANCELLED`, availability is released, and API returns `202` with retry metadata
+- `CONFIRMED` before pickup -> apply cancellation policy:
+  - full refund path -> void authorization, then `200`
+  - partial/no-refund path -> capture penalty, void remainder, then `200`
+  - if provider void fails after capture/void attempt -> booking still becomes `CANCELLED` and API returns `202` with retry metadata
+- `CONFIRMED` after pickup time, or any unsupported status -> `409 BOOKING_INVALID_STATUS`
+
+Example response `200`:
 
 ```json
 {
   "id": "booking-id",
   "status": "CANCELLED",
-  "cancellationReason": "Change of plan"
+  "cancellationReason": "Change of plan",
+  "cancelled": true,
+  "voidRetryRequired": false,
+  "code": null,
+  "paymentRetryState": null
 }
 ```
 
-**Phase 5 limitation:** cancellation is only allowed when status is `HELD`.
-Any other status (e.g. `PENDING_HOST_APPROVAL`, `CONFIRMED`) returns
-`409 BOOKING_INVALID_STATUS`. Cancellation of approved/confirmed bookings
-— including refund/void/penalty behavior — is delivered in Phase 7.
+Example response `202` when provider void must be retried asynchronously:
+
+```json
+{
+  "id": "booking-id",
+  "status": "CANCELLED",
+  "cancellationReason": "Late cancel",
+  "cancelled": true,
+  "voidRetryRequired": true,
+  "code": "PAYMENT_VOID_RETRY_REQUIRED",
+  "paymentRetryState": "VOID_RETRY_REQUIRED"
+}
+```
+
+`Idempotency-Key` remains required. Replays with the same key/body return the same terminal response, including the accepted/retry-required shape when cancellation has already been persisted.
+
+## Payments
+
+### Payment Bank Catalog
+
+`GET /api/v1/payment-banks`
+
+Response `200`:
+
+```json
+{
+  "items": [
+    {
+      "id": "bank-id",
+      "code": "COREBANK",
+      "bin": null,
+      "shortName": "CoreBank Demo Bank",
+      "fullName": "CoreBank Demo Bank",
+      "paymentMethod": "COREBANK_TRANSFER",
+      "provider": "COREBANK",
+      "active": true
+    }
+  ]
+}
+```
+
+### Authorize Booking Payment
+
+`POST /api/v1/bookings/{id}/payments/authorize`
+
+Headers:
+
+```http
+Idempotency-Key: 8b71f8d2-9e1d-4f7a-bbe6-334c3816df91
+```
+
+Request:
+
+```json
+{
+  "bankId": "bank-id",
+  "paymentMethod": "COREBANK_TRANSFER"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "booking": {
+    "id": "booking-id",
+    "status": "CONFIRMED",
+    "pickupDate": "2026-06-01",
+    "returnDate": "2026-06-03",
+    "totalAmount": 1400000,
+    "currency": "VND"
+  },
+  "payment": {
+    "id": "payment-id",
+    "status": "AUTHORIZED",
+    "paymentMethod": "COREBANK_TRANSFER",
+    "provider": "COREBANK",
+    "externalOrderRef": "rentflow:booking:booking-id",
+    "providerPaymentOrderId": "provider-order-id",
+    "providerHoldId": "provider-hold-id",
+    "authorizedAmount": 1400000,
+    "capturedAmount": 0,
+    "refundedAmount": 0,
+    "currency": "VND",
+    "transferInstruction": null
+  }
+}
+```
+
+For generic bank-transfer flows, `payment.status` remains `PENDING_TRANSFER` and `transferInstruction` is populated; QR/instruction generation does not imply money has moved.
+
+### Get Booking Payment Detail
+
+`GET /api/v1/bookings/{id}/payments`
+
+Response `200`:
+
+```json
+{
+  "booking": {
+    "id": "booking-id",
+    "customerId": "customer-id",
+    "hostId": "host-id",
+    "status": "CONFIRMED",
+    "pickupDate": "2026-06-01",
+    "returnDate": "2026-06-03"
+  },
+  "payment": {
+    "id": "payment-id",
+    "selectedBankId": "bank-id",
+    "paymentMethod": "COREBANK_TRANSFER",
+    "provider": "COREBANK",
+    "status": "AUTHORIZED",
+    "authorizedAmount": 1400000,
+    "capturedAmount": 0,
+    "refundedAmount": 0,
+    "currency": "VND",
+    "externalOrderRef": "rentflow:booking:booking-id",
+    "providerPaymentOrderId": "provider-order-id",
+    "providerHoldId": "provider-hold-id",
+    "providerStatus": "AUTHORIZED",
+    "transferInstruction": null
+  },
+  "transactions": []
+}
+```
+
+If no payment exists yet, current backend returns `404`.
+
+### Capture Payment
+
+`POST /api/v1/payments/{paymentId}/capture`
+
+Headers:
+
+```http
+Idempotency-Key: 8b71f8d2-9e1d-4f7a-bbe6-334c3816df91
+```
+
+Request:
+
+```json
+{
+  "amount": 700000
+}
+```
+
+Response `200`: `PaymentDetailResponse`.
+
+### Void Payment
+
+`POST /api/v1/payments/{paymentId}/void`
+
+Headers:
+
+```http
+Idempotency-Key: 8b71f8d2-9e1d-4f7a-bbe6-334c3816df91
+```
+
+Response `200`: `PaymentDetailResponse`.
+
+### Refund Payment
+
+`POST /api/v1/payments/{paymentId}/refund`
+
+Headers:
+
+```http
+Idempotency-Key: 8b71f8d2-9e1d-4f7a-bbe6-334c3816df91
+```
+
+Request:
+
+```json
+{
+  "amount": 300000,
+  "reason": "Customer cancellation refund"
+}
+```
+
+Response `200`: `PaymentDetailResponse`.
+
+### Payment Reconciliation
+
+`GET /api/v1/payments/{paymentId}/reconciliation`
+
+Response `200`:
+
+```json
+{
+  "local": {
+    "paymentId": "payment-id",
+    "bookingId": "booking-id",
+    "provider": "COREBANK",
+    "paymentStatus": "AUTHORIZED",
+    "providerStatus": "AUTHORIZED",
+    "externalOrderRef": "rentflow:booking:booking-id",
+    "providerPaymentOrderId": "provider-order-id",
+    "providerHoldId": "provider-hold-id",
+    "authorizedAmount": 1400000,
+    "capturedAmount": 0,
+    "refundedAmount": 0,
+    "currency": "VND"
+  },
+  "provider": {
+    "status": "AUTHORIZED",
+    "paymentOrderId": "provider-order-id",
+    "holdId": "provider-hold-id",
+    "authorizedAmount": 1400000,
+    "capturedAmount": 0,
+    "refundedAmount": 0,
+    "currency": "VND"
+  },
+  "mismatchFlags": {
+    "statusMismatch": false,
+    "amountMismatch": false,
+    "referenceMismatch": false
+  },
+  "requiresReconciliation": false
+}
+```
 
 ## Error Codes Important For Frontend
 
@@ -648,7 +907,9 @@ Any other status (e.g. `PENDING_HOST_APPROVAL`, `CONFIRMED`) returns
 | `LISTING_NOT_FOUND` | Show listing unavailable/not found |
 | `LISTING_NOT_AVAILABLE` | Refresh calendar and ask user to choose dates again |
 | `BOOKING_OVERLAP_CUSTOMER` | Link to my bookings |
-| `BOOKING_INVALID_STATUS` | Refresh booking status |
+| `BOOKING_INVALID_STATUS` | Refresh booking status; cancel is only blocked for unsupported states or invalid time windows |
+| `PAYMENT_VOID_RETRY_REQUIRED` | Show cancellation accepted, explain payment void will be retried in background |
+| `EMAIL_NOT_VERIFIED` | Route user to profile and resend verification before retrying booking/payment |
 | `IDEMPOTENCY_KEY_REQUIRED` | Client bug; regenerate request flow |
 | `IDEMPOTENCY_KEY_CONFLICT` | Do not retry with same key |
 | `REQUEST_ALREADY_PROCESSING` | Keep submit disabled and poll/fetch status |
@@ -660,8 +921,6 @@ Any other status (e.g. `PENDING_HOST_APPROVAL`, `CONFIRMED`) returns
 
 These are in the SRS/phase docs but should not be wired in frontend until backend endpoints exist:
 
-- Payment authorize/capture/void/refund.
-- Host booking approval/rejection.
 - Driver license submission and admin verification endpoints.
 - File metadata and signed upload/download.
 - Listing photo management.

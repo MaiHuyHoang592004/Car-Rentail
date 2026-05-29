@@ -70,7 +70,7 @@ public class BankTransferAuthorizeService {
             Clock clock,
             PaymentBookingSnapshotParser bookingSnapshotParser,
             AuthorizePaymentResponseFactory authorizePaymentResponseFactory,
-            @Value("${rentflow.payment.require-email-verification:false}") boolean requireEmailVerification) {
+            @Value("${rentflow.payment.require-email-verification:true}") boolean requireEmailVerification) {
         this.bookingRepository = bookingRepository;
         this.bookingPaymentRepository = bookingPaymentRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;

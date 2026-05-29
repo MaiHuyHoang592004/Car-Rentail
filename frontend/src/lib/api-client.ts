@@ -153,25 +153,29 @@ export function createApiClient(): ApiClient {
   };
 }
 
-// Default singleton — preserves existing import paths.
-const defaultClient = createApiClient();
+let activeClient = createApiClient();
 
-export const apiFetch = defaultClient.apiFetch;
-export const api = defaultClient.api;
-
-export function registerAccessTokenGetter(getter: () => string | null) {
-  defaultClient.setAccessTokenGetter(getter);
+export function setActiveApiClient(client: ApiClient) {
+  activeClient = client;
 }
 
-export function registerRefreshHandler(handler: () => Promise<boolean>) {
-  defaultClient.setRefreshHandler(handler);
+export function apiFetch<T = unknown>(path: string, init?: ApiFetchInit) {
+  return activeClient.apiFetch<T>(path, init);
 }
 
-export function registerAuthFailedHandler(handler: () => void) {
-  defaultClient.setAuthFailedHandler(handler);
-}
+export const api = {
+  get: <T = unknown>(path: string, init?: Omit<ApiFetchInit, "body">) =>
+    activeClient.api.get<T>(path, init),
+  post: <T = unknown>(path: string, body?: unknown, init?: ApiFetchInit) =>
+    activeClient.api.post<T>(path, body, init),
+  patch: <T = unknown>(path: string, body?: unknown, init?: ApiFetchInit) =>
+    activeClient.api.patch<T>(path, body, init),
+  put: <T = unknown>(path: string, body?: unknown, init?: ApiFetchInit) =>
+    activeClient.api.put<T>(path, body, init),
+  delete: <T = unknown>(path: string, init?: ApiFetchInit) =>
+    activeClient.api.delete<T>(path, init),
+};
 
-/** Reset the default client's handlers. Intended for test isolation. */
 export function resetApiClient() {
-  defaultClient.reset();
+  activeClient = createApiClient();
 }

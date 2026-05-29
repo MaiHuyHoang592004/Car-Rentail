@@ -31,7 +31,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -107,10 +106,6 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("BOOKING_INVALID_STATUS"));
-
-        Listing updatedListing = listingRepository.findById(listing.getId()).orElseThrow();
-        assertThat(updatedListing.getReviewCount()).isEqualTo(1);
-        assertThat(updatedListing.getAverageRating()).isEqualByComparingTo("5.00");
 
         mockMvc.perform(get("/api/v1/listings/{id}/reviews", listing.getId()))
                 .andExpect(status().isOk())

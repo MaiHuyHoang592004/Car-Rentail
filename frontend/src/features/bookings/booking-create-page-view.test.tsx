@@ -19,6 +19,7 @@ const authedSession = {
   user: {
     id: "u-1",
     email: "u@e.com",
+    emailVerified: false,
     roles: ["CUSTOMER"],
     fullName: "U",
     phone: null,
@@ -169,5 +170,32 @@ describe("BookingCreatePageView", () => {
 
     expect(screen.getByText("Ngày trả phải sau ngày nhận.")).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows verify-email CTA on 403 EMAIL_NOT_VERIFIED", async () => {
+    fetchSpy.mockResolvedValueOnce(listingResponse());
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: "EMAIL_NOT_VERIFIED",
+          message: "Email is not verified",
+        },
+        403,
+      ),
+    );
+    wrap(<BookingCreatePageView listingId="lst-001" isGuest={false} />);
+    await screen.findByText(/Đặt Toyota Vios 2022/);
+
+    const dateInputs = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    await userEvent.type(dateInputs[0], isoOffset(1));
+    await userEvent.type(dateInputs[1], isoOffset(3));
+    await userEvent.click(screen.getByRole("button", { name: /Giữ xe này/ }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Email chưa được xác minh")).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("link", { name: "Đi đến hồ sơ để xác minh email" }),
+    ).toHaveAttribute("href", "/me/profile");
   });
 });

@@ -119,7 +119,7 @@ public class BookingService {
             AdminNotificationService adminNotificationService,
             Clock clock,
             @Value("${rentflow.booking.hold-duration-minutes:15}") long holdDurationMinutes,
-            @Value("${rentflow.booking.require-email-verification:false}") boolean requireEmailVerification) {
+            @Value("${rentflow.booking.require-email-verification:true}") boolean requireEmailVerification) {
         this.bookingRepository = bookingRepository;
         this.bookingExtraRepository = bookingExtraRepository;
         this.listingRepository = listingRepository;
@@ -248,30 +248,55 @@ public class BookingService {
 
         UUID idempotencyKeyId = ((IdempotencyResolution.Proceed) resolution).idempotencyKeyId();
         try {
+            // Lock and validate booking
             Booking booking = bookingRepository.findByIdForUpdate(id)
                     .orElseThrow(() -> new BookingNotFoundException(String.valueOf(id)));
             if (!canCancelBooking(booking, customerId)) {
                 throw new BookingNotFoundException(String.valueOf(id));
             }
             String cancellationReason = sanitizeCancellationReason(cancelRequest.reason());
-            BookingPayment payment = bookingPaymentRepository.findByBookingIdForUpdate(booking.getId()).orElse(null);
-            List<AvailabilityCalendar> availabilityRows = availabilityReserver.lockForBooking(booking);
-            CancelOutcome outcome = cancelByState(booking, payment, availabilityRows, cancellationReason);
+            CancelBookingResponse response;
 
-            CancelBookingResponse response = new CancelBookingResponse(
-                    booking.getId(),
-                    booking.getStatus(),
-                    booking.getCancellationReason(),
-                    true,
-                    outcome.voidRetryRequired(),
-                    outcome.code(),
-                    outcome.paymentRetryState());
+            if (booking.getStatus() == BookingStatus.HELD) {
+                BookingPayment payment = bookingPaymentRepository.findByBookingIdForUpdate(booking.getId()).orElse(null);
+                List<AvailabilityCalendar> availabilityRows = availabilityReserver.lockForBooking(booking);
+                CancelOutcome outcome = cancelHeld(booking, availabilityRows, cancellationReason);
+                response = buildCancelResponse(booking, customerId, outcome);
+            } else if (booking.getStatus() == BookingStatus.PENDING_HOST_APPROVAL) {
+                BookingPayment payment = bookingPaymentRepository.findByBookingIdForUpdate(booking.getId())
+                        .orElseThrow(() -> new BusinessRuleException("PAYMENT_NOT_FOUND", "Payment not found for booking"));
+                List<AvailabilityCalendar> availabilityRows = availabilityReserver.lockForBooking(booking);
+                // Phase 1 — prepare (inside TX, locks held)
+                CancelOutcome outcome = cancelPendingHostApproval(booking, payment, availabilityRows, cancellationReason);
+                response = buildCancelResponse(booking, customerId, outcome);
+            } else if (booking.getStatus() == BookingStatus.CONFIRMED) {
+                validateBeforePickup(booking);
+                BookingPayment payment = bookingPaymentRepository.findByBookingIdForUpdate(booking.getId())
+                        .orElseThrow(() -> new BusinessRuleException("PAYMENT_NOT_FOUND", "Payment not found for booking"));
+                List<AvailabilityCalendar> availabilityRows = availabilityReserver.lockForBooking(booking);
+                CancelOutcome outcome = cancelConfirmed(booking, payment, availabilityRows, cancellationReason);
+                response = buildCancelResponse(booking, customerId, outcome);
+            } else {
+                throw new BusinessRuleException("BOOKING_INVALID_STATUS", "Booking cannot be cancelled in its current status");
+            }
+
             idempotencyService.complete(idempotencyKeyId, 200, serialize(response));
             return response;
         } catch (RuntimeException e) {
             idempotencyFailureMarker.markFailed(idempotencyKeyId);
             throw e;
         }
+    }
+
+    private CancelBookingResponse buildCancelResponse(Booking booking, UUID customerId, CancelOutcome outcome) {
+        return new CancelBookingResponse(
+                booking.getId(),
+                booking.getStatus(),
+                booking.getCancellationReason(),
+                true,
+                outcome.voidRetryRequired(),
+                outcome.code(),
+                outcome.paymentRetryState());
     }
 
     private BookingResponse createBookingAfterIdempotency(UUID customerId, CreateBookingRequest request) {

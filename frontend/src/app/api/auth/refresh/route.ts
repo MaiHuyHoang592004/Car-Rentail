@@ -7,6 +7,7 @@ import {
   clearRefreshCookie,
   clearRoleCookie,
   setRefreshCookie,
+  setRoleCookie,
 } from "@/lib/server/session-cookie";
 
 type TokenOnlyResponse = {
@@ -41,6 +42,21 @@ export async function POST() {
   }
 
   const tokens = (await response.json()) as TokenOnlyResponse;
+  const meResponse = await callBackend("/users/me", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${tokens.accessToken}`,
+    },
+  });
+
+  if (!meResponse.ok) {
+    const cleared = new NextResponse(null, { status: 204 });
+    clearRefreshCookie(cleared);
+    clearRoleCookie(cleared);
+    return cleared;
+  }
+
+  const user = (await meResponse.json()) as { roles: string[] };
   const nextResponse = NextResponse.json(
     {
       accessToken: tokens.accessToken,
@@ -49,5 +65,6 @@ export async function POST() {
     { status: 200 },
   );
   setRefreshCookie(nextResponse, tokens.refreshToken);
+  setRoleCookie(nextResponse, user.roles);
   return nextResponse;
 }

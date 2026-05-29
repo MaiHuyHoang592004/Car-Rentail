@@ -1,11 +1,5 @@
-import { RoutePlaceholder } from "@/components/rentflow/route-placeholder";
+import { AdminDashboardPageView } from "@/features/admin/dashboard/admin-dashboard-page-view";
 
 export default function AdminOverviewPage() {
-  return (
-    <RoutePlaceholder
-      title="Tổng quan Admin"
-      description="Giao diện tổng quan tĩnh dành cho quản trị viên."
-      activePath="/admin"
-    />
-  );
+  return <AdminDashboardPageView />;
 }

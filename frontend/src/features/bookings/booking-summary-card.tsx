@@ -22,6 +22,11 @@ export function BookingSummaryCard({ booking }: BookingSummaryCardProps) {
           <p className="text-sm font-semibold text-foreground">
             {booking.totalAmount.toLocaleString("en-US")} {booking.currency}
           </p>
+          {booking.status === "CANCELLED" && booking.voidRetryRequired ? (
+            <p className="text-sm font-medium text-amber-700">
+              Đang xử lý hoàn tiền hoặc void trong nền
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2">

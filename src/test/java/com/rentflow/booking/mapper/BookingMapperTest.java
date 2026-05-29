@@ -12,6 +12,8 @@ import com.rentflow.booking.service.BookingSummaryResponse;
 import com.rentflow.common.web.PageResponse;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.payment.entity.BookingPayment;
+import com.rentflow.payment.repository.BookingPaymentRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -30,11 +32,12 @@ import org.springframework.data.domain.PageRequest;
 class BookingMapperTest {
 
     @Mock private ListingRepository listingRepository;
+    @Mock private BookingPaymentRepository bookingPaymentRepository;
     private BookingMapper mapper;
 
     @BeforeEach
     void setUp() {
-        mapper = new BookingMapper(listingRepository, new ObjectMapper());
+        mapper = new BookingMapper(listingRepository, bookingPaymentRepository, new ObjectMapper());
     }
 
     @Test
@@ -62,6 +65,22 @@ class BookingMapperTest {
 
         assertThat(r.listingTitle()).isEqualTo("Toyota Vios 2022");
         assertThat(r.totalAmount()).isEqualByComparingTo("1500000.00");
+    }
+
+    @Test
+    void toSummaryResponse_includesRetryMetadataWhenPaymentRequiresVoidRetry() {
+        Booking booking = sampleBooking();
+        BookingPayment payment = new BookingPayment();
+        payment.setBookingId(booking.getId());
+        payment.setVoidRetryRequired(true);
+        payment.setProviderStatus("VOID_RETRY_REQUIRED");
+        when(listingRepository.findById(any())).thenReturn(Optional.empty());
+        when(bookingPaymentRepository.findByBookingId(booking.getId())).thenReturn(Optional.of(payment));
+
+        BookingSummaryResponse r = mapper.toSummaryResponse(booking);
+
+        assertThat(r.voidRetryRequired()).isTrue();
+        assertThat(r.paymentRetryState()).isEqualTo("VOID_RETRY_REQUIRED");
     }
 
     @Test

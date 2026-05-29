@@ -30,7 +30,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
         "rentflow.rate-limit.enabled=false",
+        "rentflow.scheduler.void-retry.enabled=false",
+        "rentflow.scheduler.outbox-publisher.enabled=false",
+        "rentflow.scheduler.idempotency-cleanup.enabled=false",
         "management.health.redis.enabled=false",
+        "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
         "jwt.secret=test-jwt-secret-key-for-unit-tests-only-minimum-60-bytes-required-for-hs512",
         "jwt.access-token-expiry=PT15M",
         "jwt.refresh-token-expiry=P7D"

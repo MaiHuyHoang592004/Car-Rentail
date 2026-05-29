@@ -146,7 +146,7 @@ class BookingServiceTest {
                 securityContext,
                 emailVerificationPolicy,
                 objectMapper,
-                new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
+                new com.rentflow.booking.mapper.BookingMapper(listingRepository, bookingPaymentRepository, objectMapper),
                 bookingPaymentRepository,
                 paymentTransactionRepository,
                 paymentProviderRouter,
@@ -320,7 +320,7 @@ class BookingServiceTest {
                 securityContext,
                 emailVerificationPolicy,
                 objectMapper,
-                new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
+                new com.rentflow.booking.mapper.BookingMapper(listingRepository, bookingPaymentRepository, objectMapper),
                 bookingPaymentRepository,
                 paymentTransactionRepository,
                 paymentProviderRouter,
@@ -364,7 +364,7 @@ class BookingServiceTest {
                 securityContext,
                 emailVerificationPolicy,
                 objectMapper,
-                new com.rentflow.booking.mapper.BookingMapper(listingRepository, objectMapper),
+                new com.rentflow.booking.mapper.BookingMapper(listingRepository, bookingPaymentRepository, objectMapper),
                 bookingPaymentRepository,
                 paymentTransactionRepository,
                 paymentProviderRouter,
@@ -941,7 +941,6 @@ class BookingServiceTest {
         mockCancelProceed();
         when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
         when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.empty());
-        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
                 .isInstanceOf(BusinessRuleException.class)
@@ -1000,7 +999,6 @@ class BookingServiceTest {
         mockCancelProceed();
         when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
         when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.empty());
-        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
                 .isInstanceOf(BusinessRuleException.class)

@@ -124,6 +124,9 @@ FOR UPDATE SKIP LOCKED;
 12. Commit.
 ```
 
+**⚠ VIOLATION: Provider calls (callCapture, callVoid) are made INSIDE the transaction while holding all locks.**
+Target for Slice 4 refactor.
+
 ---
 
 ## TX-05 — Cancel Booking with Partial Penalty
@@ -168,6 +171,9 @@ VOID fails after CAPTURE succeeds:
 
 **Critical: CAPTURE before VOID (BR-47)**
 
+**⚠ VIOLATION: Provider calls are made INSIDE the transaction while holding all locks.**
+Target for Slice 4 refactor.
+
 ---
 
 ## TX-06 — Host Approve/Reject
@@ -185,6 +191,9 @@ VOID fails after CAPTURE succeeds:
 8. timeline/audit/outbox.
 ```
 
+**Lock order: idempotency → booking → payment → availability ✅**
+No provider call needed. ✅
+
 ### Host Rejection
 
 ```text
@@ -199,6 +208,10 @@ VOID fails after CAPTURE succeeds:
 9. availability HOLD -> FREE.
 10. timeline/audit/outbox.
 ```
+
+**Lock order: idempotency → booking → payment → availability ✅**
+Provider call now runs outside the DB transaction using `prepare -> provider call -> finalize`.
+Finalize re-locks and revalidates booking/payment/availability before mutating local state. ✅
 
 ---
 
@@ -336,6 +349,58 @@ FAILED:
 
 ---
 
+## Lock-Order Transaction Matrix (Slice 1)
+
+### Canonical Invariant
+
+```
+1. Idempotency key (FOR UPDATE) — always first (where applicable)
+2. Booking row (FOR UPDATE)
+3. BookingPayment row (FOR UPDATE)
+4. Availability rows (ORDER BY available_date ASC, FOR UPDATE) — always last
+```
+
+### Compliance Matrix
+
+| Operation | File/Method | Lock Order | Provider Call Outside TX? | Risk |
+|---|---|---|---|---|
+| **Authorize** | `CoreBankAuthorizeService.authorizeBookingPayment()` | ✅ idempotency → booking → payment → availability | ✅ Yes (split TX pattern) | LOW |
+| **Capture** | `CoreBankCaptureService.capture()` | ✅ booking → payment (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW |
+| **Void** | `CoreBankVoidService.voidAuthorization()` | ✅ booking → payment (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW |
+| **Refund** | `CoreBankRefundService.refund()` | ✅ booking → payment (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW |
+| **Cancel booking** | `BookingService.cancelBooking()` | ✅ booking → payment → availability | ❌ No — callCapture/callVoid INSIDE TX | **HIGH** |
+| **Host approve** | `HostBookingApprovalService.approveBooking()` | ✅ booking → payment → availability | ✅ No provider call | OK |
+| **Host reject** | `HostBookingApprovalService.rejectBooking()` | ✅ booking → payment → availability | ✅ Yes (split TX pattern) | LOW |
+| **Void retry** | `DefaultPaymentVoidRetryService.retrySingle()` | ✅ payment lock only; prepare/finalize relock before mutation | ✅ Yes (between prepare/finalize) | LOW |
+| **Trip checkout** | `TripPaymentCaptureService.captureRemainingForBooking()` | ✅ payment lock only; prepare/finalize relock before mutation | ✅ Yes (between prepare/finalize) | LOW |
+| **Create booking** | `BookingService.createBooking()` | ✅ idempotency → availability | ✅ No provider call | OK |
+| **Expire HELD** | `BookingExpiryJob` | ✅ booking → availability | ✅ No provider call | OK |
+| **Expire host approval** | `ExpireHostApprovalsProcessor` | ✅ booking → payment → availability | ✅ Yes (split TX pattern) | LOW |
+
+### Violation Summary
+
+**Remaining provider-call-while-holding-locks violations:**
+- `BookingService.cancelBooking` → `callCapture` + `callVoid`
+
+All other payment/host-approval mutation paths listed in this matrix now follow:
+
+```text
+prepare (lock + validate + create PENDING payment_transaction)
+-> provider call outside DB TX
+-> finalize (re-lock + revalidate + mutate aggregate + mark transaction)
+```
+
+If provider success is followed by local state drift, finalize must:
+
+```text
+1. NOT overwrite booking/payment/availability state
+2. mark payment_transaction FAILED
+3. set provider_error_code = PAYMENT_FINALIZATION_UNSAFE
+4. surface a domain error for reconciliation / operator review
+```
+
+---
+
 ## Critical Rules Summary
 
 | Rule | Description |
@@ -347,3 +412,5 @@ FAILED:
 | FOR UPDATE SKIP LOCKED | For all scheduled jobs to prevent duplicate processing |
 | Bounded batches | All jobs process in batches (default 100) |
 | Same TX for state change + outbox | Outbox events created in same transaction as business state change |
+| Provider calls must be outside DB TX | Do not call external providers while holding DB locks (exceptions must be explicitly justified) |
+| Lock order: booking before payment | Both `prepare*` and `finalize*` methods must lock booking before payment |

@@ -2,6 +2,7 @@ package com.rentflow.auth.controller;
 
 import com.rentflow.auth.entity.Role;
 import com.rentflow.auth.entity.UserStatus;
+import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.web.PageResponse;
 import com.rentflow.user.dto.UserSummaryResponse;
 import com.rentflow.user.service.UserService;
@@ -28,15 +29,32 @@ public class AdminUserController {
             @RequestParam(required = false) String role,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        UserStatus statusEnum = null;
-        if (status != null && !status.isBlank()) {
-            try {
-                statusEnum = UserStatus.valueOf(status.toUpperCase());
-            } catch (IllegalArgumentException ignored) {
-            }
-        }
+        UserStatus statusEnum = parseUserStatus(status);
+        Role roleEnum = parseRole(role);
 
-        Page<UserSummaryResponse> page = userService.listUsers(statusEnum, role, pageable);
+        Page<UserSummaryResponse> page = userService.listUsers(statusEnum, roleEnum, pageable);
         return ResponseEntity.ok(PageResponse.from(page));
+    }
+
+    private UserStatus parseUserStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        try {
+            return UserStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationException("Invalid user status: " + status);
+        }
+    }
+
+    private Role parseRole(String role) {
+        if (role == null || role.isBlank()) {
+            return null;
+        }
+        try {
+            return Role.valueOf(role.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationException("Invalid user role: " + role);
+        }
     }
 }

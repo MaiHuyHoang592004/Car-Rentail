@@ -10,22 +10,15 @@ import com.rentflow.auth.repository.AuthUserRepository;
 import com.rentflow.auth.repository.RefreshTokenRepository;
 import com.rentflow.auth.repository.UserRoleRepository;
 import com.rentflow.common.security.JwtTokenProvider;
-import com.rentflow.user.repository.UserProfileRepository;
+import com.rentflow.integration.BaseIntegrationTest;
 import com.rentflow.user.entity.UserProfile;
+import com.rentflow.user.repository.UserProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
@@ -36,30 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-@AutoConfigureMockMvc
 @Tag("integration")
-class UserIntegrationTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("rentflow")
-            .withUsername("rentflow")
-            .withPassword("rentflow");
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-        registry.add("spring.flyway.enabled", () -> true);
-    }
-
-    @Autowired
-    private MockMvc mockMvc;
+class UserIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private JwtTokenProvider tokenProvider;
@@ -99,6 +70,7 @@ class UserIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.email").value("me@example.com"))
+                .andExpect(jsonPath("$.emailVerified").value(false))
                 .andExpect(jsonPath("$.fullName").value("Me User"))
                 .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"))
                 .andExpect(jsonPath("$.driverVerificationStatus").value("NOT_SUBMITTED"))
@@ -149,6 +121,7 @@ class UserIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("Patched Name"))
                 .andExpect(jsonPath("$.phone").value("0909000000"))
+                .andExpect(jsonPath("$.emailVerified").value(false))
                 .andExpect(jsonPath("$.addressLine").value("New Address"));
     }
 
@@ -190,6 +163,7 @@ class UserIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("Allowed Name"))
                 .andExpect(jsonPath("$.email").value("protected-fields@example.com"))
+                .andExpect(jsonPath("$.emailVerified").value(false))
                 .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"))
                 .andExpect(jsonPath("$.driverVerificationStatus").value("NOT_SUBMITTED"));
     }
@@ -248,6 +222,30 @@ class UserIntegrationTest {
                         .param("role", "CUSTOMER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void adminListUsers_invalidStatusReturns400() throws Exception {
+        AuthUser admin = createUser("admin4@example.com", "Password@123", Role.ADMIN);
+        String adminToken = tokenProvider.generateAccessToken(admin.getId(), admin.getEmail(), List.of(Role.ADMIN));
+
+        mockMvc.perform(get("/api/v1/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("status", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void adminListUsers_invalidRoleReturns400() throws Exception {
+        AuthUser admin = createUser("admin5@example.com", "Password@123", Role.ADMIN);
+        String adminToken = tokenProvider.generateAccessToken(admin.getId(), admin.getEmail(), List.of(Role.ADMIN));
+
+        mockMvc.perform(get("/api/v1/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("role", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
