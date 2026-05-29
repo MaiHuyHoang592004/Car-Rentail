@@ -38,7 +38,7 @@ public class EmailVerificationService {
         String hash = PasswordService.sha256(raw);
         emailVerificationTokenRepository.save(new EmailVerificationToken(
                 user.getId(), hash, Instant.now().plus(TOKEN_LIFETIME)));
-        log.info("[email-stub] verification link for {}: /verify-email?token={}", user.getEmail(), raw);
+        log.info("[email-stub] verification requested for {}", user.getEmail());
     }
 
     @Transactional

@@ -1,0 +1,23 @@
+jwt:
+  secret: test-jwt-secret-key-for-unit-tests-only-minimum-64-bytes-required-for-hs512-123456789
+
+encryption:
+  secret-key: Q6iaj8bzwS3UjXZTvgin7MChtBS6lhUZmj19bHF6z1o=
+
+rentflow:
+  file:
+    signed-url:
+      secret: test-signed-url-secret-1234567890-abcdef
+  scheduler:
+    void-retry:
+      enabled: false
+    outbox-publisher:
+      enabled: false
+    idempotency-cleanup:
+      enabled: false
+    expire-held-bookings:
+      enabled: false
+    expire-host-approvals:
+      enabled: false
+    expire-driver-verifications:
+      enabled: false

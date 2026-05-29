@@ -52,7 +52,7 @@ public class PasswordService {
         String hash = sha256(raw);
         passwordResetTokenRepository.save(new PasswordResetToken(
                 user.getId(), hash, Instant.now().plus(TOKEN_LIFETIME)));
-        log.info("[email-stub] password reset link for {}: /reset-password?token={}", email, raw);
+        log.info("[email-stub] password reset requested for {}", email);
     }
 
     @Transactional
