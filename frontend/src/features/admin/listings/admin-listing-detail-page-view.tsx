@@ -1,13 +1,15 @@
-"use client";
+﻿"use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ArrowLeft, Ban, CheckCircle, RefreshCw, ShieldX } from "lucide-react";
 
 import { AppShell } from "@/components/rentflow/app-shell";
-import { PageHeader } from "@/components/rentflow/page-header";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
+import { StatusBadge } from "@/components/rentflow/status-badge";
+import { HostActionDialog } from "@/features/host/components/host-action-dialog";
 import {
   adminApproveListingSafe,
   adminGetListingDetail,
@@ -16,162 +18,24 @@ import {
   adminSuspendListingSafe,
   AdminListingActionError,
 } from "@/features/admin/listings/api";
-import type { AdminListingDetail } from "@/features/admin/listings/types";
+import { getListingStatusLabel } from "@/lib/display-labels";
+import { getCancellationPolicyLabel } from "@/lib/display-labels";
+import { formatMoney } from "@/lib/formatters";
 import { ApiError } from "@/lib/api-error";
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                           */
-/* ------------------------------------------------------------------ */
-
-function statusBadgeClass(status: string): string {
-  switch (status) {
-    case "PENDING_APPROVAL":
-      return "bg-amber-100 text-amber-800 border-amber-200";
-    case "ACTIVE":
-      return "bg-emerald-100 text-emerald-800 border-emerald-200";
-    case "SUSPENDED":
-      return "bg-rose-100 text-rose-800 border-rose-200";
-    case "DRAFT":
-      return "bg-slate-100 text-slate-800 border-slate-200";
-    case "ARCHIVED":
-      return "bg-gray-100 text-gray-600 border-gray-200";
-    default:
-      return "bg-slate-100 text-slate-800 border-slate-200";
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Reason Dialog                                                     */
-/* ------------------------------------------------------------------ */
-
-type ReasonDialogProps = {
-  open: boolean;
-  title: string;
-  description: string;
-  confirmLabel: string;
-  tone?: "default" | "danger";
-  onClose: () => void;
-  onConfirm: (reason: string) => void;
-};
-
-function ReasonDialog({
-  open,
-  title,
-  description,
-  confirmLabel,
-  tone = "default",
-  onClose,
-  onConfirm,
-}: ReasonDialogProps) {
-  const [reason, setReason] = useState("");
-
-  if (!open) return null;
-
-  const confirmClass =
-    tone === "danger"
-      ? "rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-      : "rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90";
-
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-lg"
-      >
-        <h3 className="text-lg font-bold text-foreground">{title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        <textarea
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
-          placeholder="Nhập lý do (tùy chọn)"
-          className="mt-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
-          >
-            Hủy
-          </button>
-          <button
-            type="button"
-            onClick={() => onConfirm(reason)}
-            className={confirmClass}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Confirm Dialog                                                    */
-/* ------------------------------------------------------------------ */
-
-type ConfirmDialogProps = {
-  open: boolean;
-  title: string;
-  description: string;
-  confirmLabel: string;
-  tone?: "default" | "danger";
-  onClose: () => void;
-  onConfirm: () => void;
-};
-
-function ConfirmDialog({
-  open,
-  title,
-  description,
-  confirmLabel,
-  tone = "default",
-  onClose,
-  onConfirm,
-}: ConfirmDialogProps) {
-  if (!open) return null;
-
-  const confirmClass =
-    tone === "danger"
-      ? "rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-      : "rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90";
-
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-lg"
-      >
-        <h3 className="text-lg font-bold text-foreground">{title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
-          >
-            Hủy
-          </button>
-          <button type="button" onClick={onConfirm} className={confirmClass}>
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Page View                                                         */
-/* ------------------------------------------------------------------ */
+import type { AdminListingDetail } from "@/features/admin/listings/types";
 
 type AdminListingDetailPageViewProps = {
   listingId: string;
 };
+
+function DetailInfoBlock({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border bg-background px-3 py-2">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-foreground">{children}</p>
+    </div>
+  );
+}
 
 export function AdminListingDetailPageView({ listingId }: AdminListingDetailPageViewProps) {
   const queryClient = useQueryClient();
@@ -179,6 +43,7 @@ export function AdminListingDetailPageView({ listingId }: AdminListingDetailPage
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [approveOpen, setApproveOpen] = useState(false);
   const [reactivateOpen, setReactivateOpen] = useState(false);
+  const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const { data: detail, isLoading, isError } = useQuery({
     queryKey: ["admin", "listings", listingId],
@@ -191,86 +56,64 @@ export function AdminListingDetailPageView({ listingId }: AdminListingDetailPage
     queryClient.invalidateQueries({ queryKey: ["admin", "listings"] });
   };
 
+  function showError(err: unknown, fallback: string) {
+    const msg =
+      err instanceof AdminListingActionError
+        ? err.message
+        : err instanceof ApiError
+          ? err.message
+          : fallback;
+    toast.error(msg);
+  }
+
   const approveMutation = useMutation({
     mutationFn: () => adminApproveListingSafe(listingId),
     onSuccess: () => {
-      toast.success("Đã duyệt tin đăng");
+      toast.success("Da duyet tin dang thanh cong.");
       invalidate();
       setApproveOpen(false);
+      setBanner({ type: "success", message: "Tin dang da duyet." });
     },
-    onError: (err: unknown) => {
-      const msg =
-        err instanceof AdminListingActionError
-          ? err.message
-          : err instanceof ApiError
-            ? err.message
-            : "Duyệt tin đăng thất bại";
-      toast.error(msg);
-      setApproveOpen(false);
-    },
+    onError: (err) => { showError(err, "Duyet tin dang that bai."); setApproveOpen(false); },
   });
 
   const rejectMutation = useMutation({
     mutationFn: (reason: string) => adminRejectListingSafe(listingId, reason),
     onSuccess: () => {
-      toast.success("Đã từ chối tin đăng");
+      toast.success("Da tu choi tin dang.");
       invalidate();
       setRejectOpen(false);
+      setBanner({ type: "success", message: "Tin dang da tu choi." });
     },
-    onError: (err: unknown) => {
-      const msg =
-        err instanceof AdminListingActionError
-          ? err.message
-          : err instanceof ApiError
-            ? err.message
-            : "Từ chối tin đăng thất bại";
-      toast.error(msg);
-      setRejectOpen(false);
-    },
+    onError: (err) => { showError(err, "Tu choi tin dang that bai."); setRejectOpen(false); },
   });
 
   const suspendMutation = useMutation({
     mutationFn: (reason: string) => adminSuspendListingSafe(listingId, reason),
     onSuccess: () => {
-      toast.success("Đã tạm ngưng tin đăng");
+      toast.success("Da tam ngung tin dang.");
       invalidate();
       setSuspendOpen(false);
+      setBanner({ type: "success", message: "Tin dang da tam ngung." });
     },
-    onError: (err: unknown) => {
-      const msg =
-        err instanceof AdminListingActionError
-          ? err.message
-          : err instanceof ApiError
-            ? err.message
-            : "Tạm ngưng tin đăng thất bại";
-      toast.error(msg);
-      setSuspendOpen(false);
-    },
+    onError: (err) => { showError(err, "Tam ngung tin dang that bai."); setSuspendOpen(false); },
   });
 
   const reactivateMutation = useMutation({
     mutationFn: () => adminReactivateListingSafe(listingId),
     onSuccess: () => {
-      toast.success("Đã kích hoạt lại tin đăng");
+      toast.success("Da kich hoat lai tin dang.");
       invalidate();
       setReactivateOpen(false);
+      setBanner({ type: "success", message: "Tin dang da kich hoat lai." });
     },
-    onError: (err: unknown) => {
-      const msg =
-        err instanceof AdminListingActionError
-          ? err.message
-          : err instanceof ApiError
-            ? err.message
-            : "Kích hoạt lại tin đăng thất bại";
-      toast.error(msg);
-      setReactivateOpen(false);
-    },
+    onError: (err) => { showError(err, "Kich hoat lai that bai."); setReactivateOpen(false); },
   });
 
   if (isLoading) {
     return (
       <AppShell activePath="/admin/listings">
-        <PageSkeleton message="Đang tải chi tiết..." />
+        <PageSkeleton message="Dang tai chi tiet..." />
       </AppShell>
     );
   }
@@ -280,13 +123,13 @@ export function AdminListingDetailPageView({ listingId }: AdminListingDetailPage
       <AppShell activePath="/admin/listings">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            Không tìm thấy tin đăng hoặc bạn không có quyền truy cập.
+            Khong tim thay tin dang hoac ban khong co quyen truy cap.
           </p>
           <Link
             href="/admin/listings"
-            className="mt-4 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            className="mt-4 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
-            Quay về danh sách
+            Quay ve danh sach
           </Link>
         </section>
       </AppShell>
@@ -296,7 +139,6 @@ export function AdminListingDetailPageView({ listingId }: AdminListingDetailPage
   const { listing, host, bookingSummary } = detail;
   const status = listing.status;
 
-  // Which actions are available for current status
   const canApprove = status === "PENDING_APPROVAL";
   const canReject = status === "PENDING_APPROVAL";
   const canSuspend = status === "ACTIVE";
@@ -310,161 +152,209 @@ export function AdminListingDetailPageView({ listingId }: AdminListingDetailPage
 
   return (
     <AppShell activePath="/admin/listings">
-      <div className="space-y-6">
-        <PageHeader
-          title={listing.title}
-          description={`Chi tiết listing · ${listing.city}`}
-          actions={
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <Link
               href="/admin/listings"
-              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Quay về danh sách
+              <ArrowLeft className="h-4 w-4" />
+              Quay lai
             </Link>
-          }
-        />
+            <span className="text-muted-foreground">|</span>
+            <h1 className="text-xl font-bold text-foreground truncate max-w-md">
+              {listing.title}
+            </h1>
+            <StatusBadge
+              status={status}
+              label={getListingStatusLabel(status)}
+              className="bg-amber-100 text-amber-800 border-amber-200"
+            />
+          </div>
+        </div>
 
-        {/* Listing info card */}
-        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusBadgeClass(status)}`}
-            >
-              {status}
-            </span>
-            <span className="text-xs text-muted-foreground">{listing.city}</span>
+        {/* Banner */}
+        {banner ? (
+          <section
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              banner.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-rose-200 bg-rose-50 text-rose-900"
+            }`}
+          >
+            {banner.message}
+          </section>
+        ) : null}
+
+        {/* Two-column layout */}
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+          {/* Left: listing info */}
+          <div className="min-w-0 flex-1 space-y-4">
+            {/* Listing summary card */}
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3">
+                Thong tin tin dang
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DetailInfoBlock label="Gia / ngay">
+                  {formatMoney(listing.basePricePerDay, listing.currency)}
+                </DetailInfoBlock>
+                <DetailInfoBlock label="Gioi han km / ngay">
+                  {listing.dailyKmLimit} km
+                </DetailInfoBlock>
+                <DetailInfoBlock label="Cho phep dat ngay">
+                  {listing.instantBook ? "Co" : "Khong"}
+                </DetailInfoBlock>
+                <DetailInfoBlock label="Chinh sach huy">
+                  {getCancellationPolicyLabel(listing.cancellationPolicy)}
+                </DetailInfoBlock>
+                <DetailInfoBlock label="Thanh pho">
+                  {listing.city}
+                </DetailInfoBlock>
+                <DetailInfoBlock label="Dia chi">
+                  {listing.address || "—"}
+                </DetailInfoBlock>
+              </div>
+              {listing.description ? (
+                <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Mo ta</p>
+                  <p className="mt-1 whitespace-pre-line text-sm text-foreground">
+                    {listing.description}
+                  </p>
+                </div>
+              ) : null}
+            </section>
+
+            {/* Host info */}
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3">
+                Chu xe
+              </h2>
+              {host ? (
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">{host.fullName}</p>
+                  <p className="text-sm text-muted-foreground">{host.email}</p>
+                  <p className="text-xs text-muted-foreground">ID: {host.id}</p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Khong co thong tin chu xe.</p>
+              )}
+            </section>
+
+            {/* Booking summary */}
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3">
+                Dat xe hien tai
+              </h2>
+              <p className="text-2xl font-bold text-foreground">
+                {bookingSummary.activeBookings}
+              </p>
+              <p className="text-xs text-muted-foreground">dat xe dang hoat dong</p>
+            </section>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <InfoBlock label="Giá/ngày">
-              {listing.basePricePerDay.toLocaleString("en-US")} {listing.currency}
-            </InfoBlock>
-            <InfoBlock label="Giới hạn km/ngày">{listing.dailyKmLimit}</InfoBlock>
-            <InfoBlock label="Instant Book">
-              {listing.instantBook ? "Có" : "Không"}
-            </InfoBlock>
-            <InfoBlock label="Chính sách hủy">{listing.cancellationPolicy}</InfoBlock>
-          </div>
+          {/* Right: sticky action panel */}
+          <div className="w-full lg:sticky lg:top-6 lg:w-72 lg:shrink-0">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Trang thai hien tai</p>
+                <div className="mt-1">
+                  <StatusBadge
+                    status={status}
+                    label={getListingStatusLabel(status)}
+                    className="bg-amber-100 text-amber-800 border-amber-200"
+                  />
+                </div>
+              </div>
 
-          {listing.description && (
-            <p className="mt-4 text-sm text-muted-foreground whitespace-pre-line">
-              {listing.description}
-            </p>
-          )}
-        </section>
-
-        {/* Host + booking summary */}
-        <section className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Chủ xe</p>
-            <p className="mt-1 text-sm font-semibold text-foreground">
-              {host?.fullName ?? "Không rõ"}
-            </p>
-            <p className="text-xs text-muted-foreground">{host?.email ?? ""}</p>
+              <div className="border-t border-border pt-3 space-y-2">
+                {canApprove && (
+                  <button
+                    type="button"
+                    disabled={isLoadingAction}
+                    onClick={() => setApproveOpen(true)}
+                    className="flex w-full items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    {approveMutation.isPending ? "Dang duyet..." : "Duyet"}
+                  </button>
+                )}
+                {canReject && (
+                  <button
+                    type="button"
+                    disabled={isLoadingAction}
+                    onClick={() => setRejectOpen(true)}
+                    className="flex w-full items-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
+                  >
+                    <ShieldX className="h-4 w-4" />
+                    {rejectMutation.isPending ? "Dang tu choi..." : "Tu choi"}
+                  </button>
+                )}
+                {canSuspend && (
+                  <button
+                    type="button"
+                    disabled={isLoadingAction}
+                    onClick={() => setSuspendOpen(true)}
+                    className="flex w-full items-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
+                  >
+                    <Ban className="h-4 w-4" />
+                    {suspendMutation.isPending ? "Dang tam ngung..." : "Tam ngung"}
+                  </button>
+                )}
+                {canReactivate && (
+                  <button
+                    type="button"
+                    disabled={isLoadingAction}
+                    onClick={() => setReactivateOpen(true)}
+                    className="flex w-full items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    {reactivateMutation.isPending ? "Dang kich hoat..." : "Kich hoat lai"}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Đang active bookings
-            </p>
-            <p className="mt-1 text-2xl font-bold text-foreground">
-              {bookingSummary.activeBookings}
-            </p>
-          </div>
-        </section>
-
-        {/* Actions */}
-        <section className="flex flex-wrap gap-2">
-          {canApprove && (
-            <button
-              type="button"
-              disabled={isLoadingAction}
-              onClick={() => setApproveOpen(true)}
-              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
-            >
-              {approveMutation.isPending ? "Đang duyệt..." : "Duyệt"}
-            </button>
-          )}
-          {canReject && (
-            <button
-              type="button"
-              disabled={isLoadingAction}
-              onClick={() => setRejectOpen(true)}
-              className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
-            >
-              {rejectMutation.isPending ? "Đang từ chối..." : "Từ chối"}
-            </button>
-          )}
-          {canSuspend && (
-            <button
-              type="button"
-              disabled={isLoadingAction}
-              onClick={() => setSuspendOpen(true)}
-              className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
-            >
-              {suspendMutation.isPending ? "Đang tạm ngưng..." : "Tạm ngưng"}
-            </button>
-          )}
-          {canReactivate && (
-            <button
-              type="button"
-              disabled={isLoadingAction}
-              onClick={() => setReactivateOpen(true)}
-              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
-            >
-              {reactivateMutation.isPending ? "Đang kích hoạt..." : "Kích hoạt lại"}
-            </button>
-          )}
-        </section>
+        </div>
       </div>
 
       {/* Dialogs */}
-      <ConfirmDialog
+      <HostActionDialog
         open={approveOpen}
-        title="Duyệt listing"
-        description="Listing sẽ chuyển sang ACTIVE và hệ thống sẽ tạo availability rows. Bạn chắc chắn?"
-        confirmLabel="Duyệt"
+        title="Duyet tin dang"
+        description="Tin dang se chuyen sang Hoat dong va he thong se tao cac dong availability. Ban chan chan muon duyet?"
+        confirmLabel="Duyet"
         onClose={() => setApproveOpen(false)}
         onConfirm={() => approveMutation.mutate()}
       />
-      <ReasonDialog
+      <HostActionDialog
         open={rejectOpen}
-        title="Từ chối listing"
-        description="Listing sẽ chuyển về DRAFT. Vui lòng nhập lý do."
-        confirmLabel="Từ chối"
+        title="Tu choi tin dang"
+        description="Tin dang se duoc dat ve trang thai Nhap (Draft). Vui long nhap ly do."
+        confirmLabel="Tu choi"
         tone="danger"
         onClose={() => setRejectOpen(false)}
-        onConfirm={(reason) => rejectMutation.mutate(reason)}
+        onConfirm={(reason) => rejectMutation.mutate(reason ?? "")}
       />
-      <ReasonDialog
+      <HostActionDialog
         open={suspendOpen}
-        title="Tạm ngưng listing"
-        description="Listing sẽ bị tạm ngưng và ẩn khỏi tìm kiếm công khai."
-        confirmLabel="Tạm ngưng"
+        title="Tam ngung tin dang"
+        description="Tin dang se bi an khoi tim kiem cong khai. Cac dat xe hien tai van duoc giu nguyen."
+        confirmLabel="Tam ngung"
         tone="danger"
         onClose={() => setSuspendOpen(false)}
-        onConfirm={(reason) => suspendMutation.mutate(reason)}
+        onConfirm={(reason) => suspendMutation.mutate(reason ?? "")}
       />
-      <ConfirmDialog
+      <HostActionDialog
         open={reactivateOpen}
-        title="Kích hoạt lại listing"
-        description="Listing sẽ chuyển về ACTIVE và hiển thị lại trên tìm kiếm công khai."
-        confirmLabel="Kích hoạt lại"
+        title="Kich hoat lai tin dang"
+        description="Tin dang se quay tro lai trang thai Cho duyet, cho phep chinh sua va gui duyet lai."
+        confirmLabel="Kich hoat lai"
         onClose={() => setReactivateOpen(false)}
         onConfirm={() => reactivateMutation.mutate()}
       />
     </AppShell>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Tiny helper                                                       */
-/* ------------------------------------------------------------------ */
-
-function InfoBlock({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-border bg-background px-3 py-2">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-foreground">{children}</p>
-    </div>
   );
 }
