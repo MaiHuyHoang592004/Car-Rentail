@@ -117,7 +117,7 @@ describe("BookingsListPageView", () => {
     );
     const { container } = wrap(<BookingsListPageView />);
     await waitFor(() => {
-      expect(within(container).getByText("Chưa có booking nào")).toBeInTheDocument();
+      expect(within(container).getByText("Chua co don nao")).toBeInTheDocument();
     });
   });
 
@@ -137,9 +137,9 @@ describe("BookingsListPageView", () => {
     );
     wrap(<BookingsListPageView />);
 
-    expect(
-      await screen.findByText("Đang xử lý hoàn tiền hoặc void trong nền"),
-    ).toBeInTheDocument();
+      expect(
+        await screen.findByText("Dang xu ly hoan tien hoac void trong nen"),
+      ).toBeInTheDocument();
   });
 
   it("does not show retry-state marker for ordinary cancelled bookings", async () => {
@@ -158,6 +158,6 @@ describe("BookingsListPageView", () => {
     );
     wrap(<BookingsListPageView />);
     await screen.findByText("Toyota Vios 2022");
-    expect(screen.queryByText("Đang xử lý hoàn tiền hoặc void trong nền")).not.toBeInTheDocument();
+    expect(screen.queryByText("Dang xu ly hoan tien hoac void trong nen")).not.toBeInTheDocument();
   });
 });

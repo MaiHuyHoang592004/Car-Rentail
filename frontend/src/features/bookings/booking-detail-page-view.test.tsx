@@ -117,7 +117,7 @@ describe("BookingDetailPageView", () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse(bookingHELD));
     wrap(<BookingDetailPageView bookingId="bk-1" />);
     await screen.findByText("Toyota Vios 2022");
-    const payLink = screen.getByRole("link", { name: "Thanh toán" });
+    const payLink = screen.getByRole("link", { name: /Thanh toan/ });
     expect(payLink).toHaveAttribute("href", "/bookings/bk-1/payment");
   });
 
@@ -129,13 +129,13 @@ describe("BookingDetailPageView", () => {
     wrap(<BookingDetailPageView bookingId="bk-1" />);
     await screen.findByText("Toyota Vios 2022");
 
-    await userEvent.click(screen.getByRole("button", { name: /Chỉnh địa điểm/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Chinh dia diem/ }));
     const inputs = document.querySelectorAll<HTMLInputElement>('input[type="text"]');
     await userEvent.clear(inputs[0]);
     await userEvent.type(inputs[0], "Da Nang");
     await userEvent.click(screen.getByRole("button", { name: /Save locations/ }));
 
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Đã cập nhật địa điểm"));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Da cap nhat dia diem"));
     const patchCall = fetchSpy.mock.calls.find(([url, init]) => (init as RequestInit)?.method === "PATCH");
     expect(patchCall).toBeDefined();
     expect((patchCall![0] as string)).toBe("/api/v1/bookings/bk-1");
@@ -155,10 +155,10 @@ describe("BookingDetailPageView", () => {
     wrap(<BookingDetailPageView bookingId="bk-1" />);
     await screen.findByText("Toyota Vios 2022");
 
-    await userEvent.click(screen.getByRole("button", { name: /Hủy booking/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Huy don/ }));
     await userEvent.click(screen.getByRole("button", { name: /Confirm cancel/ }));
 
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Đã hủy booking"));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Da huy don"));
     const cancelCall = fetchSpy.mock.calls.find(([url]) =>
       typeof url === "string" && url.endsWith("/cancel"),
     );
@@ -173,25 +173,24 @@ describe("BookingDetailPageView", () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse(bookingPending));
     wrap(<BookingDetailPageView bookingId="bk-1" />);
     await screen.findByText("Toyota Vios 2022");
-    expect(screen.getByRole("button", { name: /Hủy booking/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Huy don/ })).toBeEnabled();
   });
 
   it("shows cancel enabled for CONFIRMED before pickup date", async () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse(bookingConfirmedFuture));
     wrap(<BookingDetailPageView bookingId="bk-1" />);
     await screen.findByText("Toyota Vios 2022");
-    expect(screen.getByRole("button", { name: /Hủy booking/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Huy don/ })).toBeEnabled();
   });
 
   it("disables cancel for CONFIRMED after pickup date", async () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse(bookingConfirmedPast));
     wrap(<BookingDetailPageView bookingId="bk-1" />);
     await screen.findByText("Toyota Vios 2022");
-    const cancelButton = screen.getByRole("button", { name: /Hủy booking/ });
-    expect(cancelButton).toBeDisabled();
     expect(
-      screen.getByText(/Booking đã đến hoặc qua ngày nhận xe nên không còn hủy được/),
+      screen.getByText(/Don da den hoac qua ngay nhan xe, khong the huy/),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Huy don/ })).not.toBeInTheDocument();
   });
 
   it("shows accepted-success message when cancel requires background void retry", async () => {
@@ -222,19 +221,19 @@ describe("BookingDetailPageView", () => {
     wrap(<BookingDetailPageView bookingId="bk-1" />);
     await screen.findByText("Toyota Vios 2022");
 
-    await userEvent.click(screen.getByRole("button", { name: /Hủy booking/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Huy don/ }));
     await userEvent.click(screen.getByRole("button", { name: /Confirm cancel/ }));
 
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith(
-        "Đã hủy booking; hoàn tiền hoặc void sẽ được xử lý tiếp trong nền",
+        "Da huy don; hoan tien se duoc xu ly tiep",
       ),
     );
     expect(
-      await screen.findByText(/Booking đã được hủy, nhưng thanh toán vẫn đang được xử lý tiếp/),
+      await screen.findByText(/Don da bi huy, nhung thanh toan van dang duoc xu ly/),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Hệ thống đang retry thao tác void thanh toán trong nền/),
+      screen.getByText(/He thong dang retry thao tac void thanh toan trong nen/),
     ).toBeInTheDocument();
   });
 
@@ -250,10 +249,10 @@ describe("BookingDetailPageView", () => {
     wrap(<BookingDetailPageView bookingId="bk-1" />);
 
     expect(
-      await screen.findByText(/Booking đã được hủy, nhưng thanh toán vẫn đang được xử lý tiếp/),
+      await screen.findByText(/Don da bi huy, nhung thanh toan van dang duoc xu ly/),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Hệ thống đang retry thao tác void thanh toán trong nền/),
+      screen.getByText(/He thong dang retry thao tac void thanh toan trong nen/),
     ).toBeInTheDocument();
   });
 });

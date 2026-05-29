@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { CalendarDays, CheckCircle2, Clock } from "lucide-react";
 
 import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
 import { AppShell } from "@/components/rentflow/app-shell";
@@ -24,6 +25,8 @@ import { PolicySnapshotPanel } from "@/features/bookings/policy-snapshot-panel";
 import { PriceSnapshotPanel } from "@/features/bookings/price-snapshot-panel";
 import type { BookingStatus } from "@/features/bookings/types";
 import { ApiError } from "@/lib/api-error";
+import { getBookingStatusLabel } from "@/lib/display-labels";
+import { formatDateRange, formatMoney } from "@/lib/formatters";
 import { newIdempotencyKey } from "@/lib/idempotency";
 
 const LOCATION_EDITABLE_STATUSES: BookingStatus[] = [
@@ -32,12 +35,7 @@ const LOCATION_EDITABLE_STATUSES: BookingStatus[] = [
   "CONFIRMED",
 ];
 
-const PAY_NOW_VISIBLE_STATUSES: BookingStatus[] = [
-  "HELD",
-  "PENDING_HOST_APPROVAL",
-  "CONFIRMED",
-];
-
+const PAY_NOW_VISIBLE_STATUSES: BookingStatus[] = ["HELD", "PENDING_HOST_APPROVAL", "CONFIRMED"];
 const MAX_EXPIRE_RETRIES = 3;
 const EXPIRE_RETRY_DELAY_MS = 5000;
 
@@ -49,14 +47,37 @@ function getTodayDateString() {
   return `${year}-${month}-${day}`;
 }
 
-function formatPaymentRetryState(state?: string) {
+function formatPaymentRetryState(state?: string | null) {
   if (!state) {
-    return "Hệ thống đang tiếp tục xử lý hoàn tiền hoặc void trong nền.";
+    return "He thong dang xu ly hoan tien trong nen.";
   }
   if (state === "VOID_RETRY_REQUIRED") {
-    return "Hệ thống đang retry thao tác void thanh toán trong nền.";
+    return "He thong dang retry thao tac void thanh toan trong nen.";
   }
-  return `Trạng thái xử lý thanh toán hiện tại: ${state}.`;
+  return `Trang thai xu ly hien tai: ${state}.`;
+}
+
+const STEPS = [
+  { key: "HELD", label: "Giu cho" },
+  { key: "PENDING_HOST_APPROVAL", label: "Doi duyet" },
+  { key: "CONFIRMED", label: "Da xac nhan" },
+  { key: "IN_PROGRESS", label: "Dang thue" },
+  { key: "COMPLETED", label: "Da tra xe" },
+];
+
+const FINAL_STATUSES = ["CANCELLED", "REJECTED", "EXPIRED"];
+
+function getStepState(
+  stepKey: string,
+  status: BookingStatus,
+): "done" | "active" | "pending" {
+  if (FINAL_STATUSES.includes(status)) return "pending";
+  const stepIndex = STEPS.findIndex((s) => s.key === stepKey);
+  const statusIndex = STEPS.findIndex((s) => s.key === status);
+  if (statusIndex === -1) return "pending";
+  if (stepIndex < statusIndex) return "done";
+  if (stepIndex === statusIndex) return "active";
+  return "pending";
 }
 
 type BookingDetailPageViewProps = {
@@ -76,14 +97,15 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
   });
 
   const patchMutation = useMutation({
-    mutationFn: (input: PatchBookingLocationsInput) => patchBookingLocations(bookingId, input),
+    mutationFn: (input: PatchBookingLocationsInput) =>
+      patchBookingLocations(bookingId, input),
     onSuccess: () => {
-      toast.success("Đã cập nhật địa điểm");
+      toast.success("Da cap nhat dia diem");
       queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
     },
     onError: (error: unknown) => {
       const message =
-        error instanceof ApiError ? error.message : "Cập nhật địa điểm thất bại";
+        error instanceof ApiError ? error.message : "Cap nhat dia diem that bai";
       toast.error(message);
     },
   });
@@ -93,9 +115,9 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
       cancelBooking(bookingId, { reason: input.reason }, input.idempotencyKey),
     onSuccess: (result) => {
       if (result.voidRetryRequired) {
-        toast.success("Đã hủy booking; hoàn tiền hoặc void sẽ được xử lý tiếp trong nền");
+        toast.success("Da huy don; hoan tien se duoc xu ly tiep");
       } else {
-        toast.success("Đã hủy booking");
+        toast.success("Da huy don");
       }
       queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
       queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
@@ -106,14 +128,14 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
         queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
       }
       const message =
-        error instanceof ApiError ? error.message : "Hủy booking thất bại";
+        error instanceof ApiError ? error.message : "Huy don that bai";
       toast.error(message);
     },
   });
 
   const scheduleExpireRetry = useCallback(() => {
     if (expireRetryRef.current >= MAX_EXPIRE_RETRIES) {
-      toast.message("Hold đang được xử lý, refresh trang");
+      toast.message("Hold dang duoc xu ly, refresh trang");
       return;
     }
     expireRetryRef.current += 1;
@@ -139,14 +161,15 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
     return (
       <AppShell activePath="/me/bookings">
         <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">Đang tải booking...</p>
+          <p className="text-sm text-muted-foreground">Dang tai chi tiet don...</p>
         </section>
       </AppShell>
     );
   }
 
   if (detailQuery.isError) {
-    const apiErr = detailQuery.error instanceof ApiError ? detailQuery.error : undefined;
+    const apiErr =
+      detailQuery.error instanceof ApiError ? detailQuery.error : undefined;
     return (
       <AppShell activePath="/me/bookings">
         <ApiErrorPanel error={apiErr} />
@@ -155,7 +178,7 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
             href="/me/bookings"
             className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
-            Quay về danh sách
+            Quay ve danh sach
           </Link>
         </div>
       </AppShell>
@@ -171,15 +194,16 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
   const canCancel =
     booking.status === "HELD" ||
     booking.status === "PENDING_HOST_APPROVAL" ||
-    (booking.status === "CONFIRMED" && booking.pickupDate > getTodayDateString());
+    (booking.status === "CONFIRMED" &&
+      booking.pickupDate > getTodayDateString());
   const showPayNow = PAY_NOW_VISIBLE_STATUSES.includes(booking.status);
   const cancelHint =
     booking.status === "CONFIRMED" && !canCancel
-      ? "Booking đã đến hoặc qua ngày nhận xe nên không còn hủy được từ giao diện này."
+      ? "Don da den hoac qua ngay nhan xe, khong the huy."
       : booking.status === "PENDING_HOST_APPROVAL"
-        ? "Hủy booking này có thể kích hoạt void thanh toán đang chờ xử lý."
+        ? "Huy don nay co the kich hoat void thanh toan dang cho."
         : booking.status === "CONFIRMED"
-          ? "Hủy booking này sẽ áp dụng chính sách hiện tại và có thể xử lý thanh toán liên quan."
+          ? "Huy don se ap dung chinh sach hien tai."
           : null;
   const cancelDialogStatus =
     canCancel &&
@@ -203,55 +227,105 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
   function handleCancelConfirm(next: CancelBookingFormState) {
     const key = cancelKeyRef.current ?? newIdempotencyKey();
     cancelKeyRef.current = key;
-    cancelMutation.mutate({ reason: next.reason || undefined, idempotencyKey: key });
+    cancelMutation.mutate({
+      reason: next.reason || undefined,
+      idempotencyKey: key,
+    });
   }
 
   function handleLocationPatch(next: PatchBookingLocationsInput) {
     patchMutation.mutate(next);
   }
 
+  const isFinalStatus = FINAL_STATUSES.includes(booking.status);
+
   return (
     <AppShell activePath="/me/bookings">
       <div className="space-y-6">
         <PageHeader
-          title={`Booking ${booking.id}`}
-          description="Chi tiết booking, có thể chỉnh địa điểm hoặc hủy nếu trạng thái cho phép."
+          title="Chi tiet don thue"
+          description="Xem chi tiet don thue cua ban."
           actions={
             <Link
               href="/me/bookings"
               className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
             >
-              Quay về danh sách
+              Quay ve
             </Link>
           }
         />
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Listing</p>
-              <h2 className="text-xl font-bold text-foreground">{booking.listingTitle}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {booking.pickupDate} → {booking.returnDate}
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {booking.listingTitle}
               </p>
+              <h2 className="mt-1 text-xl font-bold text-foreground">
+                {getBookingStatusLabel(booking.status)}
+              </h2>
+              <div className="mt-2 flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <CalendarDays className="h-4 w-4" />
+                  {formatDateRange(booking.pickupDate, booking.returnDate)}
+                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  {formatMoney(booking.totalAmount, booking.currency)}
+                </p>
+              </div>
             </div>
             <BookingStatusBadge status={booking.status} />
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border bg-background px-3 py-2">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Tổng tiền</p>
-              <p className="mt-1 text-sm font-semibold text-foreground">
-                {booking.totalAmount.toLocaleString("en-US")} {booking.currency}
-              </p>
+          {!isFinalStatus ? (
+            <div className="mt-5 overflow-x-auto">
+              <div className="flex min-w-max items-center gap-1">
+                {STEPS.map((step, i) => {
+                  const state = getStepState(step.key, booking.status);
+                  const isLast = i === STEPS.length - 1;
+                  return (
+                    <div key={step.key} className="flex items-center">
+                      <div className="flex flex-col items-center">
+                        <div
+                          className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+                            state === "done"
+                              ? "bg-green-100 text-green-700"
+                              : state === "active"
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {state === "done" ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : state === "active" ? (
+                            <Clock className="h-4 w-4" />
+                          ) : (
+                            i + 1
+                          )}
+                        </div>
+                        <p
+                          className={`mt-1.5 whitespace-nowrap text-xs font-medium ${
+                            state === "active"
+                              ? "text-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {step.label}
+                        </p>
+                      </div>
+                      {!isLast && (
+                        <div
+                          className={`mx-1.5 h-px w-8 ${
+                            state === "done" ? "bg-green-500" : "bg-border"
+                          }`}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="rounded-lg border border-border bg-background px-3 py-2">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Lý do hủy</p>
-              <p className="mt-1 text-sm font-semibold text-foreground">
-                {booking.cancellationReason || "—"}
-              </p>
-            </div>
-          </div>
+          ) : null}
 
           {booking.status === "HELD" && booking.holdExpiresAt ? (
             <div className="mt-4">
@@ -265,44 +339,48 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
 
           {booking.status === "CANCELLED" && booking.voidRetryRequired ? (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <p className="font-semibold">Booking đã được hủy, nhưng thanh toán vẫn đang được xử lý tiếp.</p>
+              <p className="font-semibold">Don da bi huy, nhung thanh toan van dang duoc xu ly.</p>
               <p className="mt-1">{formatPaymentRetryState(booking.paymentRetryState)}</p>
             </div>
           ) : null}
 
           <div className="mt-4 flex flex-wrap gap-2">
+            {showPayNow ? (
+              <Link
+                href={`/bookings/${booking.id}/payment`}
+                className="rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90"
+              >
+                Thanh toan ngay
+              </Link>
+            ) : null}
             <button
               type="button"
               disabled={!canEditLocations || patchMutation.isPending}
               onClick={() => setEditOpen(true)}
               className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:bg-accent"
             >
-              Chỉnh địa điểm
+              Chinh dia diem
             </button>
-            <button
-              type="button"
-              disabled={!canCancel || cancelMutation.isPending}
-              onClick={openCancelDialog}
-              title={!canCancel ? cancelHint ?? undefined : undefined}
-              className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
-            >
-              Hủy booking
-            </button>
-            {showPayNow ? (
-              <Link
-                href={`/bookings/${booking.id}/payment`}
-                className="rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90"
+            {canCancel ? (
+              <button
+                type="button"
+                disabled={cancelMutation.isPending}
+                onClick={openCancelDialog}
+                className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
               >
-                Thanh toán
-              </Link>
+                Huy don
+              </button>
             ) : null}
           </div>
           {cancelHint ? (
-            <p className="mt-3 text-sm text-muted-foreground">{cancelHint}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{cancelHint}</p>
           ) : null}
         </section>
 
-        <LocationSummary pickupLocation={booking.pickupLocation} returnLocation={booking.returnLocation} />
+        <LocationSummary
+          pickupLocation={booking.pickupLocation}
+          returnLocation={booking.returnLocation}
+        />
 
         <div className="grid gap-4 lg:grid-cols-2">
           <PriceSnapshotPanel priceSnapshot={booking.priceSnapshot} />
