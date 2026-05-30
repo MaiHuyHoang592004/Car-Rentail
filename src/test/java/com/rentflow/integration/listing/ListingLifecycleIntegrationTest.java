@@ -229,6 +229,107 @@ class ListingLifecycleIntegrationTest extends BaseIntegrationTest {
             .andExpect(status().isNotFound());
     }
 
+    @Test
+    void resumeSuspendedListing_transitionsToActiveWhenVehicleActive() throws Exception {
+        String vehicleId = createVehicle();
+        String listingId = createListing(vehicleId, "My Listing");
+
+        mockMvc.perform(post("/api/v1/host/listings/" + listingId + "/submit")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/approve")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        mockMvc.perform(patch("/api/v1/host/vehicles/" + vehicleId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "status": "SUSPENDED" }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/host/vehicles/" + vehicleId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "status": "ACTIVE" }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/host/listings/" + listingId + "/resume")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void resumeSuspendedListing_requiresVehicleActive() throws Exception {
+        String vehicleId = createVehicle();
+        String listingId = createListing(vehicleId, "My Listing");
+
+        mockMvc.perform(post("/api/v1/host/listings/" + listingId + "/submit")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/approve")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/host/vehicles/" + vehicleId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "status": "SUSPENDED" }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/host/listings/" + listingId + "/resume")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("VEHICLE_NOT_ACTIVE"));
+    }
+
+    @Test
+    void resumeSuspendedListing_rejectsWhenAnotherActiveListingExists() throws Exception {
+        String vehicleId = createVehicle();
+        String suspendedListing = createListing(vehicleId, "Suspended listing");
+        String activeListing = createListing(vehicleId, "Active listing");
+
+        mockMvc.perform(post("/api/v1/host/listings/" + suspendedListing + "/submit")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/listings/" + suspendedListing + "/approve")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/listings/" + suspendedListing + "/suspend")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "reason": "manual suspend" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUSPENDED"));
+
+        mockMvc.perform(post("/api/v1/host/listings/" + activeListing + "/submit")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/listings/" + activeListing + "/approve")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        mockMvc.perform(post("/api/v1/host/listings/" + suspendedListing + "/resume")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ONE_ACTIVE_LISTING_PER_VEHICLE"));
+    }
+
     // Helpers
 
     private JsonNode registerUser(String email, String password, String role) throws Exception {

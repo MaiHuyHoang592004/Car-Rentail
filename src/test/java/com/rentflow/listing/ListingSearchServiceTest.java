@@ -1,6 +1,7 @@
 package com.rentflow.listing;
 
 import com.rentflow.common.web.PageResponse;
+import com.rentflow.file.service.FileService;
 import com.rentflow.listing.dto.ListingSearchCriteria;
 import com.rentflow.listing.dto.ListingSearchRequest;
 import com.rentflow.listing.dto.ListingSearchResponse;
@@ -22,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,11 +41,15 @@ class ListingSearchServiceTest {
     @Mock
     private VehicleRepository vehicleRepository;
 
+    @Mock
+    private FileService fileService;
+
     private ListingSearchService searchService;
 
     @BeforeEach
     void setUp() {
-        searchService = new ListingSearchService(listingRepository, vehicleRepository);
+        searchService = new ListingSearchService(listingRepository, vehicleRepository, fileService);
+        lenient().when(fileService.getCoverPhotoUrls(any(Map.class))).thenReturn(Map.of());
     }
 
     private ListingSearchResponse aListing(UUID id, String city) {

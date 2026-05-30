@@ -131,7 +131,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void captureByHostUpdatesPaymentAndReplaysByIdempotency() throws Exception {
+    void captureByAdminUpdatesPaymentAndReplaysByIdempotency() throws Exception {
         Booking booking = saveBooking(customer.getId(), host.getId(), BookingStatus.CONFIRMED);
         BookingPayment payment = saveAuthorizedPayment(booking.getId());
         when(coreBankPaymentClient.captureHold(any())).thenReturn(new CoreBankCaptureHoldResult(
@@ -140,7 +140,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
 
         String key = UUID.randomUUID().toString();
         mockMvc.perform(post("/api/v1/payments/{paymentId}/capture", payment.getId())
-                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -151,7 +151,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.transactions[0].type").value("CAPTURE"));
 
         mockMvc.perform(post("/api/v1/payments/{paymentId}/capture", payment.getId())
-                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -166,7 +166,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void voidByHostMarksPaymentVoided() throws Exception {
+    void voidByAdminMarksPaymentVoided() throws Exception {
         Booking booking = saveBooking(customer.getId(), host.getId(), BookingStatus.CONFIRMED);
         BookingPayment payment = saveAuthorizedPayment(booking.getId());
         when(coreBankPaymentClient.voidHold(any())).thenReturn(new CoreBankVoidHoldResult(
@@ -174,7 +174,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
                 "{\"holdId\":\"hold-1\",\"status\":\"VOIDED\"}"));
 
         mockMvc.perform(post("/api/v1/payments/{paymentId}/void", payment.getId())
-                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -185,23 +185,23 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void customerCannotCaptureHostsBookingPayment() throws Exception {
+    void nonAdminCannotCapturePayment() throws Exception {
         Booking booking = saveBooking(customer.getId(), host.getId(), BookingStatus.CONFIRMED);
         BookingPayment payment = saveAuthorizedPayment(booking.getId());
 
         mockMvc.perform(post("/api/v1/payments/{paymentId}/capture", payment.getId())
-                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Authorization", "Bearer " + hostToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"amount":100000.00}
                                 """))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("PAYMENT_NOT_FOUND"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test
-    void refundByHostSupportsPartialAndFullRefundWithIdempotency() throws Exception {
+    void refundByAdminSupportsPartialAndFullRefundWithIdempotency() throws Exception {
         Booking booking = saveBooking(customer.getId(), host.getId(), BookingStatus.CONFIRMED);
         BookingPayment payment = saveCapturedPayment(booking.getId());
         when(coreBankPaymentClient.refund(any())).thenReturn(new CoreBankRefundResult(
@@ -210,7 +210,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
 
         String key = UUID.randomUUID().toString();
         mockMvc.perform(post("/api/v1/payments/{paymentId}/refund", payment.getId())
-                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -220,7 +220,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.payment.status").value("PARTIALLY_REFUNDED"));
 
         mockMvc.perform(post("/api/v1/payments/{paymentId}/refund", payment.getId())
-                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -244,7 +244,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
 
         String key = UUID.randomUUID().toString();
         mockMvc.perform(post("/api/v1/payments/{paymentId}/refund", payment.getId())
-                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -253,7 +253,7 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/payments/{paymentId}/refund", payment.getId())
-                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

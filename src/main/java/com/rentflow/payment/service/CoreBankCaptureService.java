@@ -202,9 +202,6 @@ public class CoreBankCaptureService {
         if (securityContext.hasRole(Role.ADMIN)) {
             return;
         }
-        if (securityContext.hasRole(Role.HOST) && booking.getHostId().equals(actorId)) {
-            return;
-        }
         throw new PaymentNotFoundException(String.valueOf(booking.getId()));
     }
 

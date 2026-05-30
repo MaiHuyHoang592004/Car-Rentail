@@ -132,4 +132,16 @@ class OneActiveListingPerVehicleTest {
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("PENDING_APPROVAL");
     }
+
+    @Test
+    void reactivateListing_failsWhenAnotherActiveListingExists() {
+        listing.setStatus(ListingStatus.SUSPENDED);
+        when(listingRepository.findByIdForUpdate(listingId)).thenReturn(Optional.of(listing));
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(listingRepository.existsByVehicleIdAndStatus(vehicleId, ListingStatus.ACTIVE)).thenReturn(true);
+
+        assertThatThrownBy(() -> adminListingService.reactivateListing(listingId))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("ACTIVE listing");
+    }
 }

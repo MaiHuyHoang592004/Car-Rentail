@@ -21,7 +21,7 @@ class VehicleListingAdapter implements VehicleListingPort {
 
     @Override
     public int suspendListings(UUID vehicleId) {
-        return listingRepository.updateStatusByVehicleIdAndStatusNot(
-                vehicleId, ListingStatus.SUSPENDED, ListingStatus.ARCHIVED);
+        return listingRepository.updateStatusByVehicleIdAndStatus(
+                vehicleId, ListingStatus.ACTIVE, ListingStatus.SUSPENDED);
     }
 }

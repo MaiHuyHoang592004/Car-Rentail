@@ -2,6 +2,7 @@ package com.rentflow.listing.service;
 
 import com.rentflow.common.exception.ListingNotFoundException;
 import com.rentflow.common.web.PageResponse;
+import com.rentflow.file.service.FileService;
 import com.rentflow.listing.dto.*;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
@@ -14,7 +15,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +26,7 @@ public class ListingSearchService {
 
     private final ListingRepository listingRepository;
     private final VehicleRepository vehicleRepository;
+    private final FileService fileService;
 
     public PageResponse<ListingSearchResponse> search(ListingSearchRequest request) {
         validateDateRange(request);
@@ -41,13 +45,20 @@ public class ListingSearchService {
 
         Pageable pageable = PageRequest.of(request.page(), request.size());
         Page<ListingSearchResponse> page = listingRepository.search(criteria, pageable);
+        Map<UUID, UUID> listingVehicleIds = listingRepository.findAllById(
+                        page.getContent().stream().map(ListingSearchResponse::id).toList())
+                .stream()
+                .collect(Collectors.toMap(Listing::getId, Listing::getVehicleId));
+        Map<UUID, String> coverUrls = fileService.getCoverPhotoUrls(listingVehicleIds);
+        Page<ListingSearchResponse> hydratedPage = page.map(response ->
+                withCoverPhoto(response, coverUrls.get(response.id())));
 
         return new PageResponse<>(
-            page.getContent(),
-            page.getNumber(),
-            page.getSize(),
-            page.getTotalElements(),
-            page.getTotalPages()
+            hydratedPage.getContent(),
+            hydratedPage.getNumber(),
+            hydratedPage.getSize(),
+            hydratedPage.getTotalElements(),
+            hydratedPage.getTotalPages()
         );
     }
 
@@ -59,8 +70,27 @@ public class ListingSearchService {
         return ListingDetailResponse.from(
             listing,
             vehicleRepository.findById(listing.getVehicleId()).orElse(null),
-            listing.getExtras()
+            listing.getExtras(),
+            fileService.getListingPhotoUrls(listing.getId(), listing.getVehicleId())
         );
+    }
+
+    private ListingSearchResponse withCoverPhoto(ListingSearchResponse response, String coverPhotoUrl) {
+        if (coverPhotoUrl == null) {
+            return response;
+        }
+        return new ListingSearchResponse(
+                response.id(),
+                response.title(),
+                response.city(),
+                response.category(),
+                response.basePricePerDay(),
+                response.currency(),
+                response.seats(),
+                response.transmission(),
+                response.fuelType(),
+                coverPhotoUrl,
+                response.ratingAverage());
     }
 
     private void validateDateRange(ListingSearchRequest request) {

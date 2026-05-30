@@ -241,6 +241,13 @@ public class AdminListingService {
                     "Vehicle must be ACTIVE to reactivate listing");
         }
 
+        boolean hasActive = listingRepository.existsByVehicleIdAndStatus(
+                vehicle.getId(), ListingStatus.ACTIVE);
+        if (hasActive) {
+            throw new BusinessRuleException("ONE_ACTIVE_LISTING_PER_VEHICLE",
+                    "Vehicle already has an ACTIVE listing");
+        }
+
         listing.setStatus(ListingStatus.ACTIVE);
         listingRepository.save(listing);
 

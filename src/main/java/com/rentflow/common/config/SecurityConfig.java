@@ -82,9 +82,9 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/payment-banks").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/payments/authorize").authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{id}/payments").authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/capture").authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/void").authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/refund").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/capture").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/void").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/{id}/refund").hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/v1/payments/{id}/reconciliation").authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/notifications/me").authenticated()
                     // Booking endpoints require authentication; service layer enforces roles and ownership
