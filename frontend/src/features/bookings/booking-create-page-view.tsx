@@ -58,6 +58,7 @@ export function BookingCreatePageView({
   const [overlap, setOverlap] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
   const [verificationGate, setVerificationGate] = useState<VerificationGateState | null>(null);
+  const [extraQuantities, setExtraQuantities] = useState<Record<string, number>>({});
   const selectedExtraIds = form.watch("selectedExtraIds");
   const pickupDate = form.watch("pickupDate");
   const returnDate = form.watch("returnDate");
@@ -129,7 +130,10 @@ export function BookingCreatePageView({
       returnDate: values.returnDate,
       pickupLocation: values.pickupLocation || undefined,
       returnLocation: values.returnLocation || undefined,
-      selectedExtraIds: values.selectedExtraIds,
+      selectedExtras: values.selectedExtraIds.map((extraId) => ({
+        extraId,
+        quantity: extraQuantities[extraId] ?? 1,
+      })),
     });
   }
 
@@ -299,6 +303,7 @@ export function BookingCreatePageView({
                 <div className="grid gap-3 md:grid-cols-2">
                   {listingData.extras.map((extra) => {
                     const checked = selectedExtraIds.includes(extra.id);
+                    const quantity = extraQuantities[extra.id] ?? (checked ? 1 : 0);
                     return (
                       <label
                         key={extra.id}
@@ -320,12 +325,47 @@ export function BookingCreatePageView({
                           <input
                             type="checkbox"
                             checked={checked}
-                            onChange={() => toggleExtra(extra.id)}
+                            onChange={() => {
+                              toggleExtra(extra.id);
+                              setExtraQuantities((current) => ({
+                                ...current,
+                                [extra.id]: checked ? 0 : 1,
+                              }));
+                            }}
                             className="mt-1 size-4 rounded border-input accent-primary"
                           />
                         </div>
+                        {checked ? (
+                          <div className="mt-3 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExtraQuantities((current) => ({
+                                  ...current,
+                                  [extra.id]: Math.max(1, quantity - 1),
+                                }))
+                              }
+                              className="h-8 w-8 rounded-full border border-border text-sm font-bold"
+                            >
+                              -
+                            </button>
+                            <span className="min-w-8 text-center text-sm font-semibold">{quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExtraQuantities((current) => ({
+                                  ...current,
+                                  [extra.id]: Math.min(5, quantity + 1),
+                                }))
+                              }
+                              className="h-8 w-8 rounded-full border border-border text-sm font-bold"
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : null}
                         <div className="mt-4 text-sm font-semibold text-foreground">
-                          {extra.price.toLocaleString("vi-VN")} {extra.currency}
+                          {(extra.price * Math.max(1, quantity || 1)).toLocaleString("vi-VN")} {extra.currency}
                         </div>
                       </label>
                     );
@@ -351,7 +391,7 @@ export function BookingCreatePageView({
               listing={listingData}
               pickupDate={pickupDate}
               returnDate={returnDate}
-              selectedExtraIds={selectedExtraIds}
+              selectedExtras={extraQuantities}
               onBook={form.handleSubmit(handleSubmit)}
               isPending={createMutation.isPending}
             />

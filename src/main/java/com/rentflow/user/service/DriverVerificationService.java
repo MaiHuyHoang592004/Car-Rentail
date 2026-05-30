@@ -5,6 +5,7 @@ import com.rentflow.common.exception.DriverVerificationNotFoundException;
 import com.rentflow.common.exception.ResourceNotFoundException;
 import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.util.EncryptionUtil;
+import com.rentflow.file.service.FileService;
 import com.rentflow.user.dto.DriverVerificationResponse;
 import com.rentflow.user.dto.ReviewDriverVerificationRequest;
 import com.rentflow.user.dto.SubmitDriverLicenseRequest;
@@ -13,7 +14,7 @@ import com.rentflow.user.entity.DriverVerificationStatus;
 import com.rentflow.user.entity.UserProfile;
 import com.rentflow.user.repository.DriverVerificationRepository;
 import com.rentflow.user.repository.UserProfileRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,12 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class DriverVerificationService {
 
     private static final Set<DriverVerificationStatus> ACTIVE_STATUSES =
@@ -36,7 +37,34 @@ public class DriverVerificationService {
     private final DriverVerificationRepository driverVerificationRepository;
     private final UserProfileRepository userProfileRepository;
     private final EncryptionUtil encryptionUtil;
+    private final FileService fileService;
     private final Clock clock;
+
+    @Autowired
+    public DriverVerificationService(
+            DriverVerificationRepository driverVerificationRepository,
+            UserProfileRepository userProfileRepository,
+            EncryptionUtil encryptionUtil,
+            FileService fileService,
+            Clock clock) {
+        this.driverVerificationRepository = driverVerificationRepository;
+        this.userProfileRepository = userProfileRepository;
+        this.encryptionUtil = encryptionUtil;
+        this.fileService = fileService;
+        this.clock = clock;
+    }
+
+    public DriverVerificationService(
+            DriverVerificationRepository driverVerificationRepository,
+            UserProfileRepository userProfileRepository,
+            EncryptionUtil encryptionUtil,
+            Clock clock) {
+        this.driverVerificationRepository = driverVerificationRepository;
+        this.userProfileRepository = userProfileRepository;
+        this.encryptionUtil = encryptionUtil;
+        this.fileService = null;
+        this.clock = clock;
+    }
 
     @Transactional
     public DriverVerificationResponse submit(UUID customerId, SubmitDriverLicenseRequest request) {
@@ -60,7 +88,7 @@ public class DriverVerificationService {
         verification = driverVerificationRepository.save(verification);
 
         syncProfileStatus(customerId, DriverVerificationStatus.PENDING);
-        return DriverVerificationResponse.from(verification);
+        return toResponse(verification);
     }
 
     @Transactional
@@ -76,7 +104,7 @@ public class DriverVerificationService {
         verification = driverVerificationRepository.save(verification);
 
         syncProfileStatus(verification.getCustomerId(), DriverVerificationStatus.APPROVED);
-        return DriverVerificationResponse.from(verification);
+        return toResponse(verification);
     }
 
     @Transactional
@@ -92,7 +120,7 @@ public class DriverVerificationService {
         verification = driverVerificationRepository.save(verification);
 
         syncProfileStatus(verification.getCustomerId(), DriverVerificationStatus.REJECTED);
-        return DriverVerificationResponse.from(verification);
+        return toResponse(verification);
     }
 
     @Transactional(readOnly = true)
@@ -100,7 +128,21 @@ public class DriverVerificationService {
         Page<DriverVerification> page = status == null
                 ? driverVerificationRepository.findAll(pageable)
                 : driverVerificationRepository.findByStatus(status, pageable);
-        return page.map(DriverVerificationResponse::from);
+        return page.map(this::toResponse);
+    }
+
+    private DriverVerificationResponse toResponse(DriverVerification verification) {
+        Long pendingAgeHours = null;
+        Boolean slaBreached = null;
+        if (verification.getStatus() == DriverVerificationStatus.PENDING && verification.getCreatedAt() != null) {
+            pendingAgeHours = ChronoUnit.HOURS.between(verification.getCreatedAt(), Instant.now(clock));
+            slaBreached = pendingAgeHours >= 24;
+        }
+        String previewUrl = verification.getDocumentFileId() == null
+                || fileService == null
+                ? null
+                : fileService.getSignedUrl(verification.getDocumentFileId()).signedUrl();
+        return DriverVerificationResponse.from(verification, previewUrl, pendingAgeHours, slaBreached);
     }
 
     private void ensurePending(DriverVerification verification) {

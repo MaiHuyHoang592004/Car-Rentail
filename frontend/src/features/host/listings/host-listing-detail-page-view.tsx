@@ -67,7 +67,11 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
   const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [reactivateOpen, setReactivateOpen] = useState(false);
-  const [extraDraft, setExtraDraft] = useState({ name: "", pricingType: "PER_DAY" as const, price: "" });
+  const [extraDraft, setExtraDraft] = useState<{
+    name: string;
+    pricingType: "PER_DAY" | "PER_TRIP";
+    price: string;
+  }>({ name: "", pricingType: "PER_DAY", price: "" });
 
   const { data: extras = [] } = useQuery({
     queryKey: ["host", "listings", listingId, "extras"],

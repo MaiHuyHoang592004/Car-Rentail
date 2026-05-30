@@ -167,7 +167,11 @@ describe("admin listings api", () => {
       const result = await adminSuspendListing("lst-1", "Policy violation");
       expect(result.listing.status).toBe("SUSPENDED");
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-      expect(JSON.parse(init.body as string)).toEqual({ reason: "Policy violation" });
+      expect(JSON.parse(init.body as string)).toEqual({
+        reason: "Policy violation",
+        source: "ADMIN",
+        suspensionUntil: null,
+      });
       expect(fetchSpy.mock.calls[1][0]).toBe("/api/v1/admin/listings/lst-1");
     });
   });

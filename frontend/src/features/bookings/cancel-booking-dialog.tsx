@@ -8,10 +8,13 @@ import {
   sanitizeCancellationReason,
   type CancelBookingFormState,
 } from "@/features/bookings/forms";
+import { formatMoney } from "@/lib/formatters";
+import type { BookingDetailViewModel } from "@/features/bookings/types";
 
 type CancelBookingDialogProps = {
   open: boolean;
   status: "HELD" | "PENDING_HOST_APPROVAL" | "CONFIRMED" | null;
+  preview?: BookingDetailViewModel["cancellationPreview"];
   onClose: () => void;
   onConfirm: (next: CancelBookingFormState) => void;
 };
@@ -29,6 +32,7 @@ function buildCancelDescription(status: CancelBookingDialogProps["status"]) {
 export function CancelBookingDialog({
   open,
   status,
+  preview,
   onClose,
   onConfirm,
 }: CancelBookingDialogProps) {
@@ -59,6 +63,22 @@ export function CancelBookingDialog({
         <p className="mt-1 text-sm text-muted-foreground">
           {buildCancelDescription(status)}
         </p>
+        {preview ? (
+          <div className="mt-4 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Hoan lai du kien</span>
+              <span className="font-semibold text-foreground">
+                {formatMoney(preview.refundableAmount, preview.currency)}
+              </span>
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="text-muted-foreground">Phi huy</span>
+              <span className="font-semibold text-foreground">
+                {formatMoney(preview.penaltyAmount, preview.currency)}
+              </span>
+            </div>
+          </div>
+        ) : null}
 
         <form onSubmit={form.handleSubmit(handleConfirm)}>
           <div className="mt-4">

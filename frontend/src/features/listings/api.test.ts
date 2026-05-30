@@ -53,6 +53,7 @@ describe("listing search api", () => {
     expect(params.get("seats")).toBe("5");
     expect(params.get("minPrice")).toBe("500000");
     expect(params.get("maxPrice")).toBe("2000000");
+    expect(params.get("sort")).toBe("NEWEST");
     expect(params.get("page")).toBe("2");
     expect(params.get("size")).toBe("20");
   });
@@ -63,6 +64,7 @@ describe("listing search api", () => {
     expect(params.has("categories")).toBe(false);
     expect(params.has("transmission")).toBe(false);
     expect(params.has("fuelType")).toBe(false);
+    expect(params.get("sort")).toBe("NEWEST");
     expect(params.get("page")).toBe("0");
     expect(params.get("size")).toBe("20");
   });
@@ -125,6 +127,6 @@ describe("listing search api", () => {
     const page = await searchListings({ ...DEFAULT_LISTING_FILTERS, city: "Hanoi" });
 
     expect(page.content[0].title).toBe("Toyota Vios");
-    expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/listings?city=Hanoi&page=0&size=20");
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/listings?city=Hanoi&sort=NEWEST&page=0&size=20");
   });
 });

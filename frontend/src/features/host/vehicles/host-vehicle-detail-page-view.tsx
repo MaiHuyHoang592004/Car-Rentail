@@ -29,6 +29,8 @@ type HostVehicleDetailPageViewProps = {
 
 export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageViewProps) {
   const queryClient = useQueryClient();
+  const [archiveOpen, setArchiveOpen] = useState<boolean>(false);
+  const [banner, setBanner] = useState<string>("");
 
   const { data: vehicle, isLoading: loadingVehicle } = useQuery({
     queryKey: ["host", "vehicles", vehicleId],
@@ -45,8 +47,6 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
   const form = useForm<VehicleFormState>({
     resolver: zodResolver(vehicleFormSchema),
   });
-  const [archiveOpen, setArchiveOpen] = useState<boolean>(false);
-  const [banner, setBanner] = useState<string>("");
 
   useEffect(() => {
     if (vehicle) {

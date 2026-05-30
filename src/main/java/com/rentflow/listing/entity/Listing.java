@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -65,6 +66,21 @@ public class Listing extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private ListingStatus status = ListingStatus.DRAFT;
+
+    @Column(name = "suspension_reason", columnDefinition = "TEXT")
+    private String suspensionReason;
+
+    @Column(name = "suspension_source", length = 40)
+    private String suspensionSource;
+
+    @Column(name = "suspension_until")
+    private Instant suspensionUntil;
+
+    @Column(name = "rejected_reason", columnDefinition = "TEXT")
+    private String rejectedReason;
+
+    @Column(name = "rejected_at")
+    private Instant rejectedAt;
 
     @Version
     @Column(nullable = false)

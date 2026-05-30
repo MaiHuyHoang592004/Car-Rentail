@@ -46,10 +46,23 @@ export type AdminListingDetail = {
     id: string;
     fullName: string;
     email: string;
+    activeListings?: number;
+  } | null;
+  vehicle?: {
+    id: string;
+    status: string;
+    activeListings: number;
   } | null;
   bookingSummary: {
     activeBookings: number;
   };
+  moderation?: {
+    suspensionReason?: string | null;
+    suspensionSource?: string | null;
+    suspensionUntil?: string | null;
+    rejectedReason?: string | null;
+    rejectedAt?: string | null;
+  } | null;
 };
 
 export type AdminListingPage = {

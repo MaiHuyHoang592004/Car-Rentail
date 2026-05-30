@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const listingFilterSchema = z
   .object({
+    query: z.string(),
     city: z.string(),
     pickupDate: z.string(),
     returnDate: z.string(),
@@ -23,6 +24,7 @@ export const listingFilterSchema = z
     seats: z.string(),
     minPrice: z.string(),
     maxPrice: z.string(),
+    sort: z.enum(["NEWEST", "PRICE_ASC", "PRICE_DESC"]),
   })
   .superRefine((values, ctx) => {
     if (values.pickupDate && values.returnDate && values.returnDate <= values.pickupDate) {

@@ -1,15 +1,15 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Users } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ban, RefreshCw, Users } from "lucide-react";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { EmptyState } from "@/components/rentflow/empty-state";
 import { FormError } from "@/components/rentflow/form-error";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { StatusBadge } from "@/components/rentflow/status-badge";
-import { adminListUsers } from "@/features/admin/users/api";
+import { adminListUsers, adminReactivateUser, adminSuspendUser } from "@/features/admin/users/api";
 import {
   ADMIN_USER_ROLE_FILTERS,
   ADMIN_USER_STATUS_FILTERS,
@@ -73,6 +73,7 @@ function FilterChip({
 }
 
 export function AdminUsersPageView() {
+  const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<AdminUserFilterStatus>("ALL");
   const [roleFilter, setRoleFilter] = useState<AdminUserFilterRole>("ALL");
   const [page, setPage] = useState(0);
@@ -82,6 +83,16 @@ export function AdminUsersPageView() {
     queryKey: ["admin", "users", statusFilter, roleFilter, page],
     queryFn: () =>
       adminListUsers({ status: statusFilter, role: roleFilter, page, size: pageSize }),
+  });
+
+  const suspendMutation = useMutation({
+    mutationFn: adminSuspendUser,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: adminReactivateUser,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
 
   const users = data?.users ?? [];
@@ -160,6 +171,7 @@ export function AdminUsersPageView() {
                     <th className="px-4 py-2.5 font-semibold">GPLX</th>
                     <th className="px-4 py-2.5 font-semibold">Tao luc</th>
                     <th className="px-4 py-2.5 font-semibold">Dang nhap cuoi</th>
+                    <th className="px-4 py-2.5 font-semibold">Thao tac</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -198,6 +210,30 @@ export function AdminUsersPageView() {
                       </td>
                       <td className="px-4 py-2.5 text-xs text-muted-foreground">
                         {formatDate(user.lastLoginAt)}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex gap-2">
+                          {user.status === "ACTIVE" ? (
+                            <button
+                              type="button"
+                              onClick={() => suspendMutation.mutate(user.id)}
+                              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs font-semibold"
+                            >
+                              <Ban className="h-3.5 w-3.5" />
+                              Tam ngung
+                            </button>
+                          ) : null}
+                          {user.status === "SUSPENDED" ? (
+                            <button
+                              type="button"
+                              onClick={() => reactivateMutation.mutate(user.id)}
+                              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs font-semibold"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Kich hoat
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -238,6 +274,28 @@ export function AdminUsersPageView() {
                   <p className="text-xs text-muted-foreground">
                     Tao: {formatDate(user.createdAt)} &middot; DN cuoi: {formatDate(user.lastLoginAt)}
                   </p>
+                  <div className="flex flex-wrap gap-2">
+                    {user.status === "ACTIVE" ? (
+                      <button
+                        type="button"
+                        onClick={() => suspendMutation.mutate(user.id)}
+                        className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
+                      >
+                        <Ban className="h-3.5 w-3.5" />
+                        Tam ngung
+                      </button>
+                    ) : null}
+                    {user.status === "SUSPENDED" ? (
+                      <button
+                        type="button"
+                        onClick={() => reactivateMutation.mutate(user.id)}
+                        className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Kich hoat
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>

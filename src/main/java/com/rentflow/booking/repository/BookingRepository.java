@@ -60,6 +60,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             @Param("vehicleId") UUID vehicleId,
             @Param("activeStatuses") List<BookingStatus> activeStatuses);
 
+    long countByListingIdAndStatusIn(UUID listingId, List<BookingStatus> statuses);
+
+    Page<Booking> findByCustomerIdOrHostIdOrderByCreatedAtDesc(UUID customerId, UUID hostId, Pageable pageable);
+
     Page<Booking> findByCustomerIdOrderByCreatedAtDesc(UUID customerId, Pageable pageable);
 
     Page<Booking> findByCustomerIdAndStatusOrderByCreatedAtDesc(

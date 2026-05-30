@@ -14,7 +14,7 @@ export type CreateBookingInput = {
   returnDate: string;
   pickupLocation?: string;
   returnLocation?: string;
-  selectedExtraIds: string[];
+  selectedExtras: { extraId: string; quantity: number }[];
 };
 
 export type CancelBookingInput = {
@@ -47,6 +47,17 @@ type RawBookingResponse = {
   rejectionReason?: string | null;
   voidRetryRequired?: boolean;
   paymentRetryState?: string | null;
+  cancellationPreview?: {
+    eligible: boolean;
+    refundableAmount: number | string;
+    penaltyAmount: number | string;
+    currency: string;
+    policy: "FLEXIBLE" | "MODERATE" | "STRICT";
+  } | null;
+  reviewEligible?: boolean;
+  reviewSubmitted?: boolean;
+  disputeEligible?: boolean;
+  disputeSubmitted?: boolean;
   createdAt: string;
 };
 
@@ -174,6 +185,19 @@ function mapBookingResponse(raw: RawBookingResponse): BookingDetailViewModel {
     paymentRetryState: raw.paymentRetryState ?? undefined,
     priceSnapshot: parsePriceSnapshot(raw.priceSnapshot, raw.currency),
     policySnapshot: parsePolicySnapshot(raw.policySnapshot),
+    cancellationPreview: raw.cancellationPreview
+      ? {
+          eligible: Boolean(raw.cancellationPreview.eligible),
+          refundableAmount: toNumber(raw.cancellationPreview.refundableAmount),
+          penaltyAmount: toNumber(raw.cancellationPreview.penaltyAmount),
+          currency: raw.cancellationPreview.currency,
+          policy: raw.cancellationPreview.policy,
+        }
+      : undefined,
+    reviewEligible: raw.reviewEligible ?? false,
+    reviewSubmitted: raw.reviewSubmitted ?? false,
+    disputeEligible: raw.disputeEligible ?? false,
+    disputeSubmitted: raw.disputeSubmitted ?? false,
   };
 }
 
@@ -201,7 +225,10 @@ export function buildCreateBookingPayload(input: CreateBookingInput) {
     returnDate: input.returnDate,
     pickupLocation: input.pickupLocation?.trim() || null,
     returnLocation: input.returnLocation?.trim() || null,
-    extras: input.selectedExtraIds.map((extraId) => ({ extraId, quantity: 1 })),
+    extras: input.selectedExtras.map((extra) => ({
+      extraId: extra.extraId,
+      quantity: extra.quantity,
+    })),
   };
 }
 
@@ -278,6 +305,37 @@ export async function cancelBooking(
     code: raw.code ?? null,
     paymentRetryState: raw.paymentRetryState ?? null,
   };
+}
+
+export async function createBookingReview(
+  id: string,
+  input: { rating: number; content?: string },
+) {
+  return api.post(`/bookings/${id}/review`, input);
+}
+
+export async function createBookingDispute(
+  id: string,
+  input: { category: string; reason: string; context?: string; attachmentFileIds?: string[] },
+) {
+  return api.post(`/bookings/${id}/dispute`, input);
+}
+
+export async function uploadDisputeAttachment(file: File): Promise<string> {
+  const intent = await api.post<{
+    fileId: string;
+    uploadUrl: string;
+  }>("/files/dispute-attachments/upload-intents", {
+    contentType: file.type || "application/octet-stream",
+    sizeBytes: file.size,
+  });
+  await fetch(intent.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  await api.post(`/files/${intent.fileId}/finalize`, {});
+  return intent.fileId;
 }
 
 export const BOOKING_STATUS_FILTERS: BookingListFilterValue[] = [

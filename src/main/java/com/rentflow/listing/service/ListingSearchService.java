@@ -32,6 +32,7 @@ public class ListingSearchService {
         validateDateRange(request);
 
         ListingSearchCriteria criteria = new ListingSearchCriteria(
+            normalizeBlank(request.query()),
             request.city(),
             request.categories() != null && request.categories().isEmpty() ? null : request.categories(),
             request.minPrice(),
@@ -40,7 +41,8 @@ public class ListingSearchService {
             request.transmission(),
             request.fuelType(),
             request.pickupDate(),
-            request.returnDate()
+            request.returnDate(),
+            request.sort()
         );
 
         Pageable pageable = PageRequest.of(request.page(), request.size());
@@ -103,5 +105,12 @@ public class ListingSearchService {
         if (hasPickup && !request.pickupDate().isBefore(request.returnDate())) {
             throw new IllegalArgumentException("pickupDate must be strictly before returnDate");
         }
+    }
+
+    private String normalizeBlank(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }

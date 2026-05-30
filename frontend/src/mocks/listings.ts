@@ -5,6 +5,7 @@ import type {
 } from "@/features/listings/types";
 
 export const DEFAULT_LISTING_FILTERS: ListingFilterState = {
+  query: "",
   city: "",
   pickupDate: "",
   returnDate: "",
@@ -14,6 +15,7 @@ export const DEFAULT_LISTING_FILTERS: ListingFilterState = {
   seats: "",
   minPrice: "",
   maxPrice: "",
+  sort: "NEWEST",
 };
 
 export const LISTING_CARDS: ListingCardViewModel[] = [

@@ -19,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import java.time.Instant;
 
 @Slf4j
 @RestController
@@ -78,7 +79,7 @@ public class AdminListingController {
     public ResponseEntity<ListingResponse> suspendListing(
             @PathVariable UUID id,
             @RequestBody SuspendRequest request) {
-        var response = adminListingService.suspendListing(id, request.reason());
+        var response = adminListingService.suspendListing(id, request.reason(), request.source(), request.suspensionUntil());
         return ResponseEntity.ok(response);
     }
 
@@ -89,5 +90,5 @@ public class AdminListingController {
     }
 
     public record RejectRequest(String reason) {}
-    public record SuspendRequest(String reason) {}
+    public record SuspendRequest(String reason, String source, Instant suspensionUntil) {}
 }

@@ -18,12 +18,17 @@ import com.rentflow.listing.event.ListingApprovedEvent;
 import com.rentflow.listing.mapper.ListingMapper;
 import com.rentflow.listing.repository.ExtraRepository;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.booking.entity.BookingStatus;
+import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.notification.entity.NotificationType;
+import com.rentflow.notification.service.NotificationService;
 import com.rentflow.outbox.service.OutboxService;
 import com.rentflow.user.repository.UserProfileRepository;
 import com.rentflow.vehicle.entity.Vehicle;
 import com.rentflow.vehicle.entity.VehicleStatus;
 import com.rentflow.vehicle.repository.VehicleRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -48,8 +53,39 @@ public class AdminListingService {
     private final ExtraRepository extraRepository;
     private final UserProfileRepository userProfileRepository;
     private final AuthUserRepository authUserRepository;
+    private final BookingRepository bookingRepository;
+    private final NotificationService notificationService;
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
+
+    @Autowired
+    public AdminListingService(ListingRepository listingRepository,
+                               VehicleRepository vehicleRepository,
+                               AvailabilityCalendarRepository availabilityRepository,
+                               ApplicationEventPublisher eventPublisher,
+                               ListingStateMachine stateMachine,
+                               ListingMapper mapper,
+                               ExtraRepository extraRepository,
+                               UserProfileRepository userProfileRepository,
+                               AuthUserRepository authUserRepository,
+                               BookingRepository bookingRepository,
+                               NotificationService notificationService,
+                               OutboxService outboxService,
+                               ObjectMapper objectMapper) {
+        this.listingRepository = listingRepository;
+        this.vehicleRepository = vehicleRepository;
+        this.availabilityRepository = availabilityRepository;
+        this.eventPublisher = eventPublisher;
+        this.stateMachine = stateMachine;
+        this.mapper = mapper;
+        this.extraRepository = extraRepository;
+        this.userProfileRepository = userProfileRepository;
+        this.authUserRepository = authUserRepository;
+        this.bookingRepository = bookingRepository;
+        this.notificationService = notificationService;
+        this.outboxService = outboxService;
+        this.objectMapper = objectMapper;
+    }
 
     public AdminListingService(ListingRepository listingRepository,
                                VehicleRepository vehicleRepository,
@@ -62,17 +98,20 @@ public class AdminListingService {
                                AuthUserRepository authUserRepository,
                                OutboxService outboxService,
                                ObjectMapper objectMapper) {
-        this.listingRepository = listingRepository;
-        this.vehicleRepository = vehicleRepository;
-        this.availabilityRepository = availabilityRepository;
-        this.eventPublisher = eventPublisher;
-        this.stateMachine = stateMachine;
-        this.mapper = mapper;
-        this.extraRepository = extraRepository;
-        this.userProfileRepository = userProfileRepository;
-        this.authUserRepository = authUserRepository;
-        this.outboxService = outboxService;
-        this.objectMapper = objectMapper;
+        this(
+                listingRepository,
+                vehicleRepository,
+                availabilityRepository,
+                eventPublisher,
+                stateMachine,
+                mapper,
+                extraRepository,
+                userProfileRepository,
+                authUserRepository,
+                null,
+                null,
+                outboxService,
+                objectMapper);
     }
 
     @Transactional(readOnly = true)
@@ -95,7 +134,8 @@ public class AdminListingService {
         AdminListingDetailResponse.HostSummary hostSummary = new AdminListingDetailResponse.HostSummary(
                 listing.getHostId(),
                 profile != null ? profile.getFullName() : null,
-                hostEmail
+                hostEmail,
+                (int) listingRepository.countByHostIdAndStatus(listing.getHostId(), ListingStatus.ACTIVE)
         );
 
         ListingResponse.VehicleSummary vehicleSummary = null;
@@ -119,7 +159,24 @@ public class AdminListingService {
         return new AdminListingDetailResponse(
                 listingResponse,
                 hostSummary,
-                new AdminListingDetailResponse.BookingSummary(0)
+                vehicle == null ? null : new AdminListingDetailResponse.VehicleRiskSummary(
+                        vehicle.getId(),
+                        vehicle.getStatus(),
+                        (int) listingRepository.countByVehicleIdAndStatus(vehicle.getId(), ListingStatus.ACTIVE)),
+                new AdminListingDetailResponse.BookingSummary(
+                        bookingRepository == null ? 0 : (int) bookingRepository.countByListingIdAndStatusIn(
+                                listingId,
+                                List.of(
+                                        BookingStatus.HELD,
+                                        BookingStatus.PENDING_HOST_APPROVAL,
+                                        BookingStatus.CONFIRMED,
+                                        BookingStatus.IN_PROGRESS))),
+                new AdminListingDetailResponse.ModerationSummary(
+                        listing.getSuspensionReason(),
+                        listing.getSuspensionSource(),
+                        listing.getSuspensionUntil(),
+                        listing.getRejectedReason(),
+                        listing.getRejectedAt())
         );
     }
 
@@ -187,6 +244,8 @@ public class AdminListingService {
 
         stateMachine.validateTransition(listing.getStatus(), ListingStatus.DRAFT);
         listing.setStatus(ListingStatus.DRAFT);
+        listing.setRejectedReason(reason == null ? null : reason.trim());
+        listing.setRejectedAt(Instant.now());
         listingRepository.save(listing);
         outboxService.append(
                 "LISTING",
@@ -197,6 +256,13 @@ public class AdminListingService {
                         "hostId", listing.getHostId(),
                         "reason", reason == null ? "" : reason,
                         "rejectedAt", Instant.now().toString())));
+        if (notificationService != null) {
+            notificationService.create(
+                    listing.getHostId(),
+                    NotificationType.LISTING_REJECTED,
+                    "Listing rejected",
+                    "Your listing was rejected: " + (reason == null || reason.isBlank() ? "No reason provided" : reason.trim()));
+        }
 
         log.info("Listing rejected: {} reason: {}", listingId, reason);
 
@@ -205,7 +271,7 @@ public class AdminListingService {
     }
 
     @Transactional
-    public ListingResponse suspendListing(UUID listingId, String reason) {
+    public ListingResponse suspendListing(UUID listingId, String reason, String source, Instant suspensionUntil) {
         Listing listing = listingRepository.findByIdForUpdate(listingId)
                 .orElseThrow(() -> new ListingNotFoundException(listingId.toString()));
 
@@ -215,6 +281,9 @@ public class AdminListingService {
         }
 
         listing.setStatus(ListingStatus.SUSPENDED);
+        listing.setSuspensionReason(reason == null ? null : reason.trim());
+        listing.setSuspensionSource(source == null || source.isBlank() ? "ADMIN" : source.trim());
+        listing.setSuspensionUntil(suspensionUntil);
         listingRepository.save(listing);
 
         log.info("Listing suspended: {} reason: {}", listingId, reason);

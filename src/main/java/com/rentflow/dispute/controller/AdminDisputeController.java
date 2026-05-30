@@ -3,6 +3,7 @@ package com.rentflow.dispute.controller;
 import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.web.PageResponse;
 import com.rentflow.common.web.PageableValidation;
+import com.rentflow.dispute.dto.AdminDisputeDetailResponse;
 import com.rentflow.dispute.dto.DisputeResponse;
 import com.rentflow.dispute.dto.ResolveDisputeRequest;
 import com.rentflow.dispute.entity.DisputeStatus;
@@ -37,6 +38,11 @@ public class AdminDisputeController {
         Pageable pageable = PageableValidation.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         DisputeStatus statusFilter = parseStatus(status);
         return ResponseEntity.ok(disputeService.listDisputes(statusFilter, pageable));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<AdminDisputeDetailResponse> getDispute(@PathVariable("id") UUID disputeId) {
+        return ResponseEntity.ok(disputeService.getAdminDisputeDetail(disputeId));
     }
 
     @PostMapping("/{id}/resolve")

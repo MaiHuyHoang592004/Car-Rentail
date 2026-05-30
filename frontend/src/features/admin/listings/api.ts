@@ -46,8 +46,10 @@ type RawListingDetail = {
     status: AdminListingStatus;
     createdAt: string;
   };
-  host: { id: string; fullName: string; email: string } | null;
+  host: { id: string; fullName: string; email: string; activeListings?: number } | null;
+  vehicle?: { id: string; status: string; activeListings: number } | null;
   bookingSummary: { activeBookings: number };
+  moderation?: AdminListingDetail["moderation"];
 };
 
 /* ------------------------------------------------------------------ */
@@ -91,7 +93,9 @@ function mapDetail(raw: RawListingDetail): AdminListingDetail {
       createdAt: raw.listing.createdAt,
     },
     host: raw.host,
+    vehicle: raw.vehicle ?? null,
     bookingSummary: raw.bookingSummary,
+    moderation: raw.moderation ?? null,
   };
 }
 
@@ -174,11 +178,13 @@ export async function adminRejectListing(
 export async function adminSuspendListing(
   listingId: string,
   reason: string,
+  source = "ADMIN",
+  suspensionUntil?: string,
 ): Promise<AdminListingDetail> {
   return adminPostActionAndRefreshDetail(
     listingId,
     `/admin/listings/${listingId}/suspend`,
-    { reason },
+    { reason, source, suspensionUntil: suspensionUntil || null },
   );
 }
 

@@ -4,5 +4,6 @@ public enum FilePurpose {
     VEHICLE_PHOTO,
     LISTING_PHOTO,
     DRIVER_LICENSE,
-    TRIP_PHOTO
+    TRIP_PHOTO,
+    DISPUTE_ATTACHMENT
 }

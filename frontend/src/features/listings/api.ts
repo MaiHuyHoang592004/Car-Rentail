@@ -5,6 +5,7 @@ const FALLBACK_COVER_IMAGE_URL =
   "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80";
 
 export const DEFAULT_LISTING_FILTERS: ListingFilterState = {
+  query: "",
   city: "",
   pickupDate: "",
   returnDate: "",
@@ -14,6 +15,7 @@ export const DEFAULT_LISTING_FILTERS: ListingFilterState = {
   seats: "",
   minPrice: "",
   maxPrice: "",
+  sort: "NEWEST",
 };
 
 type RawListingSearchResponse = {
@@ -58,6 +60,7 @@ export function buildListingSearchQuery(
   size = 20,
 ): string {
   const params = new URLSearchParams();
+  addIfPresent(params, "query", filters.query);
   addIfPresent(params, "city", filters.city);
   addIfPresent(params, "pickupDate", filters.pickupDate);
   addIfPresent(params, "returnDate", filters.returnDate);
@@ -67,6 +70,7 @@ export function buildListingSearchQuery(
   if (filters.category !== "ALL") params.set("categories", filters.category);
   if (filters.transmission !== "ALL") params.set("transmission", filters.transmission);
   if (filters.fuelType !== "ALL") params.set("fuelType", filters.fuelType);
+  params.set("sort", filters.sort);
   params.set("page", String(page));
   params.set("size", String(size));
   return params.toString();

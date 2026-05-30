@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record ListingSearchCriteria(
+    String query,
     String city,
     List<VehicleCategory> categories,
     BigDecimal minPrice,
@@ -17,5 +18,6 @@ public record ListingSearchCriteria(
     TransmissionType transmission,
     FuelType fuelType,
     LocalDate pickupDate,
-    LocalDate returnDate
+    LocalDate returnDate,
+    ListingSearchSort sort
 ) {}

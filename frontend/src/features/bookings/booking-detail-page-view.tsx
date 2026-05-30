@@ -11,8 +11,11 @@ import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
 import {
   cancelBooking,
+  createBookingDispute,
+  createBookingReview,
   getBookingById,
   patchBookingLocations,
+  uploadDisputeAttachment,
   type PatchBookingLocationsInput,
 } from "@/features/bookings/api";
 import { BookingStatusBadge } from "@/features/bookings/booking-status-badge";
@@ -88,6 +91,12 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState<boolean>(false);
   const [cancelOpen, setCancelOpen] = useState<boolean>(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewContent, setReviewContent] = useState("");
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [disputeContext, setDisputeContext] = useState("");
+  const [disputeFiles, setDisputeFiles] = useState<File[]>([]);
   const cancelKeyRef = useRef<string | null>(null);
   const expireRetryRef = useRef<number>(0);
 
@@ -130,6 +139,41 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
       const message =
         error instanceof ApiError ? error.message : "Huy don that bai";
       toast.error(message);
+    },
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: () => createBookingReview(bookingId, { rating: 5, content: reviewContent || undefined }),
+    onSuccess: () => {
+      toast.success("Da gui danh gia");
+      setReviewOpen(false);
+      setReviewContent("");
+      queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof ApiError ? error.message : "Gui danh gia that bai");
+    },
+  });
+
+  const disputeMutation = useMutation({
+    mutationFn: () =>
+      Promise.all(disputeFiles.map(uploadDisputeAttachment)).then((attachmentFileIds) =>
+        createBookingDispute(bookingId, {
+          category: "OTHER",
+          reason: disputeReason,
+          context: disputeContext || undefined,
+          attachmentFileIds,
+        })),
+    onSuccess: () => {
+      toast.success("Da tao khieu nai");
+      setDisputeOpen(false);
+      setDisputeReason("");
+      setDisputeContext("");
+      setDisputeFiles([]);
+      queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof ApiError ? error.message : "Tao khieu nai that bai");
     },
   });
 
@@ -380,11 +424,89 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
                 Huy don
               </button>
             ) : null}
+            {booking.reviewEligible ? (
+              <button
+                type="button"
+                onClick={() => setReviewOpen((open) => !open)}
+                className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+              >
+                Danh gia chuyen di
+              </button>
+            ) : null}
+            {booking.disputeEligible ? (
+              <button
+                type="button"
+                onClick={() => setDisputeOpen((open) => !open)}
+                className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+              >
+                Tao khieu nai
+              </button>
+            ) : null}
           </div>
+          {booking.status === "CONFIRMED" ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Muon doi ngay thue, hay huy don hien tai va dat lai voi ngay moi.
+            </p>
+          ) : null}
           {cancelHint ? (
             <p className="mt-2 text-sm text-muted-foreground">{cancelHint}</p>
           ) : null}
         </section>
+
+        {reviewOpen ? (
+          <section className="rounded-xl border border-border bg-card p-4">
+            <label className="text-sm font-semibold text-foreground">Noi dung danh gia</label>
+            <textarea
+              value={reviewContent}
+              onChange={(event) => setReviewContent(event.target.value)}
+              rows={3}
+              className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              disabled={reviewMutation.isPending}
+              onClick={() => reviewMutation.mutate()}
+              className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              Gui danh gia 5 sao
+            </button>
+          </section>
+        ) : null}
+
+        {disputeOpen ? (
+          <section className="rounded-xl border border-border bg-card p-4">
+            <label className="text-sm font-semibold text-foreground">Ly do khieu nai</label>
+            <textarea
+              value={disputeReason}
+              onChange={(event) => setDisputeReason(event.target.value)}
+              rows={3}
+              className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            />
+            <label className="mt-3 block text-sm font-semibold text-foreground">Bo sung boi canh</label>
+            <textarea
+              value={disputeContext}
+              onChange={(event) => setDisputeContext(event.target.value)}
+              rows={3}
+              className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            />
+            <label className="mt-3 block text-sm font-semibold text-foreground">Tai lieu dinh kem</label>
+            <input
+              type="file"
+              multiple
+              accept="image/*,application/pdf"
+              onChange={(event) => setDisputeFiles(Array.from(event.target.files ?? []))}
+              className="mt-2 block w-full text-sm text-muted-foreground"
+            />
+            <button
+              type="button"
+              disabled={!disputeReason.trim() || disputeMutation.isPending}
+              onClick={() => disputeMutation.mutate()}
+              className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              Gui khieu nai
+            </button>
+          </section>
+        ) : null}
 
         <LocationSummary
           pickupLocation={booking.pickupLocation}
@@ -412,6 +534,7 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
         key={`${booking.id}:${booking.status}:${cancelOpen ? "open" : "closed"}`}
         open={cancelOpen}
         status={cancelDialogStatus}
+        preview={booking.cancellationPreview}
         onClose={handleCancelClose}
         onConfirm={handleCancelConfirm}
       />

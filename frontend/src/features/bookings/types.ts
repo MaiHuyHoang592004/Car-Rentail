@@ -72,6 +72,17 @@ export type BookingDetailViewModel = BookingSummaryViewModel & {
   paymentRetryState?: string;
   priceSnapshot: BookingPriceSnapshot;
   policySnapshot: BookingPolicySnapshot;
+  cancellationPreview?: {
+    eligible: boolean;
+    refundableAmount: number;
+    penaltyAmount: number;
+    currency: string;
+    policy: BookingPolicySnapshot["cancellationPolicy"];
+  };
+  reviewEligible?: boolean;
+  reviewSubmitted?: boolean;
+  disputeEligible?: boolean;
+  disputeSubmitted?: boolean;
 };
 
 export type BookingLocationPatchPayload = Partial<BookingLocationPatchFormState>;

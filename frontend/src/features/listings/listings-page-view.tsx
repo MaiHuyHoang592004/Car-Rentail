@@ -57,9 +57,11 @@ export function ListingsPageView() {
   const totalElements = query.data?.totalElements ?? 0;
   const totalPages = query.data?.totalPages ?? 0;
   const hasActiveCity = Boolean(filters.city);
+  const hasActiveQuery = Boolean(filters.query);
   const hasActivePrice = Boolean(filters.minPrice || filters.maxPrice);
 
   const summaryParts: string[] = [];
+  if (hasActiveQuery) summaryParts.push(`cho "${filters.query}"`);
   if (hasActiveCity) summaryParts.push(`tại ${filters.city}`);
   if (filters.minPrice) summaryParts.push(`từ ${formatMoney(Number(filters.minPrice))}`);
   if (filters.maxPrice) summaryParts.push(`đến ${formatMoney(Number(filters.maxPrice))}`);
@@ -90,6 +92,14 @@ export function ListingsPageView() {
                 type="text"
                 placeholder="Hà Nội, TP. HCM..."
                 {...filterForm.register("city")}
+                className="h-12 w-full rounded-t-lg border-0 border-b-2 border-border bg-muted pl-10 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-0"
+              />
+            </HeroField>
+            <HeroField label="Từ khóa" icon={<Search className="h-5 w-5" />}>
+              <input
+                type="text"
+                placeholder="Toyota, Vios, xe gia đình..."
+                {...filterForm.register("query")}
                 className="h-12 w-full rounded-t-lg border-0 border-b-2 border-border bg-muted pl-10 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-0"
               />
             </HeroField>
@@ -136,10 +146,13 @@ export function ListingsPageView() {
             </p>
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               Sắp xếp:
-              <select className="border-0 bg-transparent text-sm font-semibold text-foreground focus:outline-none focus:ring-0">
-                <option>Phổ biến nhất</option>
-                <option>Giá thấp đến cao</option>
-                <option>Giá cao đến thấp</option>
+              <select
+                {...filterForm.register("sort")}
+                className="border-0 bg-transparent text-sm font-semibold text-foreground focus:outline-none focus:ring-0"
+              >
+                <option value="NEWEST">Mới nhất</option>
+                <option value="PRICE_ASC">Giá thấp đến cao</option>
+                <option value="PRICE_DESC">Giá cao đến thấp</option>
               </select>
             </label>
           </div>

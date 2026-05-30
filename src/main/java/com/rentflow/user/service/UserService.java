@@ -9,14 +9,19 @@ import com.rentflow.auth.repository.AuthUserRepository;
 import com.rentflow.auth.repository.UserRoleRepository;
 import com.rentflow.auth.service.AuthUserProfilePort;
 import com.rentflow.common.exception.AccessDeniedException;
+import com.rentflow.common.exception.BusinessRuleException;
+import com.rentflow.common.exception.ResourceNotFoundException;
 import com.rentflow.common.security.SecurityContext;
+import com.rentflow.booking.mapper.BookingMapper;
+import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.booking.service.BookingSummaryResponse;
 import com.rentflow.user.dto.UpdateProfileRequest;
 import com.rentflow.user.dto.UserProfileResponse;
 import com.rentflow.user.dto.UserSummaryResponse;
 import com.rentflow.user.entity.UserProfile;
 import com.rentflow.user.repository.UserProfileRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -31,13 +36,43 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class UserService implements AuthUserProfilePort {
 
     private final AuthUserRepository authUserRepository;
     private final UserRoleRepository userRoleRepository;
     private final UserProfileRepository userProfileRepository;
     private final SecurityContext securityContext;
+    private final BookingRepository bookingRepository;
+    private final BookingMapper bookingMapper;
+
+    @Autowired
+    public UserService(
+            AuthUserRepository authUserRepository,
+            UserRoleRepository userRoleRepository,
+            UserProfileRepository userProfileRepository,
+            SecurityContext securityContext,
+            BookingRepository bookingRepository,
+            BookingMapper bookingMapper) {
+        this.authUserRepository = authUserRepository;
+        this.userRoleRepository = userRoleRepository;
+        this.userProfileRepository = userProfileRepository;
+        this.securityContext = securityContext;
+        this.bookingRepository = bookingRepository;
+        this.bookingMapper = bookingMapper;
+    }
+
+    public UserService(
+            AuthUserRepository authUserRepository,
+            UserRoleRepository userRoleRepository,
+            UserProfileRepository userProfileRepository,
+            SecurityContext securityContext) {
+        this.authUserRepository = authUserRepository;
+        this.userRoleRepository = userRoleRepository;
+        this.userProfileRepository = userProfileRepository;
+        this.securityContext = securityContext;
+        this.bookingRepository = null;
+        this.bookingMapper = null;
+    }
 
     @Override
     @Transactional
@@ -145,6 +180,45 @@ public class UserService implements AuthUserProfilePort {
             UserProfile actualProfile = profile != null ? profile : createMinimalProfile(user);
             return UserSummaryResponse.from(user, actualProfile, roles);
         });
+    }
+
+    @Transactional
+    public UserSummaryResponse suspendUser(UUID userId) {
+        AuthUser user = authUserRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User", userId.toString()));
+        if (user.getId().equals(securityContext.currentUserId())) {
+            throw new BusinessRuleException("ADMIN_CANNOT_SUSPEND_SELF", "Admin cannot suspend their own account");
+        }
+        user.setStatus(UserStatus.SUSPENDED);
+        user = authUserRepository.save(user);
+        return toSummary(user);
+    }
+
+    @Transactional
+    public UserSummaryResponse reactivateUser(UUID userId) {
+        AuthUser user = authUserRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User", userId.toString()));
+        if (user.getStatus() == UserStatus.DELETED) {
+            throw new BusinessRuleException("USER_INVALID_STATUS", "Deleted users cannot be reactivated");
+        }
+        user.setStatus(UserStatus.ACTIVE);
+        user = authUserRepository.save(user);
+        return toSummary(user);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<BookingSummaryResponse> listUserBookings(UUID userId, Pageable pageable) {
+        if (!authUserRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("USER_NOT_FOUND", "User", userId.toString());
+        }
+        return bookingRepository.findByCustomerIdOrHostIdOrderByCreatedAtDesc(userId, userId, pageable)
+                .map(bookingMapper::toSummaryResponse);
+    }
+
+    private UserSummaryResponse toSummary(AuthUser user) {
+        UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElseGet(() -> createMinimalProfile(user));
+        List<Role> roles = userRoleRepository.findByUserId(user.getId()).stream().map(ur -> ur.getRole()).toList();
+        return UserSummaryResponse.from(user, profile, roles);
     }
 
     private UserProfile createMinimalProfile(AuthUser user) {

@@ -7,7 +7,7 @@ type BookingPriceSummaryProps = {
   listing: ListingDetailViewModel;
   pickupDate: string;
   returnDate: string;
-  selectedExtraIds: string[];
+  selectedExtras: Record<string, number>;
   onBook: () => void;
   isPending: boolean;
 };
@@ -24,17 +24,16 @@ export function BookingPriceSummary({
   listing,
   pickupDate,
   returnDate,
-  selectedExtraIds,
+  selectedExtras,
   onBook,
   isPending,
 }: BookingPriceSummaryProps) {
   const days = calcDays(pickupDate, returnDate);
   const extrasTotal = listing.extras
-    .filter((e) => selectedExtraIds.includes(e.id))
-    .reduce((sum, e) => sum + e.price, 0);
+    .reduce((sum, e) => sum + e.price * (selectedExtras[e.id] ?? 0), 0);
   const baseTotal = days != null ? listing.basePricePerDay * days : null;
   const grandTotal = days != null && baseTotal != null ? baseTotal + extrasTotal : null;
-  const selectedExtras = listing.extras.filter((e) => selectedExtraIds.includes(e.id));
+  const selectedExtraRows = listing.extras.filter((e) => (selectedExtras[e.id] ?? 0) > 0);
   const hasDates = Boolean(pickupDate && returnDate);
 
   return (
@@ -65,10 +64,12 @@ export function BookingPriceSummary({
               <span className="font-medium text-foreground">{formatMoney(baseTotal!, listing.currency)}</span>
             </div>
 
-            {selectedExtras.length > 0 ? selectedExtras.map((extra) => (
+            {selectedExtraRows.length > 0 ? selectedExtraRows.map((extra) => (
               <div key={extra.id} className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{extra.name}</span>
-                <span className="font-medium text-foreground">{formatMoney(extra.price, extra.currency)}</span>
+                <span className="text-muted-foreground">{extra.name} × {selectedExtras[extra.id]}</span>
+                <span className="font-medium text-foreground">
+                  {formatMoney(extra.price * selectedExtras[extra.id], extra.currency)}
+                </span>
               </div>
             )) : null}
 

@@ -10,17 +10,20 @@ import {
 } from "./api";
 
 describe("buildCreateBookingPayload", () => {
-  it("maps selectedExtraIds[] to extras[{extraId, quantity:1}]", () => {
+  it("maps selected extras to extras[{extraId, quantity}]", () => {
     const payload = buildCreateBookingPayload({
       listingId: "lst-1",
       pickupDate: "2026-06-01",
       returnDate: "2026-06-03",
       pickupLocation: "  HCM  ",
       returnLocation: "",
-      selectedExtraIds: ["ex-1", "ex-2"],
+      selectedExtras: [
+        { extraId: "ex-1", quantity: 2 },
+        { extraId: "ex-2", quantity: 1 },
+      ],
     });
     expect(payload.extras).toEqual([
-      { extraId: "ex-1", quantity: 1 },
+      { extraId: "ex-1", quantity: 2 },
       { extraId: "ex-2", quantity: 1 },
     ]);
     expect(payload.pickupLocation).toBe("HCM");
@@ -32,7 +35,7 @@ describe("buildCreateBookingPayload", () => {
       listingId: "lst-1",
       pickupDate: "2026-06-01",
       returnDate: "2026-06-03",
-      selectedExtraIds: [],
+      selectedExtras: [],
     });
     expect(payload.extras).toEqual([]);
   });
@@ -90,7 +93,7 @@ describe("booking api network calls", () => {
         listingId: "lst-1",
         pickupDate: "2026-06-01",
         returnDate: "2026-06-03",
-        selectedExtraIds: [],
+        selectedExtras: [],
       },
       "deadbeef-1234-4567-8901-abcdef012345",
     );

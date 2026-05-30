@@ -69,3 +69,11 @@ export async function adminListUsers(
     totalPages: raw.totalPages,
   };
 }
+
+export async function adminSuspendUser(userId: string): Promise<AdminUserSummary> {
+  return mapUser(await api.post<RawUserSummary>(`/admin/users/${userId}/suspend`, {}));
+}
+
+export async function adminReactivateUser(userId: string): Promise<AdminUserSummary> {
+  return mapUser(await api.post<RawUserSummary>(`/admin/users/${userId}/reactivate`, {}));
+}

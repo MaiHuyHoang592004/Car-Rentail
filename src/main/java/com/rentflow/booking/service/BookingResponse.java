@@ -28,7 +28,12 @@ public record BookingResponse(
         String rejectionReason,
         Instant createdAt,
         boolean voidRetryRequired,
-        String paymentRetryState) {
+        String paymentRetryState,
+        CancellationPreviewResponse cancellationPreview,
+        boolean reviewEligible,
+        boolean reviewSubmitted,
+        boolean disputeEligible,
+        boolean disputeSubmitted) {
 
     public BookingResponse(
             UUID id,
@@ -69,6 +74,60 @@ public record BookingResponse(
                 rejectionReason,
                 createdAt,
                 false,
-                null);
+                null,
+                null,
+                false,
+                false,
+                false,
+                false);
+    }
+
+    public BookingResponse(
+            UUID id,
+            BookingStatus status,
+            UUID listingId,
+            String listingTitle,
+            UUID customerId,
+            UUID hostId,
+            LocalDate pickupDate,
+            LocalDate returnDate,
+            String pickupLocation,
+            String returnLocation,
+            Instant holdExpiresAt,
+            Instant hostApprovalExpiresAt,
+            BigDecimal totalAmount,
+            String currency,
+            JsonNode priceSnapshot,
+            JsonNode policySnapshot,
+            String rejectionReason,
+            Instant createdAt,
+            boolean voidRetryRequired,
+            String paymentRetryState) {
+        this(
+                id,
+                status,
+                listingId,
+                listingTitle,
+                customerId,
+                hostId,
+                pickupDate,
+                returnDate,
+                pickupLocation,
+                returnLocation,
+                holdExpiresAt,
+                hostApprovalExpiresAt,
+                totalAmount,
+                currency,
+                priceSnapshot,
+                policySnapshot,
+                rejectionReason,
+                createdAt,
+                voidRetryRequired,
+                paymentRetryState,
+                null,
+                false,
+                false,
+                false,
+                false);
     }
 }

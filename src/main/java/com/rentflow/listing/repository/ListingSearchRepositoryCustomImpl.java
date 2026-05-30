@@ -40,14 +40,14 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
     private Page<ListingSearchResponse> searchWithoutDates(ListingSearchCriteria criteria, Pageable pageable) {
         String baseSelect = """
             SELECT l.id, l.title, l.city, v.category, l.base_price_per_day,
-                l.currency, v.seats, v.transmission, v.fuel_type
+                l.currency, v.seats, v.transmission, v.fuel_type, l.average_rating
             FROM listings l
             JOIN vehicles v ON l.vehicle_id = v.id
             WHERE l.status = 'ACTIVE'
             """;
 
         StringBuilder dynamic = buildDynamicFilters(criteria);
-        String orderBy = " ORDER BY l.created_at DESC";
+        String orderBy = orderBy(criteria);
         String dataSql = baseSelect + dynamic + orderBy;
         String countSql = "SELECT COUNT(*) FROM (" + baseSelect + dynamic + ") AS t";
 
@@ -67,7 +67,7 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
     private Page<ListingSearchResponse> searchWithDates(ListingSearchCriteria criteria, Pageable pageable) {
         String baseSelect = """
             SELECT l.id, l.title, l.city, v.category, l.base_price_per_day,
-                l.currency, v.seats, v.transmission, v.fuel_type
+                l.currency, v.seats, v.transmission, v.fuel_type, l.average_rating
             FROM listings l
             JOIN vehicles v ON l.vehicle_id = v.id
             WHERE l.status = 'ACTIVE'
@@ -95,7 +95,7 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
             """;
 
         StringBuilder dynamic = buildDynamicFilters(criteria);
-        String orderBy = " ORDER BY l.created_at DESC";
+        String orderBy = orderBy(criteria);
         String dataSql = baseSelect + availabilityFilter + dynamic + orderBy;
         String countSql = "SELECT COUNT(*) FROM (" + baseSelect + availabilityFilter + dynamic + ") AS t";
 
@@ -127,7 +127,7 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
                     enumValue(TransmissionType.class, columns[7]),
                     enumValue(FuelType.class, columns[8]),
                     null,
-                    null
+                    (BigDecimal) columns[9]
                 );
             })
             .toList();
@@ -139,6 +139,15 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
 
     private StringBuilder buildDynamicFilters(ListingSearchCriteria criteria) {
         StringBuilder dynamic = new StringBuilder();
+        if (criteria.query() != null) {
+            dynamic.append("""
+                 AND (
+                    l.title ILIKE '%' || :query || '%'
+                    OR v.make ILIKE '%' || :query || '%'
+                    OR v.model ILIKE '%' || :query || '%'
+                 )
+                """);
+        }
         if (criteria.city() != null) {
             dynamic.append(" AND l.city ILIKE :city || '%'");
         }
@@ -174,6 +183,9 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
         if (criteria.city() != null) {
             query.setParameter("city", criteria.city().trim());
         }
+        if (criteria.query() != null) {
+            query.setParameter("query", criteria.query().trim());
+        }
         if (criteria.categories() != null && !criteria.categories().isEmpty()) {
             for (int i = 0; i < criteria.categories().size(); i++) {
                 query.setParameter("cat" + i, criteria.categories().get(i).name());
@@ -194,5 +206,13 @@ public class ListingSearchRepositoryCustomImpl implements ListingSearchRepositor
         if (criteria.fuelType() != null) {
             query.setParameter("fuelType", criteria.fuelType().name());
         }
+    }
+
+    private String orderBy(ListingSearchCriteria criteria) {
+        return switch (criteria.sort()) {
+            case PRICE_ASC -> " ORDER BY l.base_price_per_day ASC, l.created_at DESC, l.id ASC";
+            case PRICE_DESC -> " ORDER BY l.base_price_per_day DESC, l.created_at DESC, l.id ASC";
+            case NEWEST -> " ORDER BY l.created_at DESC, l.id ASC";
+        };
     }
 }

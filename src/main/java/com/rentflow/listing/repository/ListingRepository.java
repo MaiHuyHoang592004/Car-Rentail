@@ -32,6 +32,8 @@ public interface ListingRepository extends
 
     long countByHostIdAndStatus(UUID hostId, ListingStatus status);
 
+    long countByVehicleIdAndStatus(UUID vehicleId, ListingStatus status);
+
     boolean existsByVehicleIdAndStatus(UUID vehicleId, ListingStatus status);
 
     List<Listing> findAllByVehicleIdAndStatusNot(UUID vehicleId, ListingStatus excludedStatus);

@@ -1,6 +1,7 @@
 export type AvailabilityDayState = "FREE" | "BLOCKED" | "UNAVAILABLE";
 
 export type ListingFilterState = {
+  query: string;
   city: string;
   pickupDate: string;
   returnDate: string;
@@ -10,6 +11,7 @@ export type ListingFilterState = {
   seats: string;
   minPrice: string;
   maxPrice: string;
+  sort: "NEWEST" | "PRICE_ASC" | "PRICE_DESC";
 };
 
 export type ListingCardViewModel = {

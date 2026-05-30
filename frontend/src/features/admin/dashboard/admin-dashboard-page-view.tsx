@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle, Users, ListChecks } from "lucide-react";
+import { AlertCircle, CheckCircle, FileCheck2, ListChecks, Scale, Users } from "lucide-react";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { adminListListings } from "@/features/admin/listings/api";
@@ -140,8 +140,11 @@ export function AdminDashboardPageView() {
             href="/admin/listings"
             className="rounded-xl border border-border bg-card p-5 shadow-sm transition-colors hover:bg-accent"
           >
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Tin dang</p>
-            <p className="mt-1 text-xl font-bold text-foreground">Duyet tin</p>
+            <div className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-muted-foreground" />
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Tin dang</p>
+            </div>
+            <p className="mt-2 text-xl font-bold text-foreground">Duyet tin</p>
             <p className="mt-2 text-xs text-muted-foreground">
               Duyet, tu choi, tam ngung hoac kich hoat lai tin dang.
             </p>
@@ -150,10 +153,39 @@ export function AdminDashboardPageView() {
             href="/admin/users"
             className="rounded-xl border border-border bg-card p-5 shadow-sm transition-colors hover:bg-accent"
           >
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Nguoi dung</p>
-            <p className="mt-1 text-xl font-bold text-foreground">Quan ly nguoi dung</p>
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Nguoi dung</p>
+            </div>
+            <p className="mt-2 text-xl font-bold text-foreground">Quan ly nguoi dung</p>
             <p className="mt-2 text-xs text-muted-foreground">
               Xem danh sach nguoi dung voi bo loc trang thai va vai tro.
+            </p>
+          </Link>
+          <Link
+            href="/admin/driver-verifications"
+            className="rounded-xl border border-border bg-card p-5 shadow-sm transition-colors hover:bg-accent"
+          >
+            <div className="flex items-center gap-2">
+              <FileCheck2 className="h-4 w-4 text-muted-foreground" />
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Xac minh GPLX</p>
+            </div>
+            <p className="mt-2 text-xl font-bold text-foreground">Duyet ho so tai xe</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Xem tai lieu, tuoi pending va trang thai SLA cua ho so cho duyet.
+            </p>
+          </Link>
+          <Link
+            href="/admin/disputes"
+            className="rounded-xl border border-border bg-card p-5 shadow-sm transition-colors hover:bg-accent"
+          >
+            <div className="flex items-center gap-2">
+              <Scale className="h-4 w-4 text-muted-foreground" />
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Khieu nai</p>
+            </div>
+            <p className="mt-2 text-xl font-bold text-foreground">Xu ly tranh chap</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Xem booking, payment, timeline va giai quyet dispute tu mot man hinh.
             </p>
           </Link>
         </div>

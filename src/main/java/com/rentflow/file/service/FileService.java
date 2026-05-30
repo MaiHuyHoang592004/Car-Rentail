@@ -9,6 +9,8 @@ import com.rentflow.common.exception.VehicleNotFoundException;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.file.dto.AddListingPhotoRequest;
 import com.rentflow.file.dto.AddVehiclePhotoRequest;
+import com.rentflow.file.dto.CreateDisputeAttachmentUploadRequest;
+import com.rentflow.file.dto.FileUploadIntentResponse;
 import com.rentflow.file.dto.ListingPhotoResponse;
 import com.rentflow.file.dto.SignedFileUrlResponse;
 import com.rentflow.file.dto.UpdateListingPhotoRequest;
@@ -47,7 +49,9 @@ import java.util.UUID;
 public class FileService {
 
     private static final long PHOTO_MAX_BYTES = 10L * 1024 * 1024;
+    private static final long DISPUTE_ATTACHMENT_MAX_BYTES = 10L * 1024 * 1024;
     private static final long VEHICLE_PHOTO_MAX_COUNT = 8L;
+    private static final String DISPUTE_ATTACHMENT_BUCKET = "rentflow-dispute-attachments";
 
     private final FileMetadataRepository fileMetadataRepository;
     private final ListingPhotoRepository listingPhotoRepository;
@@ -324,12 +328,82 @@ public class FileService {
         return new SignedFileUrlResponse(file.getId(), file.getVisibility().name(), signed.url(), signed.expiresAt());
     }
 
+    @Transactional
+    public FileUploadIntentResponse createDisputeAttachmentUploadIntent(CreateDisputeAttachmentUploadRequest request) {
+        validateDisputeAttachmentInput(request.contentType(), request.sizeBytes());
+        UUID ownerId = securityContext.currentUserId();
+
+        FileMetadata metadata = new FileMetadata();
+        metadata.setOwnerUserId(ownerId);
+        metadata.setPurpose(FilePurpose.DISPUTE_ATTACHMENT);
+        metadata.setBucket(DISPUTE_ATTACHMENT_BUCKET);
+        metadata.setObjectKey("disputes/" + ownerId + "/" + UUID.randomUUID());
+        metadata.setContentType(request.contentType().trim().toLowerCase());
+        metadata.setSizeBytes(request.sizeBytes());
+        metadata.setChecksum(request.checksum());
+        metadata.setVisibility(FileVisibility.PRIVATE);
+        metadata.setStatus(FileStatus.PENDING_UPLOAD);
+        metadata = fileMetadataRepository.save(metadata);
+
+        Signed signed = buildSignedUrl(metadata, "upload");
+        return new FileUploadIntentResponse(
+                metadata.getId(),
+                metadata.getBucket(),
+                metadata.getObjectKey(),
+                signed.url(),
+                signed.expiresAt());
+    }
+
+    @Transactional
+    public SignedFileUrlResponse finalizeUpload(UUID fileId) {
+        FileMetadata metadata = fileMetadataRepository.findById(fileId)
+                .orElseThrow(() -> new ResourceNotFoundException("FILE_NOT_FOUND", "File", fileId.toString()));
+        if (!metadata.getOwnerUserId().equals(securityContext.currentUserId())) {
+            throw new AccessDeniedException();
+        }
+        if (metadata.getPurpose() != FilePurpose.DISPUTE_ATTACHMENT) {
+            throw new ValidationException("Only dispute attachment uploads can be finalized here");
+        }
+        if (metadata.getStatus() == FileStatus.DELETED) {
+            throw new ResourceNotFoundException("FILE_NOT_FOUND", "File", fileId.toString());
+        }
+        metadata.setStatus(FileStatus.ACTIVE);
+        metadata = fileMetadataRepository.save(metadata);
+        Signed signed = buildSignedUrl(metadata);
+        return new SignedFileUrlResponse(metadata.getId(), metadata.getVisibility().name(), signed.url(), signed.expiresAt());
+    }
+
+    @Transactional(readOnly = true)
+    public void requireAttachableDisputeFile(UUID fileId, UUID ownerId) {
+        FileMetadata file = fileMetadataRepository.findByIdAndStatus(fileId, FileStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("FILE_NOT_FOUND", "File", fileId.toString()));
+        if (file.getPurpose() != FilePurpose.DISPUTE_ATTACHMENT) {
+            throw new ValidationException("File is not a dispute attachment");
+        }
+        if (!file.getOwnerUserId().equals(ownerId)) {
+            throw new AccessDeniedException();
+        }
+    }
+
     private void validatePhotoInput(String contentType, Long sizeBytes, String label) {
         if (!contentType.toLowerCase().startsWith("image/")) {
             throw new ValidationException(label + " contentType must be an image/* MIME type");
         }
         if (sizeBytes > PHOTO_MAX_BYTES) {
             throw new ValidationException(label + " must be <= 10MB");
+        }
+    }
+
+    private void validateDisputeAttachmentInput(String contentType, Long sizeBytes) {
+        if (contentType == null || contentType.isBlank()) {
+            throw new ValidationException("Dispute attachment contentType must not be blank");
+        }
+        String normalized = contentType.toLowerCase();
+        if (!normalized.startsWith("image/") && !"application/pdf".equals(normalized)) {
+            throw new ValidationException("Dispute attachment must be image/* or application/pdf");
+        }
+        if (sizeBytes == null || sizeBytes <= 0 || sizeBytes > DISPUTE_ATTACHMENT_MAX_BYTES) {
+            throw new ValidationException("Dispute attachment must be <= 10MB");
         }
     }
 
@@ -432,14 +506,19 @@ public class FileService {
     }
 
     private Signed buildSignedUrl(FileMetadata metadata) {
+        return buildSignedUrl(metadata, "read");
+    }
+
+    private Signed buildSignedUrl(FileMetadata metadata, String action) {
         Instant expiresAt = Instant.now().plus(signedUrlProperties.getTtl());
         long expiresAtEpoch = expiresAt.getEpochSecond();
-        String payload = metadata.getId() + ":" + metadata.getBucket() + ":" + metadata.getObjectKey() + ":" + expiresAtEpoch;
+        String payload = action + ":" + metadata.getId() + ":" + metadata.getBucket() + ":" + metadata.getObjectKey() + ":" + expiresAtEpoch;
         String signature = hmacSha256(payload, signedUrlProperties.getSecret());
         String baseUrl = signedUrlProperties.getBaseUrl().replaceAll("/+$", "");
         String url = baseUrl + "/files/" + metadata.getId()
                 + "?bucket=" + encode(metadata.getBucket())
                 + "&key=" + encode(metadata.getObjectKey())
+                + "&action=" + encode(action)
                 + "&exp=" + expiresAtEpoch
                 + "&sig=" + encode(signature);
         return new Signed(url, expiresAt);

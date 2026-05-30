@@ -44,6 +44,7 @@ export function ListingFiltersPanel({ form, onReset }: ListingFiltersPanelProps)
 
   const hasActiveFilters =
     watch("city") ||
+    watch("query") ||
     watch("pickupDate") ||
     watch("returnDate") ||
     category !== "ALL" ||

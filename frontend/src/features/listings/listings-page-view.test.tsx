@@ -68,7 +68,7 @@ describe("ListingsPageView", () => {
     wrap(<ListingsPageView />);
 
     await waitFor(() => expect(screen.getByText("Toyota Vios 2022")).toBeInTheDocument());
-    expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/listings?page=0&size=20");
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/listings?sort=NEWEST&page=0&size=20");
   });
 
   it("re-queries with filter params when filters change", async () => {

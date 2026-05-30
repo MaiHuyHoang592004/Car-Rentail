@@ -26,6 +26,7 @@ export const HOST_LISTINGS: HostListingViewModel[] = [
     instantBook: false,
     cancellationPolicy: "FLEXIBLE",
     status: "ACTIVE",
+    extras: [],
   },
   {
     id: "hst-lst-002",
@@ -41,6 +42,7 @@ export const HOST_LISTINGS: HostListingViewModel[] = [
     instantBook: true,
     cancellationPolicy: "MODERATE",
     status: "PENDING_APPROVAL",
+    extras: [],
   },
   {
     id: "hst-lst-003",
@@ -56,6 +58,7 @@ export const HOST_LISTINGS: HostListingViewModel[] = [
     instantBook: false,
     cancellationPolicy: "STRICT",
     status: "DRAFT",
+    extras: [],
   },
   {
     id: "hst-lst-004",
@@ -71,6 +74,7 @@ export const HOST_LISTINGS: HostListingViewModel[] = [
     instantBook: false,
     cancellationPolicy: "FLEXIBLE",
     status: "SUSPENDED",
+    extras: [],
   },
   {
     id: "hst-lst-005",
@@ -86,6 +90,7 @@ export const HOST_LISTINGS: HostListingViewModel[] = [
     instantBook: false,
     cancellationPolicy: "MODERATE",
     status: "ARCHIVED",
+    extras: [],
   },
 ];
 

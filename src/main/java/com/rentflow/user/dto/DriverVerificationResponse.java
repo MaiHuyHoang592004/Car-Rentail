@@ -12,6 +12,9 @@ public record DriverVerificationResponse(
         String status,
         LocalDate licenseExpiryDate,
         UUID documentFileId,
+        String documentPreviewUrl,
+        Long pendingAgeHours,
+        Boolean slaBreached,
         String reviewReason,
         UUID reviewedBy,
         Instant reviewedAt,
@@ -25,6 +28,29 @@ public record DriverVerificationResponse(
                 verification.getStatus().name(),
                 verification.getLicenseExpiryDate(),
                 verification.getDocumentFileId(),
+                null,
+                null,
+                null,
+                verification.getReviewReason(),
+                verification.getReviewedBy(),
+                verification.getReviewedAt(),
+                verification.getCreatedAt());
+    }
+
+    public static DriverVerificationResponse from(
+            DriverVerification verification,
+            String documentPreviewUrl,
+            Long pendingAgeHours,
+            Boolean slaBreached) {
+        return new DriverVerificationResponse(
+                verification.getId(),
+                verification.getCustomerId(),
+                verification.getStatus().name(),
+                verification.getLicenseExpiryDate(),
+                verification.getDocumentFileId(),
+                documentPreviewUrl,
+                pendingAgeHours,
+                slaBreached,
                 verification.getReviewReason(),
                 verification.getReviewedBy(),
                 verification.getReviewedAt(),

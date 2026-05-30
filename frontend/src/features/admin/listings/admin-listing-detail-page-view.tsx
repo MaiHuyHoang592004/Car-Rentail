@@ -136,7 +136,7 @@ export function AdminListingDetailPageView({ listingId }: AdminListingDetailPage
     );
   }
 
-  const { listing, host, bookingSummary } = detail;
+  const { listing, host, bookingSummary, vehicle, moderation } = detail;
   const status = listing.status;
 
   const canApprove = status === "PENDING_APPROVAL";
@@ -237,10 +237,39 @@ export function AdminListingDetailPageView({ listingId }: AdminListingDetailPage
                   <p className="text-sm font-semibold text-foreground">{host.fullName}</p>
                   <p className="text-sm text-muted-foreground">{host.email}</p>
                   <p className="text-xs text-muted-foreground">ID: {host.id}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Tin dang dang hoat dong: {host.activeListings ?? 0}
+                  </p>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Khong co thong tin chu xe.</p>
               )}
+            </section>
+
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3">
+                Rủi ro xe và moderation
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DetailInfoBlock label="Trang thai xe">
+                  {vehicle?.status ?? "—"}
+                </DetailInfoBlock>
+                <DetailInfoBlock label="Tin active cung xe">
+                  {vehicle?.activeListings ?? 0}
+                </DetailInfoBlock>
+                <DetailInfoBlock label="Nguon tam ngung">
+                  {moderation?.suspensionSource ?? "—"}
+                </DetailInfoBlock>
+                <DetailInfoBlock label="Tam ngung den">
+                  {moderation?.suspensionUntil ? new Date(moderation.suspensionUntil).toLocaleString("vi-VN") : "—"}
+                </DetailInfoBlock>
+              </div>
+              {moderation?.suspensionReason || moderation?.rejectedReason ? (
+                <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+                  {moderation.suspensionReason ? <p>Tam ngung: {moderation.suspensionReason}</p> : null}
+                  {moderation.rejectedReason ? <p>Tu choi: {moderation.rejectedReason}</p> : null}
+                </div>
+              ) : null}
             </section>
 
             {/* Booking summary */}
