@@ -67,6 +67,9 @@ public class Booking extends BaseEntity {
     @Column(name = "cancellation_reason", length = 500)
     private String cancellationReason;
 
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
     @Version
     @Column(nullable = false)
     private Long version = 0L;

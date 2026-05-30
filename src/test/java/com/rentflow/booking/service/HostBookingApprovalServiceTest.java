@@ -156,6 +156,7 @@ class HostBookingApprovalServiceTest {
 
         PageResponse<BookingSummaryResponse> response = service.listHostBookings(
                 BookingStatus.PENDING_HOST_APPROVAL,
+                null,
                 PageRequest.of(0, 20));
 
         assertThat(response).isEqualTo(expected);
@@ -216,11 +217,12 @@ class HostBookingApprovalServiceTest {
         BookingResponse mapped = bookingResponse(BookingStatus.REJECTED);
         when(bookingMapper.toResponse(booking)).thenReturn(mapped);
 
-        BookingResponse response = service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY);
+        BookingResponse response = service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY, "Host unavailable");
 
         assertThat(response.status()).isEqualTo(BookingStatus.REJECTED);
         assertThat(booking.getStatus()).isEqualTo(BookingStatus.REJECTED);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
+        assertThat(booking.getRejectionReason()).isEqualTo("Host unavailable");
         assertThat(rows).allSatisfy(row -> {
             assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.FREE);
             assertThat(row.getBookingId()).isNull();
@@ -241,7 +243,7 @@ class HostBookingApprovalServiceTest {
         when(availabilityReserver.lockForBooking(booking)).thenReturn(heldRows());
         when(paymentProvider.voidAuthorization(any())).thenThrow(new PaymentProviderUnavailableException("provider down"));
 
-        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY))
+        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY, "Host unavailable"))
                 .isInstanceOf(PaymentProviderUnavailableException.class);
 
         assertThat(booking.getStatus()).isEqualTo(BookingStatus.PENDING_HOST_APPROVAL);
@@ -274,7 +276,7 @@ class HostBookingApprovalServiceTest {
         payment.setProvider(PaymentProviderType.VIETQR_MANUAL);
         when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
 
-        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY))
+        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY, "Host unavailable"))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasFieldOrPropertyWithValue("code", "PAYMENT_PROVIDER_UNSUPPORTED");
 
@@ -310,7 +312,7 @@ class HostBookingApprovalServiceTest {
 
         when(paymentProvider.voidAuthorization(any())).thenReturn(new VoidResult("VOIDED", "{\"status\":\"VOIDED\"}"));
 
-        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY))
+        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY, "Host unavailable"))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasFieldOrPropertyWithValue("code", "PAYMENT_FINALIZATION_UNSAFE");
 
@@ -348,7 +350,7 @@ class HostBookingApprovalServiceTest {
         when(availabilityReserver.lockForBooking(finalizeBooking)).thenReturn(finalizeRows);
         when(paymentProvider.voidAuthorization(any())).thenReturn(new VoidResult("VOIDED", "{\"status\":\"VOIDED\"}"));
 
-        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY))
+        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY, "Host unavailable"))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasFieldOrPropertyWithValue("code", "PAYMENT_FINALIZATION_UNSAFE");
 
@@ -382,7 +384,7 @@ class HostBookingApprovalServiceTest {
         when(availabilityReserver.lockForBooking(finalizeBooking)).thenReturn(finalizeRows);
         when(paymentProvider.voidAuthorization(any())).thenReturn(new VoidResult("VOIDED", "{\"status\":\"VOIDED\"}"));
 
-        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY))
+        assertThatThrownBy(() -> service.rejectBooking(BOOKING_ID, IDEMPOTENCY_KEY, "Host unavailable"))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasFieldOrPropertyWithValue("code", "PAYMENT_FINALIZATION_UNSAFE");
 
@@ -466,10 +468,12 @@ class HostBookingApprovalServiceTest {
                 "Hanoi",
                 "Hanoi",
                 null,
+                NOW.plusSeconds(3600),
                 new BigDecimal("1500000.00"),
                 "VND",
                 objectMapper.createObjectNode(),
                 objectMapper.createObjectNode(),
+                status == BookingStatus.REJECTED ? "Host unavailable" : null,
                 NOW);
     }
 }

@@ -59,7 +59,7 @@ class HostBookingControllerTest {
     @Test
     void listHostBookingsDelegatesWithStatusAndPagination() throws Exception {
         PageResponse<BookingSummaryResponse> page = new PageResponse<>(List.of(summary()), 0, 20, 1, 1);
-        when(hostBookingApprovalService.listHostBookings(eq(BookingStatus.PENDING_HOST_APPROVAL), any(Pageable.class)))
+        when(hostBookingApprovalService.listHostBookings(eq(BookingStatus.PENDING_HOST_APPROVAL), eq(null), any(Pageable.class)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/v1/host/bookings")
@@ -69,7 +69,21 @@ class HostBookingControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(BOOKING_ID.toString()));
 
-        verify(hostBookingApprovalService).listHostBookings(eq(BookingStatus.PENDING_HOST_APPROVAL), any(Pageable.class));
+        verify(hostBookingApprovalService).listHostBookings(eq(BookingStatus.PENDING_HOST_APPROVAL), eq(null), any(Pageable.class));
+    }
+
+    @Test
+    void listHostBookingsDelegatesWithListingFilter() throws Exception {
+        PageResponse<BookingSummaryResponse> page = new PageResponse<>(List.of(summary()), 0, 20, 1, 1);
+        when(hostBookingApprovalService.listHostBookings(eq(null), eq(LISTING_ID), any(Pageable.class)))
+                .thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/host/bookings")
+                        .param("listingId", LISTING_ID.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].listingId").value(LISTING_ID.toString()));
+
+        verify(hostBookingApprovalService).listHostBookings(eq(null), eq(LISTING_ID), any(Pageable.class));
     }
 
     @Test
@@ -79,7 +93,18 @@ class HostBookingControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
-        verify(hostBookingApprovalService, never()).listHostBookings(any(), any());
+        verify(hostBookingApprovalService, never()).listHostBookings(any(), any(), any());
+    }
+
+    @Test
+    void getHostBookingDelegatesAndReturnsBookingResponse() throws Exception {
+        when(hostBookingApprovalService.getHostBooking(BOOKING_ID))
+                .thenReturn(response(BookingStatus.PENDING_HOST_APPROVAL));
+
+        mockMvc.perform(get("/api/v1/host/bookings/{id}", BOOKING_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(BOOKING_ID.toString()))
+                .andExpect(jsonPath("$.hostApprovalExpiresAt").value("2026-05-11T00:15:00Z"));
     }
 
     @Test
@@ -120,17 +145,30 @@ class HostBookingControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
 
-        verify(hostBookingApprovalService, never()).rejectBooking(any(), any());
+        verify(hostBookingApprovalService, never()).rejectBooking(any(), any(), any());
+    }
+
+    @Test
+    void rejectBookingRequiresReason() throws Exception {
+        mockMvc.perform(post("/api/v1/host/bookings/{id}/reject", BOOKING_ID)
+                        .header("Idempotency-Key", VALID_IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        verify(hostBookingApprovalService, never()).rejectBooking(any(), any(), any());
     }
 
     @Test
     void rejectBookingDelegatesAndReturnsBookingResponse() throws Exception {
-        when(hostBookingApprovalService.rejectBooking(BOOKING_ID, VALID_IDEMPOTENCY_KEY))
+        when(hostBookingApprovalService.rejectBooking(BOOKING_ID, VALID_IDEMPOTENCY_KEY, "Host unavailable"))
                 .thenReturn(response(BookingStatus.REJECTED));
 
         mockMvc.perform(post("/api/v1/host/bookings/{id}/reject", BOOKING_ID)
                         .header("Idempotency-Key", VALID_IDEMPOTENCY_KEY)
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Host unavailable\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("REJECTED"));
     }
@@ -144,6 +182,7 @@ class HostBookingControllerTest {
                 LocalDate.of(2026, 6, 1),
                 LocalDate.of(2026, 6, 3),
                 null,
+                Instant.parse("2026-05-11T00:15:00Z"),
                 new BigDecimal("1500000.00"),
                 "VND",
                 Instant.parse("2026-05-11T00:00:00Z"));
@@ -162,10 +201,12 @@ class HostBookingControllerTest {
                 "Hanoi",
                 "Hanoi",
                 null,
+                Instant.parse("2026-05-11T00:15:00Z"),
                 new BigDecimal("1500000.00"),
                 "VND",
                 new ObjectMapper().createObjectNode(),
                 new ObjectMapper().createObjectNode(),
+                status == BookingStatus.REJECTED ? "Host unavailable" : null,
                 Instant.parse("2026-05-11T00:00:00Z"));
     }
 }

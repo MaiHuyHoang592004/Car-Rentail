@@ -2,13 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { AlertCircle, Car, ListChecks } from "lucide-react";
+import { AlertCircle, Car, ClipboardList, ListChecks } from "lucide-react";
 import { WorkspaceSidebar } from "@/components/rentflow/workspace-sidebar";
 import { HostWorkspaceNav } from "@/features/host/components/host-workspace-nav";
 import { HostMetricStrip } from "@/features/host/components/host-metric-strip";
 import { getHostVehiclesByStatus } from "@/features/host/vehicles/api";
 import { getHostListings } from "@/features/host/listings/api";
+import { getHostBookings } from "@/features/host/bookings/api";
 import {
+  getBookingStatusLabel,
   getVehicleStatusLabel,
   getListingStatusLabel,
 } from "@/lib/display-labels";
@@ -22,6 +24,16 @@ export function HostDashboardPageView() {
   const { data: listingsResult, isLoading: loadingListings } = useQuery({
     queryKey: ["host", "listings"],
     queryFn: () => getHostListings(undefined, 0, 100),
+  });
+
+  const { data: pendingBookings, isLoading: loadingBookings } = useQuery({
+    queryKey: ["host", "bookings", "pending-dashboard"],
+    queryFn: () =>
+      getHostBookings({
+        status: "PENDING_HOST_APPROVAL",
+        page: 0,
+        size: 5,
+      }),
   });
 
   const vehicleAttention = vehicles.filter((v) =>
@@ -80,6 +92,12 @@ export function HostDashboardPageView() {
               className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
             >
               Cap nhat lich
+            </Link>
+            <Link
+              href="/host/bookings"
+              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            >
+              Duyet booking
             </Link>
           </div>
         </section>
@@ -157,6 +175,44 @@ export function HostDashboardPageView() {
                       <p className="font-semibold text-foreground">{listing.title}</p>
                       <p className="text-muted-foreground">
                         {getListingStatusLabel(listing.status)} &bull; {listing.city}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Xem</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-base font-bold text-foreground">Booking cho duyet</h2>
+              {(pendingBookings?.content.length ?? 0) > 0 && (
+                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-800">
+                  {pendingBookings?.content.length}
+                </span>
+              )}
+            </div>
+            {loadingBookings ? (
+              <p className="mt-3 text-sm text-muted-foreground">Dang tai...</p>
+            ) : (pendingBookings?.content.length ?? 0) === 0 ? (
+              <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4 text-emerald-600" />
+                Khong co booking nao dang cho duyet.
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {pendingBookings?.content.map((booking) => (
+                  <Link
+                    key={booking.id}
+                    href={`/host/bookings/${booking.id}`}
+                    className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm transition-colors hover:border-primary/50 hover:bg-accent"
+                  >
+                    <div>
+                      <p className="font-semibold text-foreground">{booking.listingTitle}</p>
+                      <p className="text-muted-foreground">
+                        {getBookingStatusLabel(booking.status)} &bull; {booking.pickupDate}
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">Xem</span>

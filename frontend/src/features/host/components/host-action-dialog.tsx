@@ -9,6 +9,9 @@ type HostActionDialogProps = {
   description: string;
   confirmLabel: string;
   tone?: "default" | "danger";
+  reasonRequired?: boolean;
+  reasonPlaceholder?: string;
+  hideReason?: boolean;
   onClose: () => void;
   onConfirm: (reason?: string) => void;
   children?: ReactNode;
@@ -20,6 +23,9 @@ export function HostActionDialog({
   description,
   confirmLabel,
   tone = "default",
+  reasonRequired = false,
+  reasonPlaceholder = "Nhap ly do (tuy chon)",
+  hideReason = false,
   onClose,
   onConfirm,
   children,
@@ -36,7 +42,7 @@ export function HostActionDialog({
       : "rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50";
 
   function handleConfirm() {
-    onConfirm(reason || undefined);
+    onConfirm(reason.trim() || undefined);
     setReason("");
   }
 
@@ -44,6 +50,8 @@ export function HostActionDialog({
     setReason("");
     onClose();
   }
+
+  const disableConfirm = reasonRequired && reason.trim().length === 0;
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4">
@@ -58,13 +66,15 @@ export function HostActionDialog({
         {children}
 
         <div className="mt-4 flex flex-col gap-3">
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={3}
-            placeholder="Nhap ly do (tuy chon)"
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+          {!hideReason ? (
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              placeholder={reasonPlaceholder}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          ) : null}
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
@@ -73,7 +83,7 @@ export function HostActionDialog({
             >
               Huy
             </button>
-            <button type="button" onClick={handleConfirm} className={confirmClass}>
+            <button type="button" onClick={handleConfirm} disabled={disableConfirm} className={confirmClass}>
               {confirmLabel}
             </button>
           </div>

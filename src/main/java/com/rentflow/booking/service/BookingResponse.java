@@ -20,10 +20,12 @@ public record BookingResponse(
         String pickupLocation,
         String returnLocation,
         Instant holdExpiresAt,
+        Instant hostApprovalExpiresAt,
         BigDecimal totalAmount,
         String currency,
         JsonNode priceSnapshot,
         JsonNode policySnapshot,
+        String rejectionReason,
         Instant createdAt,
         boolean voidRetryRequired,
         String paymentRetryState) {
@@ -40,10 +42,12 @@ public record BookingResponse(
             String pickupLocation,
             String returnLocation,
             Instant holdExpiresAt,
+            Instant hostApprovalExpiresAt,
             BigDecimal totalAmount,
             String currency,
             JsonNode priceSnapshot,
             JsonNode policySnapshot,
+            String rejectionReason,
             Instant createdAt) {
         this(
                 id,
@@ -57,10 +61,12 @@ public record BookingResponse(
                 pickupLocation,
                 returnLocation,
                 holdExpiresAt,
+                hostApprovalExpiresAt,
                 totalAmount,
                 currency,
                 priceSnapshot,
                 policySnapshot,
+                rejectionReason,
                 createdAt,
                 false,
                 null);

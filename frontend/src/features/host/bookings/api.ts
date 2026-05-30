@@ -1,32 +1,16 @@
+"use client";
+
 import { api } from "@/lib/api-client";
 import type {
   BookingDetailViewModel,
+  BookingListFilterValue,
   BookingPolicySnapshot,
   BookingPriceSnapshot,
   BookingStatus,
   BookingSummaryViewModel,
-  BookingListFilterValue,
 } from "@/features/bookings/types";
 
-export type CreateBookingInput = {
-  listingId: string;
-  pickupDate: string;
-  returnDate: string;
-  pickupLocation?: string;
-  returnLocation?: string;
-  selectedExtraIds: string[];
-};
-
-export type CancelBookingInput = {
-  reason?: string;
-};
-
-export type PatchBookingLocationsInput = {
-  pickupLocation?: string;
-  returnLocation?: string;
-};
-
-type RawBookingResponse = {
+type RawHostBookingResponse = {
   id: string;
   status: BookingStatus;
   listingId: string;
@@ -43,14 +27,14 @@ type RawBookingResponse = {
   currency: string;
   priceSnapshot: unknown;
   policySnapshot: unknown;
-  cancellationReason?: string | null;
   rejectionReason?: string | null;
+  cancellationReason?: string | null;
   voidRetryRequired?: boolean;
   paymentRetryState?: string | null;
   createdAt: string;
 };
 
-type RawSummaryResponse = {
+type RawHostBookingSummary = {
   id: string;
   status: BookingStatus;
   listingId: string;
@@ -74,22 +58,12 @@ type RawPageResponse<T> = {
   totalPages: number;
 };
 
-export type BookingPage = {
+export type HostBookingPage = {
   content: BookingSummaryViewModel[];
   page: number;
   size: number;
   totalElements: number;
   totalPages: number;
-};
-
-export type CancelBookingResult = {
-  id: string;
-  status: BookingStatus;
-  cancellationReason: string | null;
-  cancelled: boolean;
-  voidRetryRequired: boolean;
-  code: string | null;
-  paymentRetryState: string | null;
 };
 
 function toNumber(value: number | string | null | undefined): number {
@@ -127,14 +101,14 @@ function parsePriceSnapshot(raw: unknown, fallbackCurrency: string): BookingPric
     totalAmount: toNumber(obj.totalAmount as number | string),
     currency: typeof obj.currency === "string" ? obj.currency : fallbackCurrency,
     extras: extrasRaw.map((item) => {
-      const e = item as Record<string, unknown>;
+      const extra = item as Record<string, unknown>;
       return {
-        id: String(e.id ?? e.extraId ?? ""),
-        name: String(e.name ?? ""),
-        quantity: toNumber(e.quantity as number | string),
-        unitPrice: toNumber(e.unitPrice as number | string),
-        totalPrice: toNumber(e.totalPrice as number | string),
-        currency: typeof e.currency === "string" ? e.currency : fallbackCurrency,
+        id: String(extra.id ?? extra.extraId ?? ""),
+        name: String(extra.name ?? ""),
+        quantity: toNumber(extra.quantity as number | string),
+        unitPrice: toNumber(extra.unitPrice as number | string),
+        totalPrice: toNumber(extra.totalPrice as number | string),
+        currency: typeof extra.currency === "string" ? extra.currency : fallbackCurrency,
       };
     }),
   };
@@ -152,7 +126,24 @@ function parsePolicySnapshot(raw: unknown): BookingPolicySnapshot {
   };
 }
 
-function mapBookingResponse(raw: RawBookingResponse): BookingDetailViewModel {
+function mapSummary(raw: RawHostBookingSummary): BookingSummaryViewModel {
+  return {
+    id: raw.id,
+    status: raw.status,
+    listingId: raw.listingId,
+    listingTitle: raw.listingTitle,
+    pickupDate: raw.pickupDate,
+    returnDate: raw.returnDate,
+    holdExpiresAt: raw.holdExpiresAt ?? undefined,
+    hostApprovalExpiresAt: raw.hostApprovalExpiresAt ?? undefined,
+    totalAmount: toNumber(raw.totalAmount),
+    currency: raw.currency,
+    voidRetryRequired: raw.voidRetryRequired ?? false,
+    paymentRetryState: raw.paymentRetryState ?? undefined,
+  };
+}
+
+function mapDetail(raw: RawHostBookingResponse): BookingDetailViewModel {
   return {
     id: raw.id,
     status: raw.status,
@@ -177,66 +168,26 @@ function mapBookingResponse(raw: RawBookingResponse): BookingDetailViewModel {
   };
 }
 
-function mapSummaryResponse(raw: RawSummaryResponse): BookingSummaryViewModel {
-  return {
-    id: raw.id,
-    status: raw.status,
-    listingId: raw.listingId,
-    listingTitle: raw.listingTitle,
-    pickupDate: raw.pickupDate,
-    returnDate: raw.returnDate,
-    holdExpiresAt: raw.holdExpiresAt ?? undefined,
-    hostApprovalExpiresAt: raw.hostApprovalExpiresAt ?? undefined,
-    totalAmount: toNumber(raw.totalAmount),
-    currency: raw.currency,
-    voidRetryRequired: raw.voidRetryRequired ?? false,
-    paymentRetryState: raw.paymentRetryState ?? undefined,
-  };
-}
-
-export function buildCreateBookingPayload(input: CreateBookingInput) {
-  return {
-    listingId: input.listingId,
-    pickupDate: input.pickupDate,
-    returnDate: input.returnDate,
-    pickupLocation: input.pickupLocation?.trim() || null,
-    returnLocation: input.returnLocation?.trim() || null,
-    extras: input.selectedExtraIds.map((extraId) => ({ extraId, quantity: 1 })),
-  };
-}
-
-export async function createBooking(
-  input: CreateBookingInput,
-  idempotencyKey: string,
-): Promise<BookingDetailViewModel> {
-  const body = buildCreateBookingPayload(input);
-  const raw = await api.post<RawBookingResponse>("/bookings", body, { idempotencyKey });
-  return mapBookingResponse(raw);
-}
-
-export async function getBookingById(id: string): Promise<BookingDetailViewModel> {
-  const raw = await api.get<RawBookingResponse>(`/bookings/${id}`);
-  return mapBookingResponse(raw);
-}
-
-export async function listMyBookings(
+export async function getHostBookings(
   params: {
     status: BookingListFilterValue;
+    listingId?: string;
     page?: number;
     size?: number;
   },
   signal?: AbortSignal,
-): Promise<BookingPage> {
+): Promise<HostBookingPage> {
   const search = new URLSearchParams();
   if (params.status !== "ALL") search.set("status", params.status);
+  if (params.listingId && params.listingId !== "ALL") search.set("listingId", params.listingId);
   search.set("page", String(params.page ?? 0));
   search.set("size", String(params.size ?? 20));
-  const raw = await api.get<RawPageResponse<RawSummaryResponse>>(
-    `/bookings/me?${search.toString()}`,
+  const raw = await api.get<RawPageResponse<RawHostBookingSummary>>(
+    `/host/bookings?${search.toString()}`,
     { signal },
   );
   return {
-    content: raw.content.map(mapSummaryResponse),
+    content: raw.content.map(mapSummary),
     page: raw.page,
     size: raw.size,
     totalElements: raw.totalElements,
@@ -244,50 +195,27 @@ export async function listMyBookings(
   };
 }
 
-export async function patchBookingLocations(
-  id: string,
-  input: PatchBookingLocationsInput,
-): Promise<BookingDetailViewModel> {
-  const body: Record<string, string> = {};
-  if (input.pickupLocation !== undefined) body.pickupLocation = input.pickupLocation;
-  if (input.returnLocation !== undefined) body.returnLocation = input.returnLocation;
-  const raw = await api.patch<RawBookingResponse>(`/bookings/${id}`, body);
-  return mapBookingResponse(raw);
+export async function getHostBookingById(id: string): Promise<BookingDetailViewModel> {
+  const raw = await api.get<RawHostBookingResponse>(`/host/bookings/${id}`);
+  return mapDetail(raw);
 }
 
-export async function cancelBooking(
+export async function approveHostBooking(id: string, idempotencyKey: string): Promise<BookingDetailViewModel> {
+  const raw = await api.post<RawHostBookingResponse>(`/host/bookings/${id}/approve`, undefined, {
+    idempotencyKey,
+  });
+  return mapDetail(raw);
+}
+
+export async function rejectHostBooking(
   id: string,
-  input: CancelBookingInput,
+  reason: string,
   idempotencyKey: string,
-): Promise<CancelBookingResult> {
-  const raw = await api.post<{
-    id: string;
-    status: BookingStatus;
-    cancellationReason: string | null;
-    cancelled?: boolean;
-    voidRetryRequired?: boolean;
-    code?: string | null;
-    paymentRetryState?: string | null;
-  }>(`/bookings/${id}/cancel`, { reason: input.reason ?? null }, { idempotencyKey });
-  return {
-    id: raw.id,
-    status: raw.status,
-    cancellationReason: raw.cancellationReason,
-    cancelled: raw.cancelled ?? raw.status === "CANCELLED",
-    voidRetryRequired: raw.voidRetryRequired ?? false,
-    code: raw.code ?? null,
-    paymentRetryState: raw.paymentRetryState ?? null,
-  };
+): Promise<BookingDetailViewModel> {
+  const raw = await api.post<RawHostBookingResponse>(
+    `/host/bookings/${id}/reject`,
+    { reason },
+    { idempotencyKey },
+  );
+  return mapDetail(raw);
 }
-
-export const BOOKING_STATUS_FILTERS: BookingListFilterValue[] = [
-  "ALL",
-  "HELD",
-  "PENDING_HOST_APPROVAL",
-  "CONFIRMED",
-  "IN_PROGRESS",
-  "COMPLETED",
-  "CANCELLED",
-  "REJECTED",
-  "EXPIRED",
-];

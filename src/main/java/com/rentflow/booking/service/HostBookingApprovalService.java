@@ -91,14 +91,33 @@ public class HostBookingApprovalService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<BookingSummaryResponse> listHostBookings(BookingStatus status, Pageable pageable) {
+    public PageResponse<BookingSummaryResponse> listHostBookings(BookingStatus status, UUID listingId, Pageable pageable) {
         UUID hostId = securityContext.currentUserId();
         securityContext.requireRole(Role.HOST);
 
-        Page<Booking> bookings = status == null
-                ? bookingRepository.findByHostIdOrderByCreatedAtDesc(hostId, pageable)
-                : bookingRepository.findByHostIdAndStatusOrderByCreatedAtDesc(hostId, status, pageable);
+        Page<Booking> bookings;
+        if (listingId != null && status != null) {
+            bookings = bookingRepository.findByHostIdAndListingIdAndStatusOrderByCreatedAtDesc(
+                    hostId, listingId, status, pageable);
+        } else if (listingId != null) {
+            bookings = bookingRepository.findByHostIdAndListingIdOrderByCreatedAtDesc(hostId, listingId, pageable);
+        } else if (status != null) {
+            bookings = bookingRepository.findByHostIdAndStatusOrderByCreatedAtDesc(hostId, status, pageable);
+        } else {
+            bookings = bookingRepository.findByHostIdOrderByCreatedAtDesc(hostId, pageable);
+        }
         return bookingMapper.toSummaryPage(bookings);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingResponse getHostBooking(UUID bookingId) {
+        UUID hostId = securityContext.currentUserId();
+        securityContext.requireRole(Role.HOST);
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException(String.valueOf(bookingId)));
+        requireHostOwnership(booking, hostId);
+        return bookingMapper.toResponse(booking);
     }
 
     @Transactional
@@ -152,11 +171,12 @@ public class HostBookingApprovalService {
         }
     }
 
-    public BookingResponse rejectBooking(UUID bookingId, String idempotencyKey) {
+    public BookingResponse rejectBooking(UUID bookingId, String idempotencyKey, String reason) {
         UUID hostId = securityContext.currentUserId();
         securityContext.requireRole(Role.HOST);
 
-        String requestHash = idempotencyService.computeHash(new HostDecisionHashInput(bookingId));
+        String sanitizedReason = sanitizeRejectReason(reason);
+        String requestHash = idempotencyService.computeHash(new HostRejectDecisionHashInput(bookingId, sanitizedReason));
         IdempotencyResolution resolution = idempotencyService.resolve(
                 hostId,
                 IdempotencyScope.HOST_REJECT_BOOKING,
@@ -170,7 +190,7 @@ public class HostBookingApprovalService {
         try {
             // Phase 1 — Prepare: validate state and create PENDING void transaction (inside TX)
             PreparedRejectContext prepared = required(transactionTemplate.execute(status ->
-                    prepareReject(hostId, bookingId, idempotencyKey, idempotencyKeyId)));
+                    prepareReject(hostId, bookingId, idempotencyKey, idempotencyKeyId, sanitizedReason)));
 
             // Phase 2 — Call provider (outside DB TX)
             VoidResult voidResult = callHostRejectVoid(prepared);
@@ -186,7 +206,7 @@ public class HostBookingApprovalService {
     }
 
     private PreparedRejectContext prepareReject(
-            UUID hostId, UUID bookingId, String clientIdempotencyKey, UUID idempotencyKeyId) {
+            UUID hostId, UUID bookingId, String clientIdempotencyKey, UUID idempotencyKeyId, String rejectionReason) {
         Booking booking = bookingRepository.findByIdForUpdate(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException(String.valueOf(bookingId)));
         requireHostOwnership(booking, hostId);
@@ -227,7 +247,7 @@ public class HostBookingApprovalService {
 
         return new PreparedRejectContext(
                 booking.getId(), tx.getId(), command,
-                requestId, correlationId, idempotencyKeyId);
+                requestId, correlationId, idempotencyKeyId, rejectionReason);
     }
 
     private VoidResult callHostRejectVoid(PreparedRejectContext prepared) {
@@ -277,6 +297,7 @@ public class HostBookingApprovalService {
 
         // Reject booking and free availability
         booking.setStatus(BookingStatus.REJECTED);
+        booking.setRejectionReason(prepared.rejectionReason());
         booking.setHoldToken(null);
         booking.setHoldExpiresAt(null);
         booking.setHostApprovalExpiresAt(null);
@@ -367,6 +388,20 @@ public class HostBookingApprovalService {
         }
     }
 
+    private String sanitizeRejectReason(String reason) {
+        if (reason == null) {
+            throw new BusinessRuleException("VALIDATION_ERROR", "reason is required");
+        }
+        String sanitized = reason.replaceAll("<[^>]*>", "").trim();
+        if (sanitized.isBlank()) {
+            throw new BusinessRuleException("VALIDATION_ERROR", "reason is required");
+        }
+        if (sanitized.length() > 500) {
+            throw new BusinessRuleException("VALIDATION_ERROR", "reason must be at most 500 characters");
+        }
+        return sanitized;
+    }
+
     private void validatePendingHostApproval(Booking booking) {
         if (booking.getStatus() != BookingStatus.PENDING_HOST_APPROVAL) {
             throw new BusinessRuleException("BOOKING_INVALID_STATUS", "Booking is not pending host approval");
@@ -449,13 +484,17 @@ public class HostBookingApprovalService {
     private record HostDecisionHashInput(UUID bookingId) {
     }
 
+    private record HostRejectDecisionHashInput(UUID bookingId, String reason) {
+    }
+
     private record PreparedRejectContext(
             UUID bookingId,
             UUID transactionId,
             VoidCommand command,
             String requestId,
             String correlationId,
-            UUID idempotencyKeyId
+            UUID idempotencyKeyId,
+            String rejectionReason
     ) {
     }
 

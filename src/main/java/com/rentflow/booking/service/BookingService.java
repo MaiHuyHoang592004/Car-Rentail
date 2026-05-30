@@ -345,10 +345,12 @@ public class BookingService {
                 booking.getPickupLocation(),
                 booking.getReturnLocation(),
                 booking.getHoldExpiresAt(),
+                booking.getHostApprovalExpiresAt(),
                 price.totalAmount(),
                 price.currency(),
                 priceSnapshotNode,
                 policySnapshotNode,
+                booking.getRejectionReason(),
                 booking.getCreatedAt() == null ? now : booking.getCreatedAt());
     }
 

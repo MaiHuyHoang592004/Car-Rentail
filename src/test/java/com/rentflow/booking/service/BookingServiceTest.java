@@ -1164,10 +1164,12 @@ class BookingServiceTest {
                 "Hanoi",
                 "Hanoi",
                 NOW.plusSeconds(900),
+                null,
                 new BigDecimal("1500000.00"),
                 "VND",
                 objectMapper.createObjectNode(),
                 objectMapper.createObjectNode(),
+                null,
                 NOW);
     }
 

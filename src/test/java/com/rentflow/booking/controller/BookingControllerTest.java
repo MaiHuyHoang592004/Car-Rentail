@@ -366,10 +366,12 @@ class BookingControllerTest {
                 pickupLocation,
                 returnLocation,
                 Instant.parse("2026-05-11T00:15:00Z"),
+                null,
                 new BigDecimal("1500000.00"),
                 "VND",
                 objectMapper.createObjectNode(),
                 objectMapper.createObjectNode(),
+                null,
                 Instant.parse("2026-05-11T00:00:00Z"));
     }
 
@@ -382,6 +384,7 @@ class BookingControllerTest {
                 LocalDate.of(2026, 6, 1),
                 LocalDate.of(2026, 6, 3),
                 Instant.parse("2026-05-11T00:15:00Z"),
+                null,
                 new BigDecimal("1500000.00"),
                 "VND",
                 Instant.parse("2026-05-11T00:00:00Z"));

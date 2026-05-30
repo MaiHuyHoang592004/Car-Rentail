@@ -6,7 +6,7 @@ import {
   LayoutDashboard,
   Car,
   ListChecks,
-  CalendarDays,
+  ClipboardList,
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -33,6 +33,12 @@ const NAV_ITEMS = [
     icon: ListChecks,
     exact: false,
   },
+  {
+    href: "/host/bookings",
+    label: "Bookings",
+    icon: ClipboardList,
+    exact: false,
+  },
 ] as const;
 
 type NavLink = (typeof NAV_ITEMS)[number];
@@ -49,13 +55,13 @@ export function HostWorkspaceNav() {
   return (
     <aside
       className={cn(
-        "flex flex-col border-r border-border bg-card transition-all duration-200",
-        collapsed ? "w-16" : "w-56",
+        "rf-section-card sticky top-24 flex flex-col overflow-hidden transition-all duration-200",
+        collapsed ? "w-18" : "w-64",
       )}
     >
-      <div className="flex h-14 items-center justify-between border-b border-border px-3">
+      <div className="flex h-16 items-center justify-between border-b border-border px-4">
         {!collapsed && (
-          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
             Chu xe
           </span>
         )}
@@ -73,7 +79,7 @@ export function HostWorkspaceNav() {
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 p-2" aria-label="Host workspace">
+      <nav className="flex-1 space-y-1 p-3" aria-label="Host workspace">
         {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item);
           const Icon = item.icon;
@@ -82,7 +88,7 @@ export function HostWorkspaceNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors",
                 active
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -98,17 +104,17 @@ export function HostWorkspaceNav() {
       </nav>
 
       {!collapsed ? (
-        <div className="border-t border-border p-3 space-y-2">
+        <div className="space-y-2 border-t border-border p-3">
           <Link
             href="/host/vehicles/new"
-            className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            className="flex items-center gap-2 rounded-2xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
             Them xe
           </Link>
           <Link
             href="/host/listings/new"
-            className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+            className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-accent"
           >
             <Plus className="h-4 w-4" />
             Tao tin dang
@@ -119,7 +125,7 @@ export function HostWorkspaceNav() {
           <Link
             href="/host/vehicles/new"
             aria-label="Them xe"
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:opacity-90"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
           </Link>

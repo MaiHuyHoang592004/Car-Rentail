@@ -15,6 +15,7 @@ public record BookingSummaryResponse(
         LocalDate pickupDate,
         LocalDate returnDate,
         Instant holdExpiresAt,
+        Instant hostApprovalExpiresAt,
         BigDecimal totalAmount,
         String currency,
         Instant createdAt,
@@ -29,6 +30,7 @@ public record BookingSummaryResponse(
             LocalDate pickupDate,
             LocalDate returnDate,
             Instant holdExpiresAt,
+            Instant hostApprovalExpiresAt,
             BigDecimal totalAmount,
             String currency,
             Instant createdAt) {
@@ -40,6 +42,7 @@ public record BookingSummaryResponse(
                 pickupDate,
                 returnDate,
                 holdExpiresAt,
+                hostApprovalExpiresAt,
                 totalAmount,
                 currency,
                 createdAt,

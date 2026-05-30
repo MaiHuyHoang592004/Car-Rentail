@@ -30,6 +30,7 @@ export type BookingSummaryViewModel = {
   totalAmount: number;
   currency: string;
   holdExpiresAt?: string;
+  hostApprovalExpiresAt?: string;
   voidRetryRequired: boolean;
   paymentRetryState?: string;
 };
@@ -65,6 +66,8 @@ export type BookingDetailViewModel = BookingSummaryViewModel & {
   pickupLocation: string;
   returnLocation: string;
   cancellationReason?: string;
+  rejectionReason?: string;
+  hostApprovalExpiresAt?: string;
   voidRetryRequired: boolean;
   paymentRetryState?: string;
   priceSnapshot: BookingPriceSnapshot;

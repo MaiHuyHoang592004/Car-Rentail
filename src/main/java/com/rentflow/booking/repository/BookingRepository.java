@@ -74,6 +74,22 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             BookingStatus status,
             Pageable pageable);
 
+    Page<Booking> findByHostIdAndListingIdOrderByCreatedAtDesc(
+            UUID hostId,
+            UUID listingId,
+            Pageable pageable);
+
+    Page<Booking> findByHostIdAndListingIdAndStatusOrderByCreatedAtDesc(
+            UUID hostId,
+            UUID listingId,
+            BookingStatus status,
+            Pageable pageable);
+
+    long countByHostIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            UUID hostId,
+            Instant fromInclusive,
+            Instant toExclusive);
+
     @Query(value = """
             SELECT *
             FROM bookings

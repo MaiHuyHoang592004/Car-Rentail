@@ -242,20 +242,22 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
   return (
     <AppShell activePath="/me/bookings">
       <div className="space-y-6">
-        <PageHeader
-          title="Chi tiet don thue"
-          description="Xem chi tiet don thue cua ban."
-          actions={
-            <Link
-              href="/me/bookings"
-              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
-            >
-              Quay ve
-            </Link>
-          }
-        />
+        <section className="rf-section-card p-6 md:p-8">
+          <PageHeader
+            title="Chi tiết đặt chỗ"
+            description="Theo dõi tiến trình booking, cập nhật địa điểm và xử lý thanh toán."
+            actions={
+              <Link
+                href="/me/bookings"
+                className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+              >
+                Quay ve
+              </Link>
+            }
+          />
+        </section>
 
-        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <section className="rf-section-card p-5 md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -341,6 +343,13 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <p className="font-semibold">Don da bi huy, nhung thanh toan van dang duoc xu ly.</p>
               <p className="mt-1">{formatPaymentRetryState(booking.paymentRetryState)}</p>
+            </div>
+          ) : null}
+
+          {booking.status === "REJECTED" && booking.rejectionReason ? (
+            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+              <p className="font-semibold">Ly do chu xe tu choi</p>
+              <p className="mt-1">{booking.rejectionReason}</p>
             </div>
           ) : null}
 
