@@ -7,6 +7,7 @@ import com.rentflow.vehicle.entity.VehicleCategory;
 import com.rentflow.vehicle.entity.VehicleStatus;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record VehicleResponse(
@@ -22,10 +23,28 @@ public record VehicleResponse(
     String city,
     String plateNumber,
     String vin,
+    String primaryPhotoUrl,
+    List<Photo> photos,
     Instant createdAt,
     Instant updatedAt
 ) {
+    public record Photo(
+        UUID id,
+        UUID fileId,
+        boolean primary,
+        int displayOrder,
+        String signedUrl
+    ) {}
+
     public static VehicleResponse from(Vehicle vehicle, String decryptedPlate, String decryptedVin) {
+        return from(vehicle, decryptedPlate, decryptedVin, List.of());
+    }
+
+    public static VehicleResponse from(
+            Vehicle vehicle,
+            String decryptedPlate,
+            String decryptedVin,
+            List<Photo> photos) {
         return new VehicleResponse(
             vehicle.getId(),
             vehicle.getCategory(),
@@ -39,6 +58,11 @@ public record VehicleResponse(
             vehicle.getCity(),
             decryptedPlate,
             decryptedVin,
+            photos.stream().filter(Photo::primary).findFirst()
+                    .or(() -> photos.stream().findFirst())
+                    .map(Photo::signedUrl)
+                    .orElse(null),
+            photos,
             vehicle.getCreatedAt(),
             vehicle.getUpdatedAt()
         );

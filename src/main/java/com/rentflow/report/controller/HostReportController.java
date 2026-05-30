@@ -1,6 +1,7 @@
 package com.rentflow.report.controller;
 
 import com.rentflow.report.dto.EarningsReportResponse;
+import com.rentflow.report.dto.HostOverviewReportResponse;
 import com.rentflow.report.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -24,5 +25,12 @@ public class HostReportController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(reportService.hostEarnings(from, to));
+    }
+
+    @GetMapping("/overview")
+    public ResponseEntity<HostOverviewReportResponse> overview(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(reportService.hostOverview(from, to));
     }
 }

@@ -7,6 +7,7 @@ import {
   Car,
   ListChecks,
   ClipboardList,
+  BarChart3,
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -37,6 +38,12 @@ const NAV_ITEMS = [
     href: "/host/bookings",
     label: "Bookings",
     icon: ClipboardList,
+    exact: false,
+  },
+  {
+    href: "/host/reports",
+    label: "Bao cao",
+    icon: BarChart3,
     exact: false,
   },
 ] as const;

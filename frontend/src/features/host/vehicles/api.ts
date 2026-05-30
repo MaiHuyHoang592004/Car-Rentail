@@ -2,15 +2,18 @@ import { api } from "@/lib/api-client";
 import type { HostVehicleViewModel } from "@/features/host/types";
 import type {
   CreateVehicleInput,
+  AddVehiclePhotoInput,
   HostVehicleFilterValue,
   HostVehicleSelectOption,
   UpdateVehicleInput,
   VehiclePageResponse,
+  VehiclePhotoResponse,
   VehicleResponse,
 } from "@/features/host/vehicles/types";
 
 export type {
   CreateVehicleInput,
+  AddVehiclePhotoInput,
   HostVehicleFilterValue,
   HostVehicleSelectOption,
   UpdateVehicleInput,
@@ -39,6 +42,14 @@ function mapVehicleResponseToViewModel(r: VehicleResponse): HostVehicleViewModel
     city: r.city,
     plateNumber: r.plateNumber,
     vin: r.vin,
+    primaryPhotoUrl: r.primaryPhotoUrl,
+    photos: r.photos?.map((photo) => ({
+      id: photo.id,
+      fileId: photo.fileId,
+      primary: photo.primary,
+      displayOrder: photo.displayOrder,
+      signedUrl: photo.signedUrl,
+    })),
   };
 }
 
@@ -85,11 +96,45 @@ export async function archiveHostVehicle(id: string): Promise<void> {
   await api.delete(`/host/vehicles/${id}`);
 }
 
+type RawArchivePreview = {
+  vehicleId: string;
+  affectedListings: { id: string; title: string; status: string }[];
+  hasActiveBookings: boolean;
+  archiveAllowed: boolean;
+  blockingReason: string | null;
+};
+
+export type HostVehicleArchivePreview = {
+  vehicleId: string;
+  affectedListings: { id: string; title: string; status: string }[];
+  hasActiveBookings: boolean;
+  archiveAllowed: boolean;
+  blockingReason?: string;
+};
+
+export async function getHostVehicleArchivePreview(id: string): Promise<HostVehicleArchivePreview> {
+  const raw = await api.get<RawArchivePreview>(`/host/vehicles/${id}/archive-preview`);
+  return {
+    vehicleId: raw.vehicleId,
+    affectedListings: raw.affectedListings,
+    hasActiveBookings: raw.hasActiveBookings,
+    archiveAllowed: raw.archiveAllowed,
+    blockingReason: raw.blockingReason ?? undefined,
+  };
+}
+
 export async function createHostVehicle(
   body: CreateVehicleInput,
 ): Promise<string> {
   const result = await api.post<VehicleResponse>("/host/vehicles", body);
   return result.id;
+}
+
+export async function addHostVehiclePhoto(
+  vehicleId: string,
+  body: AddVehiclePhotoInput,
+): Promise<VehiclePhotoResponse> {
+  return api.post<VehiclePhotoResponse>(`/host/vehicles/${vehicleId}/photos`, body);
 }
 
 export async function getHostActiveVehicles(): Promise<HostVehicleSelectOption[]> {

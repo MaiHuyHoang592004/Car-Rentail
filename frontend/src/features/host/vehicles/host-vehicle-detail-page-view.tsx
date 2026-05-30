@@ -17,6 +17,7 @@ import { VehicleFormFields } from "@/features/host/vehicles/vehicle-form-fields"
 import { buildVehicleFormFromViewModel } from "@/features/host/vehicles/vehicle-form-utils";
 import {
   archiveHostVehicle,
+  getHostVehicleArchivePreview,
   getHostVehicleById,
   updateHostVehicle,
 } from "@/features/host/vehicles/api";
@@ -33,6 +34,12 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
     queryKey: ["host", "vehicles", vehicleId],
     queryFn: () => getHostVehicleById(vehicleId),
     enabled: true,
+  });
+
+  const { data: archivePreview } = useQuery({
+    queryKey: ["host", "vehicles", vehicleId, "archive-preview"],
+    queryFn: () => getHostVehicleArchivePreview(vehicleId),
+    enabled: !!vehicle && archiveOpen,
   });
 
   const form = useForm<VehicleFormState>({
@@ -117,6 +124,10 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
   }
 
   function handleArchive() {
+    if (archivePreview && !archivePreview.archiveAllowed) {
+      toast.error(archivePreview.blockingReason ?? "Xe nay chua the luu kho.");
+      return;
+    }
     doArchive();
   }
 
@@ -168,6 +179,8 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
           <form onSubmit={form.handleSubmit(handleSave)} noValidate className="space-y-6">
             <VehicleFormFields
               register={form.register}
+              setValue={form.setValue}
+              watch={form.watch}
               errors={form.formState.errors}
               hideStatus={false}
             />
@@ -198,11 +211,21 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
       <HostActionDialog
         open={archiveOpen}
         title="Luu kho xe"
-        description="Xe nay va cac tin dang lien quan se duoc luu kho. Cac don dat xe hien tai khong bi anh huong."
+        description={
+          archivePreview
+            ? [
+                archivePreview.blockingReason ?? "Xe nay va cac tin dang lien quan se duoc luu kho.",
+                archivePreview.affectedListings.length > 0
+                  ? `Tin bi anh huong: ${archivePreview.affectedListings.map((item) => item.title).join(", ")}`
+                  : "Khong co listing nao dang lien ket.",
+              ].join(" ")
+            : "Xe nay va cac tin dang lien quan se duoc luu kho. Cac don dat xe hien tai khong bi anh huong."
+        }
         confirmLabel="Xac nhan luu kho"
         tone="danger"
         onClose={() => setArchiveOpen(false)}
         onConfirm={handleArchive}
+        hideReason
       />
     </WorkspaceSidebar>
   );

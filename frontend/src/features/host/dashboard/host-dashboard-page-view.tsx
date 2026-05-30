@@ -9,6 +9,7 @@ import { HostMetricStrip } from "@/features/host/components/host-metric-strip";
 import { getHostVehiclesByStatus } from "@/features/host/vehicles/api";
 import { getHostListings } from "@/features/host/listings/api";
 import { getHostBookings } from "@/features/host/bookings/api";
+import { getHostOverviewReport } from "@/features/host/reports/api";
 import {
   getBookingStatusLabel,
   getVehicleStatusLabel,
@@ -16,6 +17,12 @@ import {
 } from "@/lib/display-labels";
 
 export function HostDashboardPageView() {
+  const today = new Date();
+  const fromDate = new Date();
+  fromDate.setDate(today.getDate() - 29);
+  const from = fromDate.toISOString().split("T")[0];
+  const to = today.toISOString().split("T")[0];
+
   const { data: vehicles = [], isLoading: loadingVehicles } = useQuery({
     queryKey: ["host", "vehicles"],
     queryFn: () => getHostVehiclesByStatus(),
@@ -36,6 +43,11 @@ export function HostDashboardPageView() {
       }),
   });
 
+  const { data: overview } = useQuery({
+    queryKey: ["host", "reports", "overview", from, to],
+    queryFn: () => getHostOverviewReport(from, to),
+  });
+
   const vehicleAttention = vehicles.filter((v) =>
     ["MAINTENANCE", "SUSPENDED"].includes(v.status),
   );
@@ -48,11 +60,11 @@ export function HostDashboardPageView() {
 
   const metrics = {
     totalVehicles,
-    activeListings: totalListings,
-    pendingApprovals: (listingsResult?.listings ?? []).filter(
+    activeListings: overview?.activeListings ?? totalListings,
+    pendingApprovals: overview?.pendingApprovalListings ?? (listingsResult?.listings ?? []).filter(
       (l) => l.status === "PENDING_APPROVAL",
     ).length,
-    blockedDates: 0,
+    blockedDates: overview?.blockedDays ?? 0,
   };
 
   return (
@@ -98,6 +110,12 @@ export function HostDashboardPageView() {
               className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
             >
               Duyet booking
+            </Link>
+            <Link
+              href="/host/reports"
+              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            >
+              Xem bao cao
             </Link>
           </div>
         </section>

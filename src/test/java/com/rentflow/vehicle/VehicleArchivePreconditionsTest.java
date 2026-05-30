@@ -4,6 +4,8 @@ import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.exception.VehicleArchiveNotAllowedException;
 import com.rentflow.common.util.EncryptionUtil;
 import com.rentflow.booking.service.VehicleBookingPort;
+import com.rentflow.file.service.FileService;
+import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.listing.service.VehicleListingPort;
 import com.rentflow.vehicle.dto.CreateVehicleRequest;
 import com.rentflow.vehicle.dto.VehicleResponse;
@@ -44,6 +46,12 @@ class VehicleArchivePreconditionsTest {
     @Mock
     private EncryptionUtil encryptionUtil;
 
+    @Mock
+    private FileService fileService;
+
+    @Mock
+    private ListingRepository listingRepository;
+
     private VehicleMapper mapper;
 
     private VehicleService vehicleService;
@@ -56,7 +64,7 @@ class VehicleArchivePreconditionsTest {
     void setUp() {
         mapper = new VehicleMapper(encryptionUtil);
         vehicleService = new VehicleService(
-            vehicleRepository, listingPort, bookingPort, stateMachine, mapper, encryptionUtil);
+            vehicleRepository, listingPort, bookingPort, stateMachine, mapper, encryptionUtil, fileService, listingRepository);
 
         hostId = UUID.randomUUID();
         vehicleId = UUID.randomUUID();

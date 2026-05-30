@@ -1,6 +1,9 @@
 package com.rentflow.report.service;
 
 import com.rentflow.common.security.SecurityContext;
+import com.rentflow.availability.repository.AvailabilityCalendarRepository;
+import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.report.dto.EarningsReportResponse;
 import com.rentflow.report.dto.RevenueReportResponse;
@@ -24,6 +27,9 @@ import static org.mockito.Mockito.when;
 class ReportServiceTest {
 
     @Mock private BookingPaymentRepository bookingPaymentRepository;
+    @Mock private BookingRepository bookingRepository;
+    @Mock private ListingRepository listingRepository;
+    @Mock private AvailabilityCalendarRepository availabilityRepository;
     @Mock private SecurityContext securityContext;
 
     private ReportService reportService;
@@ -32,7 +38,13 @@ class ReportServiceTest {
     void setUp() {
         ReportProperties properties = new ReportProperties();
         properties.setPlatformFeeRate(new BigDecimal("0.15"));
-        reportService = new ReportService(bookingPaymentRepository, properties, securityContext);
+        reportService = new ReportService(
+                bookingPaymentRepository,
+                bookingRepository,
+                listingRepository,
+                availabilityRepository,
+                properties,
+                securityContext);
     }
 
     @Test

@@ -30,6 +30,8 @@ public interface ListingRepository extends
 
     Page<Listing> findByHostId(UUID hostId, Pageable pageable);
 
+    long countByHostIdAndStatus(UUID hostId, ListingStatus status);
+
     boolean existsByVehicleIdAndStatus(UUID vehicleId, ListingStatus status);
 
     List<Listing> findAllByVehicleIdAndStatusNot(UUID vehicleId, ListingStatus excludedStatus);

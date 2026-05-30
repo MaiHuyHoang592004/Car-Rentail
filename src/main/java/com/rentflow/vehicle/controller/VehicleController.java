@@ -6,6 +6,7 @@ import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.security.UserPrincipal;
 import com.rentflow.vehicle.dto.CreateVehicleRequest;
 import com.rentflow.vehicle.dto.UpdateVehicleRequest;
+import com.rentflow.vehicle.dto.VehicleArchivePreviewResponse;
 import com.rentflow.vehicle.dto.VehicleResponse;
 import com.rentflow.vehicle.entity.VehicleStatus;
 import com.rentflow.vehicle.service.VehicleService;
@@ -70,6 +71,14 @@ public class VehicleController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UserPrincipal principal) {
         var response = vehicleService.getVehicle(id, principal.getUserId());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/archive-preview")
+    public ResponseEntity<VehicleArchivePreviewResponse> getArchivePreview(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        var response = vehicleService.getArchivePreview(id, principal.getUserId());
         return ResponseEntity.ok(response);
     }
 

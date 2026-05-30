@@ -7,6 +7,8 @@ import com.rentflow.vehicle.dto.VehicleResponse;
 import com.rentflow.vehicle.entity.Vehicle;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class VehicleMapper {
 
@@ -48,10 +50,15 @@ public class VehicleMapper {
     }
 
     public VehicleResponse toResponse(Vehicle vehicle) {
+        return toResponse(vehicle, List.of());
+    }
+
+    public VehicleResponse toResponse(Vehicle vehicle, List<VehicleResponse.Photo> photos) {
         return VehicleResponse.from(
             vehicle,
             encryptionUtil.decrypt(vehicle.getPlateNumberEncrypted()),
-            encryptionUtil.decrypt(vehicle.getVinEncrypted())
+            encryptionUtil.decrypt(vehicle.getVinEncrypted()),
+            photos
         );
     }
 }
