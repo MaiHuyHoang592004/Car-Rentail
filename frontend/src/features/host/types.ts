@@ -17,6 +17,14 @@ export type HostVehicleViewModel = {
   city: string;
   plateNumber: string;
   vin: string;
+  primaryPhotoUrl?: string | null;
+  photos?: {
+    id: string;
+    fileId: string;
+    primary: boolean;
+    displayOrder: number;
+    signedUrl: string;
+  }[];
 };
 
 export type HostListingViewModel = {
@@ -33,6 +41,15 @@ export type HostListingViewModel = {
   instantBook: boolean;
   cancellationPolicy: "FLEXIBLE" | "MODERATE" | "STRICT";
   status: HostListingStatus;
+  extras: HostListingExtraViewModel[];
+};
+
+export type HostListingExtraViewModel = {
+  id: string;
+  name: string;
+  pricingType: "PER_DAY" | "PER_TRIP";
+  price: number;
+  active: boolean;
 };
 
 export type HostAvailabilityDayViewModel = {

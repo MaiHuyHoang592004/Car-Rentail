@@ -6,6 +6,9 @@ import com.rentflow.common.web.PageResponse;
 import com.rentflow.common.web.PageableValidation;
 import com.rentflow.listing.dto.ListingResponse;
 import com.rentflow.listing.dto.ListingSummaryResponse;
+import com.rentflow.listing.dto.ExtraResponse;
+import com.rentflow.listing.dto.CreateExtraRequest;
+import com.rentflow.listing.dto.UpdateExtraRequest;
 import com.rentflow.listing.dto.UpdateListingRequest;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.service.ListingService;
@@ -23,6 +26,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -104,5 +108,48 @@ public class ListingController {
             @AuthenticationPrincipal UserPrincipal principal) {
         var response = listingService.reactivateListing(id, principal.getUserId());
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/resume")
+    public ResponseEntity<ListingResponse> resumeListing(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        var response = listingService.resumeListing(id, principal.getUserId());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/extras")
+    public ResponseEntity<List<ExtraResponse>> listExtras(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(listingService.listExtras(id, principal.getUserId()));
+    }
+
+    @PostMapping("/{id}/extras")
+    public ResponseEntity<ExtraResponse> createExtra(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateExtraRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        var response = listingService.createExtra(id, principal.getUserId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PatchMapping("/{id}/extras/{extraId}")
+    public ResponseEntity<ExtraResponse> updateExtra(
+            @PathVariable UUID id,
+            @PathVariable UUID extraId,
+            @Valid @RequestBody UpdateExtraRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        var response = listingService.updateExtra(id, extraId, principal.getUserId(), request);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}/extras/{extraId}")
+    public ResponseEntity<Void> deleteExtra(
+            @PathVariable UUID id,
+            @PathVariable UUID extraId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        listingService.deleteExtra(id, extraId, principal.getUserId());
+        return ResponseEntity.noContent().build();
     }
 }

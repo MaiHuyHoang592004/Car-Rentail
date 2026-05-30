@@ -37,6 +37,14 @@ public record ListingDetailResponse(
     ) {}
 
     public static ListingDetailResponse from(Listing listing, Vehicle vehicle, List<Extra> extras) {
+        return from(listing, vehicle, extras, List.of());
+    }
+
+    public static ListingDetailResponse from(
+            Listing listing,
+            Vehicle vehicle,
+            List<Extra> extras,
+            List<String> photos) {
         VehicleSummary vs = vehicle != null
             ? new VehicleSummary(
                 vehicle.getCategory(),
@@ -50,6 +58,7 @@ public record ListingDetailResponse(
             : null;
 
         List<ExtraResponse> extraResponses = extras.stream()
+            .filter(extra -> Boolean.TRUE.equals(extra.getActive()))
             .map(ExtraResponse::from)
             .toList();
 
@@ -64,7 +73,7 @@ public record ListingDetailResponse(
             listing.getDailyKmLimit(),
             listing.getInstantBook(),
             listing.getCancellationPolicy(),
-            List.of(),
+            photos,
             vs,
             extraResponses
         );

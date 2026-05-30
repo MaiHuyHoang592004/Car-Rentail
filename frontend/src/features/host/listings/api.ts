@@ -1,5 +1,9 @@
 import { api } from "@/lib/api-client";
-import type { HostListingViewModel, HostListingStatus } from "@/features/host/types";
+import type {
+  HostListingExtraViewModel,
+  HostListingViewModel,
+  HostListingStatus,
+} from "@/features/host/types";
 import { ApiError } from "@/lib/api-error";
 
 export type HostListingFilterValue = "ALL" | HostListingStatus;
@@ -56,8 +60,17 @@ type RawListingDetail = {
   cancellationPolicy: "FLEXIBLE" | "MODERATE" | "STRICT";
   status: RawListingStatus;
   vehicleSummary: RawVehicleSummary | null;
+  extras?: RawExtra[];
   createdAt: string;
   updatedAt: string | null;
+};
+
+type RawExtra = {
+  id: string;
+  name: string;
+  pricingType: "PER_DAY" | "PER_TRIP";
+  price: number | string;
+  active: boolean;
 };
 
 type RawPageResponse<T> = {
@@ -80,6 +93,16 @@ function mapVehicleLabel(vehicle: RawVehicleSummary | null): string {
   return `${vehicle.make} ${vehicle.model} (${vehicle.year})`;
 }
 
+function mapExtra(raw: RawExtra): HostListingExtraViewModel {
+  return {
+    id: raw.id,
+    name: raw.name,
+    pricingType: raw.pricingType,
+    price: toNumber(raw.price),
+    active: raw.active,
+  };
+}
+
 export function mapListingSummary(raw: RawListingSummary): HostListingViewModel {
   return {
     id: raw.id,
@@ -95,6 +118,7 @@ export function mapListingSummary(raw: RawListingSummary): HostListingViewModel 
     instantBook: false,
     cancellationPolicy: "FLEXIBLE" as const,
     status: raw.status,
+    extras: [],
   };
 }
 
@@ -113,6 +137,7 @@ export function mapListingDetail(raw: RawListingDetail): HostListingViewModel {
     instantBook: raw.instantBook,
     cancellationPolicy: raw.cancellationPolicy,
     status: raw.status,
+    extras: (raw.extras ?? []).map(mapExtra),
   };
 }
 
@@ -161,6 +186,60 @@ export async function reactivateListing(
     `/host/listings/${id}/reactivate`,
   );
   return mapListingDetail(raw);
+}
+
+export async function resumeListing(
+  id: string,
+): Promise<HostListingViewModel> {
+  const raw = await api.post<RawListingDetail>(`/host/listings/${id}/resume`);
+  return mapListingDetail(raw);
+}
+
+export async function updateListing(
+  id: string,
+  body: Omit<CreateListingInput, "vehicleId">,
+): Promise<HostListingViewModel> {
+  const raw = await api.patch<RawListingDetail>(`/host/listings/${id}`, body);
+  return mapListingDetail(raw);
+}
+
+export interface CreateExtraInput {
+  name: string;
+  pricingType: "PER_DAY" | "PER_TRIP";
+  price: number;
+}
+
+export interface UpdateExtraInput {
+  name?: string;
+  pricingType?: "PER_DAY" | "PER_TRIP";
+  price?: number;
+  active?: boolean;
+}
+
+export async function getHostListingExtras(id: string): Promise<HostListingExtraViewModel[]> {
+  const raw = await api.get<RawExtra[]>(`/host/listings/${id}/extras`);
+  return raw.map(mapExtra);
+}
+
+export async function createHostListingExtra(
+  listingId: string,
+  body: CreateExtraInput,
+): Promise<HostListingExtraViewModel> {
+  const raw = await api.post<RawExtra>(`/host/listings/${listingId}/extras`, body);
+  return mapExtra(raw);
+}
+
+export async function updateHostListingExtra(
+  listingId: string,
+  extraId: string,
+  body: UpdateExtraInput,
+): Promise<HostListingExtraViewModel> {
+  const raw = await api.patch<RawExtra>(`/host/listings/${listingId}/extras/${extraId}`, body);
+  return mapExtra(raw);
+}
+
+export async function deleteHostListingExtra(listingId: string, extraId: string): Promise<void> {
+  await api.delete(`/host/listings/${listingId}/extras/${extraId}`);
 }
 
 export interface CreateListingInput {
@@ -228,6 +307,16 @@ export async function reactivateListingSafe(
 ): Promise<HostListingViewModel> {
   try {
     return await reactivateListing(id);
+  } catch (err) {
+    handleListingError(err);
+  }
+}
+
+export async function resumeListingSafe(
+  id: string,
+): Promise<HostListingViewModel> {
+  try {
+    return await resumeListing(id);
   } catch (err) {
     handleListingError(err);
   }

@@ -14,5 +14,7 @@ public interface ExtraRepository extends JpaRepository<Extra, UUID> {
 
     List<Extra> findByListingIdAndActiveTrue(UUID listingId);
 
+    java.util.Optional<Extra> findByIdAndListingId(UUID id, UUID listingId);
+
     void deleteByListingId(UUID listingId);
 }
