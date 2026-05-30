@@ -20,6 +20,28 @@ export interface VehicleResponse {
   city: string;
   plateNumber: string;
   vin: string;
+  primaryPhotoUrl?: string | null;
+  photos?: VehiclePhotoResponse[];
+}
+
+export interface VehiclePhotoResponse {
+  id: string;
+  vehicleId: string;
+  fileId: string;
+  primary: boolean;
+  displayOrder: number;
+  visibility: string;
+  signedUrl: string;
+  signedUrlExpiresAt: string;
+}
+
+export interface AddVehiclePhotoInput {
+  bucket: string;
+  objectKey: string;
+  contentType: string;
+  sizeBytes: number;
+  checksum?: string;
+  primary?: boolean;
 }
 
 export interface VehiclePageResponse<T> {

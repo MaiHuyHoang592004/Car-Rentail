@@ -5,57 +5,78 @@ import com.rentflow.common.exception.AccessDeniedException;
 import com.rentflow.common.exception.ListingNotFoundException;
 import com.rentflow.common.exception.ResourceNotFoundException;
 import com.rentflow.common.exception.ValidationException;
+import com.rentflow.common.exception.VehicleNotFoundException;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.file.dto.AddListingPhotoRequest;
+import com.rentflow.file.dto.AddVehiclePhotoRequest;
 import com.rentflow.file.dto.ListingPhotoResponse;
 import com.rentflow.file.dto.SignedFileUrlResponse;
+import com.rentflow.file.dto.UpdateListingPhotoRequest;
+import com.rentflow.file.dto.UpdateVehiclePhotoRequest;
+import com.rentflow.file.dto.VehiclePhotoResponse;
 import com.rentflow.file.entity.FileMetadata;
 import com.rentflow.file.entity.FilePurpose;
 import com.rentflow.file.entity.FileStatus;
 import com.rentflow.file.entity.FileVisibility;
 import com.rentflow.file.entity.ListingPhoto;
+import com.rentflow.file.entity.VehiclePhoto;
 import com.rentflow.file.repository.FileMetadataRepository;
 import com.rentflow.file.repository.ListingPhotoRepository;
+import com.rentflow.file.repository.VehiclePhotoRepository;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.vehicle.entity.Vehicle;
+import com.rentflow.vehicle.repository.VehicleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 public class FileService {
 
-    private static final long LISTING_PHOTO_MAX_BYTES = 10L * 1024 * 1024;
+    private static final long PHOTO_MAX_BYTES = 10L * 1024 * 1024;
+    private static final long VEHICLE_PHOTO_MAX_COUNT = 8L;
 
     private final FileMetadataRepository fileMetadataRepository;
     private final ListingPhotoRepository listingPhotoRepository;
+    private final VehiclePhotoRepository vehiclePhotoRepository;
     private final ListingRepository listingRepository;
+    private final VehicleRepository vehicleRepository;
     private final SecurityContext securityContext;
     private final FileSignedUrlProperties signedUrlProperties;
 
     public FileService(
             FileMetadataRepository fileMetadataRepository,
             ListingPhotoRepository listingPhotoRepository,
+            VehiclePhotoRepository vehiclePhotoRepository,
             ListingRepository listingRepository,
+            VehicleRepository vehicleRepository,
             SecurityContext securityContext,
             FileSignedUrlProperties signedUrlProperties) {
         this.fileMetadataRepository = fileMetadataRepository;
         this.listingPhotoRepository = listingPhotoRepository;
+        this.vehiclePhotoRepository = vehiclePhotoRepository;
         this.listingRepository = listingRepository;
+        this.vehicleRepository = vehicleRepository;
         this.securityContext = securityContext;
         this.signedUrlProperties = signedUrlProperties;
     }
 
     @Transactional
     public ListingPhotoResponse addListingPhoto(UUID listingId, AddListingPhotoRequest request) {
-        validateListingPhotoInput(request);
+        validatePhotoInput(request.contentType(), request.sizeBytes(), "Listing photo");
         UUID hostId = securityContext.currentUserId();
         Listing listing = listingRepository.findByIdAndHostId(listingId, hostId)
                 .orElseThrow(() -> new ListingNotFoundException(listingId.toString()));
@@ -72,11 +93,17 @@ public class FileService {
         metadata.setStatus(FileStatus.ACTIVE);
         metadata = fileMetadataRepository.save(metadata);
 
+        long currentCount = listingPhotoRepository.countByListingId(listingId);
+        boolean primary = Boolean.TRUE.equals(request.primary()) || currentCount == 0;
+        if (primary) {
+            clearListingPrimary(listingId);
+        }
+
         ListingPhoto photo = new ListingPhoto();
         photo.setListingId(listingId);
         photo.setFileId(metadata.getId());
-        photo.setDisplayOrder((int) listingPhotoRepository.countByListingId(listingId));
-        photo.setPrimary(Boolean.TRUE.equals(request.primary()));
+        photo.setDisplayOrder((int) currentCount);
+        photo.setPrimary(primary);
         photo = listingPhotoRepository.save(photo);
 
         Signed signed = buildSignedUrl(metadata);
@@ -92,6 +119,203 @@ public class FileService {
     }
 
     @Transactional(readOnly = true)
+    public List<ListingPhotoResponse> listListingPhotos(UUID listingId) {
+        UUID hostId = securityContext.currentUserId();
+        assertListingOwner(listingId, hostId);
+        return listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId).stream()
+                .map(this::toListingPhotoResponse)
+                .toList();
+    }
+
+    @Transactional
+    public ListingPhotoResponse updateListingPhoto(UUID listingId, UUID photoId, UpdateListingPhotoRequest request) {
+        UUID hostId = securityContext.currentUserId();
+        assertListingOwner(listingId, hostId);
+        ListingPhoto photo = listingPhotoRepository.findByIdAndListingId(photoId, listingId)
+                .orElseThrow(() -> new ResourceNotFoundException("LISTING_PHOTO_NOT_FOUND", "ListingPhoto", photoId.toString()));
+
+        if (request.displayOrder() != null) {
+            photo.setDisplayOrder(request.displayOrder());
+        }
+        if (Boolean.TRUE.equals(request.primary())) {
+            clearListingPrimary(listingId);
+            photo.setPrimary(true);
+        } else if (Boolean.FALSE.equals(request.primary())) {
+            photo.setPrimary(false);
+        }
+
+        photo = listingPhotoRepository.save(photo);
+        return toListingPhotoResponse(photo);
+    }
+
+    @Transactional
+    public void deleteListingPhoto(UUID listingId, UUID photoId) {
+        UUID hostId = securityContext.currentUserId();
+        assertListingOwner(listingId, hostId);
+        ListingPhoto photo = listingPhotoRepository.findByIdAndListingId(photoId, listingId)
+                .orElseThrow(() -> new ResourceNotFoundException("LISTING_PHOTO_NOT_FOUND", "ListingPhoto", photoId.toString()));
+        boolean wasPrimary = photo.isPrimary();
+        listingPhotoRepository.delete(photo);
+
+        if (wasPrimary) {
+            listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId).stream()
+                    .findFirst()
+                    .ifPresent(next -> {
+                        next.setPrimary(true);
+                        listingPhotoRepository.save(next);
+                    });
+        }
+    }
+
+    @Transactional
+    public VehiclePhotoResponse addVehiclePhoto(UUID vehicleId, AddVehiclePhotoRequest request) {
+        validatePhotoInput(request.contentType(), request.sizeBytes(), "Vehicle photo");
+        UUID hostId = securityContext.currentUserId();
+        assertVehicleOwner(vehicleId, hostId);
+
+        long currentCount = vehiclePhotoRepository.countByVehicleId(vehicleId);
+        if (currentCount >= VEHICLE_PHOTO_MAX_COUNT) {
+            throw new ValidationException("Vehicle can have at most 8 photos");
+        }
+
+        FileMetadata metadata = new FileMetadata();
+        metadata.setOwnerUserId(hostId);
+        metadata.setPurpose(FilePurpose.VEHICLE_PHOTO);
+        metadata.setBucket(request.bucket().trim());
+        metadata.setObjectKey(request.objectKey().trim());
+        metadata.setContentType(request.contentType().trim().toLowerCase());
+        metadata.setSizeBytes(request.sizeBytes());
+        metadata.setChecksum(request.checksum());
+        metadata.setVisibility(FileVisibility.PRIVATE);
+        metadata.setStatus(FileStatus.ACTIVE);
+        metadata = fileMetadataRepository.save(metadata);
+
+        boolean primary = Boolean.TRUE.equals(request.primary()) || currentCount == 0;
+        if (primary) {
+            clearVehiclePrimary(vehicleId);
+        }
+
+        VehiclePhoto photo = new VehiclePhoto();
+        photo.setVehicleId(vehicleId);
+        photo.setFileId(metadata.getId());
+        photo.setDisplayOrder((int) currentCount);
+        photo.setPrimary(primary);
+        photo = vehiclePhotoRepository.save(photo);
+
+        return toVehiclePhotoResponse(photo, metadata);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VehiclePhotoResponse> listVehiclePhotos(UUID vehicleId) {
+        UUID hostId = securityContext.currentUserId();
+        assertVehicleOwner(vehicleId, hostId);
+        return vehiclePhotoRepository.findByVehicleIdOrderByDisplayOrderAsc(vehicleId).stream()
+                .map(this::toVehiclePhotoResponse)
+                .toList();
+    }
+
+    @Transactional
+    public VehiclePhotoResponse updateVehiclePhoto(UUID vehicleId, UUID photoId, UpdateVehiclePhotoRequest request) {
+        UUID hostId = securityContext.currentUserId();
+        assertVehicleOwner(vehicleId, hostId);
+        VehiclePhoto photo = vehiclePhotoRepository.findByIdAndVehicleId(photoId, vehicleId)
+                .orElseThrow(() -> new ResourceNotFoundException("VEHICLE_PHOTO_NOT_FOUND", "VehiclePhoto", photoId.toString()));
+
+        if (request.displayOrder() != null) {
+            photo.setDisplayOrder(request.displayOrder());
+        }
+        if (Boolean.TRUE.equals(request.primary())) {
+            clearVehiclePrimary(vehicleId);
+            photo.setPrimary(true);
+        } else if (Boolean.FALSE.equals(request.primary())) {
+            photo.setPrimary(false);
+        }
+
+        photo = vehiclePhotoRepository.save(photo);
+        return toVehiclePhotoResponse(photo);
+    }
+
+    @Transactional
+    public void deleteVehiclePhoto(UUID vehicleId, UUID photoId) {
+        UUID hostId = securityContext.currentUserId();
+        assertVehicleOwner(vehicleId, hostId);
+        VehiclePhoto photo = vehiclePhotoRepository.findByIdAndVehicleId(photoId, vehicleId)
+                .orElseThrow(() -> new ResourceNotFoundException("VEHICLE_PHOTO_NOT_FOUND", "VehiclePhoto", photoId.toString()));
+        boolean wasPrimary = photo.isPrimary();
+        vehiclePhotoRepository.delete(photo);
+
+        if (wasPrimary) {
+            vehiclePhotoRepository.findByVehicleIdOrderByDisplayOrderAsc(vehicleId).stream()
+                    .findFirst()
+                    .ifPresent(next -> {
+                        next.setPrimary(true);
+                        vehiclePhotoRepository.save(next);
+                    });
+        }
+    }
+
+    @Transactional
+    public void seedListingPhotosFromVehicle(UUID listingId, UUID vehicleId) {
+        if (listingPhotoRepository.countByListingId(listingId) > 0) {
+            return;
+        }
+        List<VehiclePhoto> vehiclePhotos = vehiclePhotoRepository.findByVehicleIdOrderByDisplayOrderAsc(vehicleId);
+        for (VehiclePhoto vehiclePhoto : vehiclePhotos) {
+            ListingPhoto listingPhoto = new ListingPhoto();
+            listingPhoto.setListingId(listingId);
+            listingPhoto.setFileId(vehiclePhoto.getFileId());
+            listingPhoto.setDisplayOrder(vehiclePhoto.getDisplayOrder());
+            listingPhoto.setPrimary(vehiclePhoto.isPrimary());
+            listingPhotoRepository.save(listingPhoto);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getListingPhotoUrls(UUID listingId, UUID vehicleId) {
+        List<ListingPhoto> listingPhotos = listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId);
+        if (!listingPhotos.isEmpty()) {
+            return listingPhotos.stream()
+                    .sorted(photoComparator())
+                    .map(this::signedUrlForPhoto)
+                    .toList();
+        }
+        return vehiclePhotoRepository.findByVehicleIdOrderByDisplayOrderAsc(vehicleId).stream()
+                .sorted(vehiclePhotoComparator())
+                .map(this::signedUrlForVehiclePhoto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, String> getCoverPhotoUrls(Collection<UUID> listingIds) {
+        if (listingIds == null || listingIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> urls = new LinkedHashMap<>();
+        listingPhotoRepository.findByListingIdInOrderByDisplayOrderAsc(listingIds).stream()
+                .sorted(photoComparator())
+                .forEach(photo -> urls.putIfAbsent(photo.getListingId(), signedUrlForPhoto(photo)));
+        return urls;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, String> getCoverPhotoUrls(Map<UUID, UUID> listingVehicleIds) {
+        if (listingVehicleIds == null || listingVehicleIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> urls = new LinkedHashMap<>(getCoverPhotoUrls(listingVehicleIds.keySet()));
+        listingVehicleIds.forEach((listingId, vehicleId) -> {
+            if (urls.containsKey(listingId)) {
+                return;
+            }
+            vehiclePhotoRepository.findByVehicleIdOrderByDisplayOrderAsc(vehicleId).stream()
+                    .sorted(vehiclePhotoComparator())
+                    .findFirst()
+                    .ifPresent(photo -> urls.put(listingId, signedUrlForVehiclePhoto(photo)));
+        });
+        return urls;
+    }
+
+    @Transactional(readOnly = true)
     public SignedFileUrlResponse getSignedUrl(UUID fileId) {
         FileMetadata file = fileMetadataRepository.findByIdAndStatus(fileId, FileStatus.ACTIVE)
                 .orElseThrow(() -> new ResourceNotFoundException("FILE_NOT_FOUND", "File", fileId.toString()));
@@ -100,13 +324,100 @@ public class FileService {
         return new SignedFileUrlResponse(file.getId(), file.getVisibility().name(), signed.url(), signed.expiresAt());
     }
 
-    private void validateListingPhotoInput(AddListingPhotoRequest request) {
-        if (!request.contentType().toLowerCase().startsWith("image/")) {
-            throw new ValidationException("Listing photo contentType must be an image/* MIME type");
+    private void validatePhotoInput(String contentType, Long sizeBytes, String label) {
+        if (!contentType.toLowerCase().startsWith("image/")) {
+            throw new ValidationException(label + " contentType must be an image/* MIME type");
         }
-        if (request.sizeBytes() > LISTING_PHOTO_MAX_BYTES) {
-            throw new ValidationException("Listing photo must be <= 10MB");
+        if (sizeBytes > PHOTO_MAX_BYTES) {
+            throw new ValidationException(label + " must be <= 10MB");
         }
+    }
+
+    private void assertVehicleOwner(UUID vehicleId, UUID hostId) {
+        Vehicle vehicle = vehicleRepository.findByIdAndHostId(vehicleId, hostId)
+                .orElseThrow(() -> new VehicleNotFoundException(vehicleId.toString()));
+        if (!vehicle.getHostId().equals(hostId)) {
+            throw new AccessDeniedException();
+        }
+    }
+
+    private void assertListingOwner(UUID listingId, UUID hostId) {
+        listingRepository.findByIdAndHostId(listingId, hostId)
+                .orElseThrow(() -> new ListingNotFoundException(listingId.toString()));
+    }
+
+    private void clearListingPrimary(UUID listingId) {
+        listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId).forEach(photo -> {
+            if (photo.isPrimary()) {
+                photo.setPrimary(false);
+                listingPhotoRepository.save(photo);
+            }
+        });
+    }
+
+    private void clearVehiclePrimary(UUID vehicleId) {
+        vehiclePhotoRepository.findByVehicleIdOrderByDisplayOrderAsc(vehicleId).forEach(photo -> {
+            if (photo.isPrimary()) {
+                photo.setPrimary(false);
+                vehiclePhotoRepository.save(photo);
+            }
+        });
+    }
+
+    private VehiclePhotoResponse toVehiclePhotoResponse(VehiclePhoto photo) {
+        FileMetadata metadata = fileMetadataRepository.findByIdAndStatus(photo.getFileId(), FileStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("FILE_NOT_FOUND", "File", photo.getFileId().toString()));
+        return toVehiclePhotoResponse(photo, metadata);
+    }
+
+    private VehiclePhotoResponse toVehiclePhotoResponse(VehiclePhoto photo, FileMetadata metadata) {
+        Signed signed = buildSignedUrl(metadata);
+        return new VehiclePhotoResponse(
+                photo.getId(),
+                photo.getVehicleId(),
+                photo.getFileId(),
+                photo.isPrimary(),
+                photo.getDisplayOrder(),
+                metadata.getVisibility().name(),
+                signed.url(),
+                signed.expiresAt());
+    }
+
+    private ListingPhotoResponse toListingPhotoResponse(ListingPhoto photo) {
+        FileMetadata metadata = fileMetadataRepository.findByIdAndStatus(photo.getFileId(), FileStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("FILE_NOT_FOUND", "File", photo.getFileId().toString()));
+        Signed signed = buildSignedUrl(metadata);
+        return new ListingPhotoResponse(
+                photo.getId(),
+                photo.getListingId(),
+                photo.getFileId(),
+                photo.isPrimary(),
+                photo.getDisplayOrder(),
+                metadata.getVisibility().name(),
+                signed.url(),
+                signed.expiresAt());
+    }
+
+    private String signedUrlForPhoto(ListingPhoto photo) {
+        FileMetadata metadata = fileMetadataRepository.findByIdAndStatus(photo.getFileId(), FileStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("FILE_NOT_FOUND", "File", photo.getFileId().toString()));
+        return buildSignedUrl(metadata).url();
+    }
+
+    private String signedUrlForVehiclePhoto(VehiclePhoto photo) {
+        FileMetadata metadata = fileMetadataRepository.findByIdAndStatus(photo.getFileId(), FileStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("FILE_NOT_FOUND", "File", photo.getFileId().toString()));
+        return buildSignedUrl(metadata).url();
+    }
+
+    private Comparator<ListingPhoto> photoComparator() {
+        return Comparator.comparing(ListingPhoto::isPrimary).reversed()
+                .thenComparing(ListingPhoto::getDisplayOrder);
+    }
+
+    private Comparator<VehiclePhoto> vehiclePhotoComparator() {
+        return Comparator.comparing(VehiclePhoto::isPrimary).reversed()
+                .thenComparing(VehiclePhoto::getDisplayOrder);
     }
 
     private void assertReadable(FileMetadata file) {

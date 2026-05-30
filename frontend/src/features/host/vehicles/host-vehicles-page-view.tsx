@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import { WorkspaceSidebar } from "@/components/rentflow/workspace-sidebar";
@@ -21,7 +22,13 @@ const FILTERS: { value: HostVehicleFilterValue; label: string }[] = [
 ];
 
 export function HostVehiclesPageView() {
-  const [statusFilter, setStatusFilter] = useState<HostVehicleFilterValue>("ALL");
+  const searchParams = useSearchParams();
+  const [statusFilter, setStatusFilter] = useState<HostVehicleFilterValue>(() => {
+    const requestedStatus = searchParams.get("status");
+    return FILTERS.some((filter) => filter.value === requestedStatus)
+      ? (requestedStatus as HostVehicleFilterValue)
+      : "ALL";
+  });
 
   const { data: vehicles = [], isLoading } = useQuery({
     queryKey: ["host", "vehicles", statusFilter],
@@ -31,12 +38,12 @@ export function HostVehiclesPageView() {
   return (
     <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/vehicles">
       <div className="space-y-5">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        <section className="rf-section-card p-6 md:p-8">
+          <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Xe cua toi</h1>
+            <h1 className="text-3xl font-bold text-foreground">Quản lý xe của tôi</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Quan ly dong xe theo trang thai.
+              Theo dõi toàn bộ xe theo trạng thái hoạt động, bảo trì và tạm ngưng.
             </p>
           </div>
           <Link
@@ -46,10 +53,10 @@ export function HostVehiclesPageView() {
             <Plus className="h-4 w-4" />
             Them xe
           </Link>
-        </div>
+          </div>
+        </section>
 
-        {/* Filter chips */}
-        <div className="flex flex-wrap gap-2">
+        <div className="rf-section-card flex flex-wrap gap-2 p-4">
           {FILTERS.map((filter) => {
             const active = statusFilter === filter.value;
             return (
@@ -70,7 +77,6 @@ export function HostVehiclesPageView() {
           })}
         </div>
 
-        {/* Vehicle list */}
         {isLoading ? (
           <PageSkeleton message="Dang tai danh sach xe..." />
         ) : vehicles.length === 0 ? (

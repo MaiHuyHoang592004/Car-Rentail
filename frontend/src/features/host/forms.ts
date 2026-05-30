@@ -1,7 +1,7 @@
-﻿import { z } from "zod"
-""
-const currentYear = new Date().getFullYear()
-""
+import { z } from "zod";
+
+const currentYear = new Date().getFullYear();
+
 export const vehicleFormSchema = z.object({
   category: z.string().trim().min(1, "Loai xe khong duoc de trong."),
   make: z.string().trim().min(1, "Hang xe khong duoc de trong."),
@@ -13,10 +13,10 @@ export const vehicleFormSchema = z.object({
     .refine((v) => !Number.isNaN(Number(v)), "Nam san xuat khong hop le.")
     .refine(
       (v) => Number(v) >= 1995 && Number(v) <= currentYear + 1,
-      `Nam phai tu 1995 den ${currentYear + 1}.`, 
+      `Nam phai tu 1995 den ${currentYear + 1}.`,
     ),
   transmission: z.enum(["AUTO", "MANUAL"]),
-  fuelType: z.string(),
+  fuelType: z.string().trim().min(1, "Nhien lieu khong duoc de trong."),
   seats: z
     .string()
     .trim()
@@ -28,9 +28,9 @@ export const vehicleFormSchema = z.object({
   plateNumber: z.string().trim().min(1, "Bien so khong duoc de trong."),
   vin: z.string(),
 });
-""
-export type VehicleFormState = z.infer<typeof vehicleFormSchema>
-""
+
+export type VehicleFormState = z.infer<typeof vehicleFormSchema>;
+
 export const listingFormSchema = z.object({
   vehicleId: z.string().min(1, "Vui long chon xe."),
   title: z.string().trim().min(1, "Tieu de khong duoc de trong."),
@@ -52,9 +52,9 @@ export const listingFormSchema = z.object({
   instantBook: z.boolean(),
   cancellationPolicy: z.enum(["FLEXIBLE", "MODERATE", "STRICT"]),
 });
-""
-export type HostListingFormState = z.infer<typeof listingFormSchema>
-""
+
+export type HostListingFormState = z.infer<typeof listingFormSchema>;
+
 export type AvailabilitySelectionState = {
   selectedDates: string[];
 };

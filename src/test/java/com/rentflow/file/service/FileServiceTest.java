@@ -3,18 +3,24 @@ package com.rentflow.file.service;
 import com.rentflow.auth.entity.Role;
 import com.rentflow.common.exception.AccessDeniedException;
 import com.rentflow.file.dto.AddListingPhotoRequest;
+import com.rentflow.file.dto.AddVehiclePhotoRequest;
 import com.rentflow.file.dto.ListingPhotoResponse;
 import com.rentflow.file.dto.SignedFileUrlResponse;
+import com.rentflow.file.dto.VehiclePhotoResponse;
 import com.rentflow.file.entity.FileMetadata;
 import com.rentflow.file.entity.FileStatus;
 import com.rentflow.file.entity.FileVisibility;
 import com.rentflow.file.entity.ListingPhoto;
+import com.rentflow.file.entity.VehiclePhoto;
 import com.rentflow.file.repository.FileMetadataRepository;
 import com.rentflow.file.repository.ListingPhotoRepository;
+import com.rentflow.file.repository.VehiclePhotoRepository;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.common.security.SecurityContext;
+import com.rentflow.vehicle.entity.Vehicle;
+import com.rentflow.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,7 +44,9 @@ class FileServiceTest {
 
     @Mock private FileMetadataRepository fileMetadataRepository;
     @Mock private ListingPhotoRepository listingPhotoRepository;
+    @Mock private VehiclePhotoRepository vehiclePhotoRepository;
     @Mock private ListingRepository listingRepository;
+    @Mock private VehicleRepository vehicleRepository;
     @Mock private SecurityContext securityContext;
 
     private FileService service;
@@ -50,7 +59,14 @@ class FileServiceTest {
         properties.setTtl(Duration.ofMinutes(10));
         properties.setBaseUrl("https://files.test.local");
         properties.setSecret("test-secret");
-        service = new FileService(fileMetadataRepository, listingPhotoRepository, listingRepository, securityContext, properties);
+        service = new FileService(
+                fileMetadataRepository,
+                listingPhotoRepository,
+                vehiclePhotoRepository,
+                listingRepository,
+                vehicleRepository,
+                securityContext,
+                properties);
         hostId = UUID.randomUUID();
         listingId = UUID.randomUUID();
     }
@@ -64,6 +80,7 @@ class FileServiceTest {
         when(securityContext.currentUserId()).thenReturn(hostId);
         when(listingRepository.findByIdAndHostId(listingId, hostId)).thenReturn(Optional.of(listing));
         when(listingPhotoRepository.countByListingId(listingId)).thenReturn(0L);
+        when(listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId)).thenReturn(List.of());
         doReturn(savedFile(FileVisibility.PRIVATE)).when(fileMetadataRepository).save(any(FileMetadata.class));
         doReturn(savedPhoto()).when(listingPhotoRepository).save(any(ListingPhoto.class));
 
@@ -86,6 +103,7 @@ class FileServiceTest {
         when(securityContext.currentUserId()).thenReturn(hostId);
         when(listingRepository.findByIdAndHostId(listingId, hostId)).thenReturn(Optional.of(listing));
         when(listingPhotoRepository.countByListingId(listingId)).thenReturn(0L);
+        when(listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId)).thenReturn(List.of());
         doReturn(savedFile(FileVisibility.PUBLIC)).when(fileMetadataRepository).save(any(FileMetadata.class));
         doReturn(savedPhoto()).when(listingPhotoRepository).save(any(ListingPhoto.class));
 
@@ -93,6 +111,28 @@ class FileServiceTest {
                 "bucket-a", "path/b.jpg", "image/jpeg", 1024L, null, false));
 
         assertThat(response.visibility()).isEqualTo("PUBLIC");
+    }
+
+    @Test
+    void addListingPhotoClearsExistingPrimaryWhenNewPhotoIsPrimary() {
+        Listing listing = new Listing();
+        listing.setId(listingId);
+        listing.setHostId(hostId);
+        listing.setStatus(ListingStatus.ACTIVE);
+        ListingPhoto existingPrimary = savedPhoto();
+        existingPrimary.setPrimary(true);
+
+        when(securityContext.currentUserId()).thenReturn(hostId);
+        when(listingRepository.findByIdAndHostId(listingId, hostId)).thenReturn(Optional.of(listing));
+        when(listingPhotoRepository.countByListingId(listingId)).thenReturn(1L);
+        when(listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId)).thenReturn(List.of(existingPrimary));
+        doReturn(savedFile(FileVisibility.PUBLIC)).when(fileMetadataRepository).save(any(FileMetadata.class));
+        doReturn(savedPhoto()).when(listingPhotoRepository).save(any(ListingPhoto.class));
+
+        service.addListingPhoto(listingId, new AddListingPhotoRequest(
+                "bucket-a", "path/c.jpg", "image/jpeg", 1024L, null, true));
+
+        assertThat(existingPrimary.isPrimary()).isFalse();
     }
 
     @Test
@@ -124,6 +164,25 @@ class FileServiceTest {
         assertThat(response.signedUrl()).contains("https://files.test.local/files/" + fileId);
     }
 
+    @Test
+    void addVehiclePhotoDefaultsFirstPhotoToPrimaryAndPrivate() {
+        UUID vehicleId = UUID.randomUUID();
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(vehicleId);
+        vehicle.setHostId(hostId);
+        when(securityContext.currentUserId()).thenReturn(hostId);
+        when(vehicleRepository.findByIdAndHostId(vehicleId, hostId)).thenReturn(Optional.of(vehicle));
+        when(vehiclePhotoRepository.countByVehicleId(vehicleId)).thenReturn(0L);
+        doReturn(savedFile(FileVisibility.PRIVATE)).when(fileMetadataRepository).save(any(FileMetadata.class));
+        doReturn(savedVehiclePhoto(vehicleId, true)).when(vehiclePhotoRepository).save(any(VehiclePhoto.class));
+
+        VehiclePhotoResponse response = service.addVehiclePhoto(vehicleId, new AddVehiclePhotoRequest(
+                "bucket-a", "vehicles/a.jpg", "image/jpeg", 1024L, null, false));
+
+        assertThat(response.primary()).isTrue();
+        assertThat(response.visibility()).isEqualTo("PRIVATE");
+    }
+
     private FileMetadata savedFile(FileVisibility visibility) {
         FileMetadata file = new FileMetadata();
         file.setId(UUID.randomUUID());
@@ -144,6 +203,16 @@ class FileServiceTest {
         photo.setFileId(UUID.randomUUID());
         photo.setDisplayOrder(0);
         photo.setPrimary(true);
+        return photo;
+    }
+
+    private VehiclePhoto savedVehiclePhoto(UUID vehicleId, boolean primary) {
+        VehiclePhoto photo = new VehiclePhoto();
+        photo.setId(UUID.randomUUID());
+        photo.setVehicleId(vehicleId);
+        photo.setFileId(UUID.randomUUID());
+        photo.setDisplayOrder(0);
+        photo.setPrimary(primary);
         return photo;
     }
 }
