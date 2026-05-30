@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { CarFront, Fuel, Heart, MapPin, Settings2 } from "lucide-react";
 
 import { formatMoney } from "@/lib/formatters";
 import { getFuelTypeLabel, getTransmissionLabel } from "@/lib/display-labels";
@@ -13,59 +13,78 @@ export function ListingCard({ listing }: ListingCardProps) {
   return (
     <Link
       href={`/listings/${listing.id}`}
-      className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
+      className="group flex flex-col overflow-hidden rounded-xl border border-border bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
     >
-      <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+      <div className="relative aspect-[4/3] overflow-hidden bg-muted">
         <img
           src={listing.coverImageUrl}
           alt={listing.title}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        {listing.ratingLabel ? (
-          <div className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white">
-            <svg
-              className="h-3 w-3 fill-amber-400 text-amber-400"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            {listing.ratingLabel}
-          </div>
-        ) : null}
+        <div className="absolute left-3 top-3">
+          <span className="rounded-full bg-emerald-500 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.05em] text-white">
+            Đang hiển thị
+          </span>
+        </div>
+        <span className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-rose-600 transition-transform group-hover:scale-110">
+          <Heart className="h-4 w-4" />
+        </span>
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {listing.city}
-          </p>
-          <h3 className="mt-1 truncate text-base font-bold text-foreground">
-            {listing.title}
-          </h3>
+      <div className="flex flex-1 flex-col space-y-4 p-4">
+        <div>
+          <div className="mb-1 flex min-w-0 items-center gap-1 text-xs font-medium text-muted-foreground">
+            <MapPin className="h-4 w-4 shrink-0" />
+            <span className="truncate">{listing.city}</span>
+            <span className="text-border">•</span>
+            <span className="truncate">{getCategoryLabel(listing.category)}</span>
+          </div>
+          <h3 className="truncate text-xl font-semibold text-foreground">{listing.title}</h3>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span>{listing.seats} chỗ</span>
-          <span className="text-muted-foreground/50">·</span>
-          <span>{getTransmissionLabel(listing.transmission)}</span>
-          <span className="text-muted-foreground/50">·</span>
-          <span>{getFuelTypeLabel(listing.fuelType)}</span>
+        <div className="flex flex-wrap gap-2">
+          <SpecPill icon={<CarFront className="h-4 w-4" />} label={`${listing.seats} chỗ`} />
+          <SpecPill icon={<Settings2 className="h-4 w-4" />} label={getTransmissionLabel(listing.transmission)} />
+          <SpecPill icon={<Fuel className="h-4 w-4" />} label={getFuelTypeLabel(listing.fuelType)} />
         </div>
 
-        <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-          <p className="text-sm text-muted-foreground">
-            <span className="text-lg font-bold text-foreground">
+        <div className="mt-auto flex items-center justify-between border-t border-border pt-4">
+          <p className="min-w-0 text-sm text-muted-foreground">
+            <span className="block text-xl font-semibold text-primary">
               {formatMoney(listing.basePricePerDay, listing.currency)}
-            </span>{" "}
+            </span>
             / ngày
           </p>
-          <span className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90">
-            Xem chi tiết
-            <ArrowRight className="h-3 w-3" />
+          <span className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity group-hover:opacity-90">
+            Đặt xe
           </span>
         </div>
       </div>
     </Link>
   );
+}
+
+function SpecPill({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+function getCategoryLabel(category: string): string {
+  const labels: Record<string, string> = {
+    SEDAN: "Xe sedan",
+    SUV: "SUV / CUV",
+    HATCHBACK: "Hatchback",
+    PICKUP: "Xe bán tải",
+    VAN: "Van",
+    MINIVAN: "Minivan",
+    SPORTS: "Thể thao",
+    LUXURY: "Hạng sang",
+    ECONOMY: "Tiết kiệm",
+    MPV: "MPV",
+  };
+  return labels[category] ?? category;
 }

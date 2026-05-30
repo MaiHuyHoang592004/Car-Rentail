@@ -39,8 +39,7 @@ export function BookingPriceSummary({
 
   return (
     <div className="sticky top-6 space-y-4">
-      {/* Listing Card */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="overflow-hidden rounded-[1.5rem] border border-border/70 bg-card shadow-[0_20px_48px_-28px_rgba(15,23,42,0.42)]">
         <div className="relative h-40 bg-muted">
           <img
             src={listing.coverImageUrl}
@@ -48,9 +47,9 @@ export function BookingPriceSummary({
             className="h-full w-full object-cover"
           />
         </div>
-        <div className="p-4 space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{listing.city}</p>
-          <h3 className="text-base font-bold text-foreground">{listing.title}</h3>
+        <div className="space-y-2 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{listing.city}</p>
+          <h3 className="text-lg font-bold text-foreground">{listing.title}</h3>
           <div className="flex items-center gap-1">
             <span className="text-lg font-bold text-foreground">{formatMoney(listing.basePricePerDay, listing.currency)}</span>
             <span className="text-sm text-muted-foreground">/ ngày</span>
@@ -58,8 +57,7 @@ export function BookingPriceSummary({
         </div>
       </div>
 
-      {/* Price Breakdown Card */}
-      <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
+      <div className="rounded-[1.5rem] border border-border/70 bg-card p-6 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.42)] space-y-4">
         {hasDates && days != null ? (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -87,7 +85,7 @@ export function BookingPriceSummary({
           type="button"
           onClick={onBook}
           disabled={isPending}
-          className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 mt-2"
+          className="mt-2 w-full rounded-2xl bg-primary py-3.5 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
         >{isPending ? "Đang giữ xe..." : "Giữ xe trong 15 phút"}</button>
 
         <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">

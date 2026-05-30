@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 
 import { WorkspaceSidebar } from "@/components/rentflow/workspace-sidebar";
 import { HostWorkspaceNav } from "@/features/host/components/host-workspace-nav";
@@ -11,7 +12,12 @@ import { EmptyState } from "@/components/rentflow/empty-state";
 import { FormError } from "@/components/rentflow/form-error";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { HostListingRow } from "@/features/host/components/host-listing-row";
-import { getHostListings, type HostListingFilterValue } from "@/features/host/listings/api";
+import {
+  getHostListings,
+  resumeListingSafe,
+  type HostListingFilterValue,
+  type ListingTransitionError,
+} from "@/features/host/listings/api";
 
 const FILTERS: { value: HostListingFilterValue; label: string }[] = [
   { value: "ALL", label: "Tat ca" },
@@ -23,6 +29,7 @@ const FILTERS: { value: HostListingFilterValue; label: string }[] = [
 ];
 
 export function HostListingsPageView() {
+  const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<HostListingFilterValue>("ALL");
 
   const { data, isLoading, isError } = useQuery({
@@ -31,6 +38,16 @@ export function HostListingsPageView() {
   });
 
   const listings = data?.listings ?? [];
+
+  const resumeMutation = useMutation({
+    mutationFn: (listingId: string) => resumeListingSafe(listingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["host", "listings"] });
+    },
+    onError: (error: ListingTransitionError) => {
+      toast.error(error.message || "Khong the kich hoat lai tin dang.");
+    },
+  });
 
   return (
     <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/listings">
@@ -87,7 +104,12 @@ export function HostListingsPageView() {
         ) : (
           <div className="space-y-3">
             {listings.map((listing) => (
-              <HostListingRow key={listing.id} listing={listing} />
+              <HostListingRow
+                key={listing.id}
+                listing={listing}
+                onResume={listing.status === "SUSPENDED" ? (id) => resumeMutation.mutate(id) : undefined}
+                resumePending={resumeMutation.isPending}
+              />
             ))}
           </div>
         )}

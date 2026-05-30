@@ -77,7 +77,7 @@ describe("ListingsPageView", () => {
 
     await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
     await userEvent.type(screen.getByPlaceholderText("Thành phố hoặc địa điểm"), "Hanoi");
-    const suvLabel = screen.getByText("SUV");
+    const suvLabel = screen.getByText("SUV / CUV");
     await userEvent.click(suvLabel);
 
     await waitFor(() => {

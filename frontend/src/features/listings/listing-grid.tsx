@@ -19,7 +19,7 @@ export function ListingGrid({
 }: ListingGridProps) {
   if (listings.length === 0) {
     return (
-      <section className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-12 text-center">
+      <section className="rf-section-card flex flex-col items-center justify-center border-dashed p-12 text-center">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
           <SearchX className="h-7 w-7 text-muted-foreground" />
         </div>
@@ -48,7 +48,7 @@ export function ListingGrid({
   }
 
   return (
-    <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
       {listings.map((listing) => (
         <ListingCard key={listing.id} listing={listing} />
       ))}

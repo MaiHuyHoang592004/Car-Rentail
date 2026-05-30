@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { CarFront, CircleHelp, LayoutGrid, Menu, User, X } from "lucide-react";
 
 import { UserMenu } from "@/components/rentflow/user-menu";
 import { useAuth, type AuthRole } from "@/features/auth/auth-context";
@@ -53,56 +54,50 @@ export function AppShell({ children, activePath }: AppShellProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, [mobileOpen]);
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur">
+        <div className="rf-shell-container flex h-18 items-center justify-between gap-4 py-3">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               aria-label="Mở menu"
               aria-expanded={mobileOpen}
               aria-controls="mobile-nav"
               onClick={() => setMobileOpen((open) => !open)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-accent md:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-accent md:hidden"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-5 w-5"
-                aria-hidden="true"
-              >
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
+              <Menu className="h-5 w-5" aria-hidden="true" />
             </button>
-            <Link href="/" className="font-heading text-xl font-bold text-foreground">
+            <Link href="/" className="font-heading text-2xl font-bold tracking-tight text-primary">
               RentFlow
             </Link>
           </div>
-          <nav className="hidden items-center gap-6 md:flex">
+          <nav className="hidden items-center gap-7 md:flex">
             {visibleNav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground",
-                  isActive(active, item.href) && "text-foreground",
+                  "border-b-2 border-transparent pb-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-primary",
+                  isActive(active, item.href) && "border-primary text-primary",
                 )}
               >
                 {item.label}
               </Link>
             ))}
+            <Link
+              href="/host/dashboard"
+              className="text-sm font-semibold text-muted-foreground transition-colors hover:text-primary"
+            >
+              Trở thành chủ xe
+            </Link>
+            <a
+              href="#how-it-works"
+              className="text-sm font-semibold text-muted-foreground transition-colors hover:text-primary"
+            >
+              Hướng dẫn
+            </a>
           </nav>
           <UserMenu />
         </div>
@@ -118,30 +113,17 @@ export function AppShell({ children, activePath }: AppShellProps) {
           <nav
             id="mobile-nav"
             aria-label="Điều hướng chính"
-            className="absolute left-0 top-0 h-full w-72 max-w-[80vw] overflow-y-auto border-r border-border bg-background p-4 shadow-lg"
+            className="absolute left-0 top-0 h-full w-72 max-w-[84vw] overflow-y-auto border-r border-border bg-card p-4 shadow-lg"
           >
             <div className="mb-4 flex items-center justify-between">
-              <span className="font-heading text-lg font-bold text-foreground">RentFlow</span>
+              <span className="font-heading text-lg font-bold text-primary">RentFlow</span>
               <button
                 type="button"
                 aria-label="Đóng menu"
                 onClick={() => setMobileOpen(false)}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md text-foreground hover:bg-accent"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
             <ul className="space-y-1">
@@ -159,12 +141,72 @@ export function AppShell({ children, activePath }: AppShellProps) {
                   </Link>
                 </li>
               ))}
+              <li>
+                <Link
+                  href="/host/dashboard"
+                  onClick={() => setMobileOpen(false)}
+                  className="block rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  Trở thành chủ xe
+                </Link>
+              </li>
             </ul>
           </nav>
         </div>
       ) : null}
 
-      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</main>
+      <main className="rf-shell-container py-8 md:py-10">{children}</main>
+
+      <footer className="mt-12 border-t border-border/70 bg-card">
+        <div className="rf-shell-container flex flex-col gap-8 py-10 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-sm space-y-3">
+            <p className="font-heading text-2xl font-bold text-foreground">RentFlow</p>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Nền tảng thuê xe tự lái minh bạch, tập trung vào trải nghiệm đặt xe rõ ràng và an toàn.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-6 text-sm text-muted-foreground sm:grid-cols-3">
+            <FooterColumn
+              title="Khám phá"
+              links={[
+                { href: "/listings", label: "Tìm xe" },
+                { href: "/me/bookings", label: "Chuyến đi" },
+              ]}
+            />
+            <FooterColumn
+              title="Host"
+              links={[
+                { href: "/host/dashboard", label: "Bảng điều khiển" },
+                { href: "/host/vehicles", label: "Quản lý xe" },
+              ]}
+            />
+            <FooterColumn
+              title="Hỗ trợ"
+              links={[
+                { href: "/me/profile", label: "Tài khoản" },
+                { href: "/forbidden", label: "Chính sách" },
+              ]}
+            />
+          </div>
+        </div>
+      </footer>
+
+      <div className="fixed inset-x-4 bottom-4 z-20 md:hidden">
+        <div className="grid grid-cols-4 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-[0_20px_48px_-24px_rgba(15,23,42,0.45)] backdrop-blur">
+          <MobileNavItem href="/listings" label="Tìm xe" active={isActive(active, "/listings")}>
+            <LayoutGrid className="h-4 w-4" />
+          </MobileNavItem>
+          <MobileNavItem href="/me/bookings" label="Chuyến đi" active={isActive(active, "/me/bookings")}>
+            <CarFront className="h-4 w-4" />
+          </MobileNavItem>
+          <MobileNavItem href="/host/dashboard" label="Host" active={isActive(active, "/host/dashboard")}>
+            <User className="h-4 w-4" />
+          </MobileNavItem>
+          <MobileNavItem href="/" label="Hỗ trợ" active={active === "/"}>
+            <CircleHelp className="h-4 w-4" />
+          </MobileNavItem>
+        </div>
+      </div>
     </div>
   );
 }
@@ -174,4 +216,48 @@ function isActive(current: string, href: string): boolean {
     return current === "/";
   }
   return current === href || current.startsWith(`${href}/`);
+}
+
+function FooterColumn({
+  title,
+  links,
+}: {
+  title: string;
+  links: { href: string; label: string }[];
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="font-semibold uppercase tracking-[0.16em] text-foreground/80">{title}</p>
+      {links.map((link) => (
+        <Link key={link.href} href={link.href} className="block hover:text-primary">
+          {link.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function MobileNavItem({
+  href,
+  label,
+  active,
+  children,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold transition-colors",
+        active ? "bg-primary/8 text-primary" : "text-muted-foreground",
+      )}
+    >
+      {children}
+      <span>{label}</span>
+    </Link>
+  );
 }

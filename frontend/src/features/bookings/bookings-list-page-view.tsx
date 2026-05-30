@@ -36,19 +36,21 @@ export function BookingsListPageView() {
   return (
     <AppShell activePath="/me/bookings">
       <div className="space-y-6">
-        <PageHeader
-          title="Don thue cua toi"
-          description="Danh sach don thue cua ban."
-        />
+        <section className="rf-section-card p-6 md:p-8">
+          <PageHeader
+            title="Chuyến đi của tôi"
+            description="Theo dõi toàn bộ booking, trạng thái giữ chỗ và xác nhận từ chủ xe."
+          />
+        </section>
 
-        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <section className="rf-section-card p-4">
           <div className="flex flex-wrap gap-2">
             {BOOKING_STATUS_FILTERS.map((status) => {
               const active = status === statusFilter;
               const label =
                 status === "ALL" || status === "HELD"
                   ? status
-                  : getBookingStatusLabel(status as any);
+                  : getBookingStatusLabel(status);
               return (
                 <button
                   key={status}
@@ -69,7 +71,7 @@ export function BookingsListPageView() {
         </section>
 
         {query.isLoading ? (
-          <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+          <section className="rf-section-card border-dashed p-10 text-center">
             <p className="text-sm text-muted-foreground">Dang tai...</p>
           </section>
         ) : null}
@@ -79,7 +81,7 @@ export function BookingsListPageView() {
         ) : null}
 
         {!query.isLoading && !query.isError && rows.length === 0 ? (
-          <section className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+          <section className="rf-section-card border-dashed p-10 text-center">
             <h2 className="text-xl font-bold text-foreground">Chua co don nao</h2>
             <p className="mt-2 text-sm text-muted-foreground">Tao don moi tu trang xe.</p>
           </section>
@@ -94,7 +96,7 @@ export function BookingsListPageView() {
         ) : null}
 
         {totalPages > 1 ? (
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-card px-4 py-4 text-sm">
             <button
               type="button"
               disabled={page === 0 || query.isFetching}

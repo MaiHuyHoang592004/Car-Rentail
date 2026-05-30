@@ -220,11 +220,11 @@ export async function getListingDetailById(listingId: string): Promise<ListingDe
 }
 
 export async function getFeaturedListings(limit = 3): Promise<ListingCardViewModel[]> {
-  const raw = await api.get<RawPageResponse<RawListingSummaryResponse>>(
-    `/host/listings?status=ACTIVE&size=${limit}`,
+  const raw = await api.get<RawPageResponse<RawListingSearchResponse>>(
+    `/listings?page=0&size=${limit}`,
     { skipAuth: true },
   );
-  return raw.content.map(toListingCard);
+  return raw.content.map(mapListingSearchResponse);
 }
 
 export async function getPublicListings(params: string): Promise<ListingCardViewModel[]> {

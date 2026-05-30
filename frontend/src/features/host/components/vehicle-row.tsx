@@ -15,7 +15,7 @@ export function VehicleRow({ vehicle }: VehicleRowProps) {
   const canCreateListing = vehicle.status === "ACTIVE";
 
   return (
-    <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
+    <article className="rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         {/* Left: vehicle info */}
         <div className="min-w-0 flex-1 space-y-2">
@@ -25,7 +25,7 @@ export function VehicleRow({ vehicle }: VehicleRowProps) {
               {vehicle.city}
             </p>
           </div>
-          <h3 className="text-lg font-bold text-foreground truncate">
+          <h3 className="truncate text-lg font-bold text-foreground">
             {vehicle.make} {vehicle.model} ({vehicle.year})
           </h3>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -51,7 +51,7 @@ export function VehicleRow({ vehicle }: VehicleRowProps) {
           {canCreateListing ? (
             <Link
               href="/host/listings/new"
-              className="flex items-center gap-1 rounded-full border border-secondary bg-background px-3 py-1.5 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-accent"
+            className="flex items-center gap-1 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
             >
               <ListPlus className="h-3.5 w-3.5" />
               Tao tin dang

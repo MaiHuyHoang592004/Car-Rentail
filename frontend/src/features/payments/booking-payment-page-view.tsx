@@ -176,34 +176,30 @@ export function BookingPaymentPageView({ bookingId }: BookingPaymentPageViewProp
   const isPending = authorizeMutation.isPending;
   const isCaptured = hasPayment && payment!.payment.status === "CAPTURED";
   const isFailed = hasPayment && payment!.payment.status === "FAILED";
-  const isRefundOrVoid =
-    hasPayment &&
-    (payment!.payment.status === "REFUNDED" ||
-      payment!.payment.status === "PARTIALLY_REFUNDED" ||
-      payment!.payment.status === "VOIDED");
-
   return (
     <AppShell activePath="/me/bookings">
       <div className="space-y-6">
-        <PageHeader
-          title="Thanh toan"
-          description={booking.listingTitle}
-          actions={
-            <Link
-              href={`/bookings/${bookingId}`}
-              className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
-            >
-              Quay ve
-            </Link>
-          }
-        />
+        <section className="rf-section-card p-6 md:p-8">
+          <PageHeader
+            title="Thanh toán đặt xe"
+            description={booking.listingTitle}
+            actions={
+              <Link
+                href={`/bookings/${bookingId}`}
+                className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+              >
+                Quay ve
+              </Link>
+            }
+          />
+        </section>
 
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
           {/* Left column: status + bank selection + transfer */}
           <div className="min-w-0 flex-1 space-y-5">
             {/* Payment status card */}
             {hasPayment ? (
-              <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <section className="rf-section-card p-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -302,7 +298,7 @@ export function BookingPaymentPageView({ bookingId }: BookingPaymentPageViewProp
 
             {/* Bank selection */}
             {isPayable && !isAuthorized && !isCaptured && (
-              <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <section className="rf-section-card p-5">
                 <h2 className="text-base font-bold text-foreground">Chon phuong thuc thanh toan</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Chon ngan hang hoac phuong thuc de thanh toan.
@@ -383,7 +379,7 @@ export function BookingPaymentPageView({ bookingId }: BookingPaymentPageViewProp
 
             {/* Technical details (collapsible) */}
             {hasPayment && (payment!.payment.externalOrderRef || payment!.payment.providerPaymentOrderId || payment!.payment.providerHoldId) ? (
-              <section className="rounded-xl border border-border bg-card shadow-sm">
+              <section className="rf-section-card overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setTechDetailsOpen((o) => !o)}
@@ -446,8 +442,8 @@ export function BookingPaymentPageView({ bookingId }: BookingPaymentPageViewProp
           </div>
 
           {/* Right column: sticky payment summary */}
-          <div className="w-full lg:sticky lg:top-6 lg:w-80 lg:shrink-0">
-            <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-4">
+          <div className="w-full lg:sticky lg:top-24 lg:w-80 lg:shrink-0">
+            <div className="rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.42)] space-y-4">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {booking.listingTitle}

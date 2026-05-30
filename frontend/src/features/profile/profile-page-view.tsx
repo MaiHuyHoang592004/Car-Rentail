@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/rentflow/empty-state";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { StatusBadge } from "@/components/rentflow/status-badge";
-import type { ProfileFormErrors, ProfileFormState } from "@/features/profile/types";
+import type { ProfileFormErrors, ProfileFormState, ProfileViewModel } from "@/features/profile/types";
 import { getProfile, resendVerificationEmail, updateProfile } from "@/features/profile/api";
 
 function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
@@ -37,33 +37,40 @@ function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
 }
 
 export function ProfilePageView() {
-  const queryClient = useQueryClient();
-
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile"],
     queryFn: getProfile,
   });
 
+  if (isLoading) {
+    return (
+      <AppShell activePath="/me/profile">
+        <PageSkeleton message="Đang tải hồ sơ..." />
+      </AppShell>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <AppShell activePath="/me/profile">
+        <EmptyState title="Không tải được hồ sơ" />
+      </AppShell>
+    );
+  }
+
+  return <ProfileContent profile={profile} />;
+}
+
+function ProfileContent({ profile }: { profile: ProfileViewModel }) {
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<ProfileFormState>({
-    fullName: "",
-    phone: "",
-    dateOfBirth: "",
-    addressLine: "",
+    fullName: profile.fullName,
+    phone: profile.phone,
+    dateOfBirth: profile.dateOfBirth,
+    addressLine: profile.addressLine,
   });
   const [errors, setErrors] = useState<ProfileFormErrors>({});
   const [banner, setBanner] = useState<string>("");
-
-  // Sync profile data into form state — runs once when profile loads.
-  useEffect(() => {
-    if (profile && form.fullName === "") {
-      setForm({
-        fullName: profile.fullName,
-        phone: profile.phone,
-        dateOfBirth: profile.dateOfBirth,
-        addressLine: profile.addressLine,
-      });
-    }
-  }, [profile, form.fullName]);
 
   const { mutate: doUpdate, isPending: saving } = useMutation({
     mutationFn: updateProfile,
@@ -107,22 +114,6 @@ export function ProfilePageView() {
       dateOfBirth: form.dateOfBirth || null,
       addressLine: form.addressLine.trim(),
     });
-  }
-
-  if (isLoading) {
-    return (
-      <AppShell activePath="/me/profile">
-        <PageSkeleton message="Đang tải hồ sơ..." />
-      </AppShell>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <AppShell activePath="/me/profile">
-        <EmptyState title="Không tải được hồ sơ" />
-      </AppShell>
-    );
   }
 
   return (

@@ -10,6 +10,8 @@ import type { HostListingViewModel } from "@/features/host/types";
 
 type HostListingRowProps = {
   listing: HostListingViewModel;
+  onResume?: (listingId: string) => void;
+  resumePending?: boolean;
 };
 
 function nextActionLabel(status: string): string {
@@ -23,7 +25,9 @@ function nextActionLabel(status: string): string {
   }
 }
 
-export function HostListingRow({ listing }: HostListingRowProps) {
+export function HostListingRow({ listing, onResume, resumePending = false }: HostListingRowProps) {
+  const canResume = listing.status === "SUSPENDED" && onResume;
+
   return (
     <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -48,6 +52,16 @@ export function HostListingRow({ listing }: HostListingRowProps) {
             status={listing.status}
             label={getListingStatusLabel(listing.status)}
           />
+          {canResume ? (
+            <button
+              type="button"
+              disabled={resumePending}
+              onClick={() => onResume?.(listing.id)}
+              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {resumePending ? "Dang kich hoat..." : "Kich hoat"}
+            </button>
+          ) : null}
           <Link
             href={`/host/listings/${listing.id}`}
             className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"

@@ -6,6 +6,8 @@ import { FeaturedListingsSection } from "@/features/public-home/featured-listing
 import { HowItWorksSection } from "@/features/public-home/how-it-works-section";
 import { HostCtaSection } from "@/features/public-home/host-cta-section";
 import { PublicHero } from "@/features/public-home/public-hero";
+import { TrustSection } from "@/features/public-home/trust-section";
+import { VehicleCategoriesSection } from "@/features/public-home/vehicle-categories-section";
 import { getFeaturedListings } from "@/features/listings/api";
 
 export function PublicHomePage() {
@@ -16,10 +18,14 @@ export function PublicHomePage() {
 
   return (
     <AppShell activePath="/">
-      <div className="space-y-6">
+      <div>
         <PublicHero />
-        <HowItWorksSection />
+        <VehicleCategoriesSection />
         <FeaturedListingsSection featured={featured} />
+        <div id="how-it-works">
+          <HowItWorksSection />
+        </div>
+        <TrustSection />
         <HostCtaSection />
       </div>
     </AppShell>

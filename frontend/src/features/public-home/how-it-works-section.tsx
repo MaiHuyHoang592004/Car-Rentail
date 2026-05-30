@@ -1,54 +1,43 @@
-﻿import { Car, CreditCard, Key, CalendarCheck } from "lucide-react";
+import { CalendarCheck, KeyRound, Search } from "lucide-react";
 
 const STEPS = [
   {
-    icon: Car,
-    title: "Chon xe",
-    description: "Duyet xe theo thanh pho, ngay va ngan sach phu hop voi ban.",
+    icon: Search,
+    title: "Tìm xe ưng ý",
+    description: "Duyệt xe theo địa điểm, thời gian, dòng xe và ngân sách phù hợp.",
   },
   {
     icon: CalendarCheck,
-    title: "Giu xe",
-    description: "Dat coc giu cho de xe duoc bao hanh trong vai phut.",
+    title: "Đặt xe và giữ chỗ",
+    description: "Chọn lịch thuê, kiểm tra chi phí rõ ràng và giữ chỗ trước chuyến đi.",
   },
   {
-    icon: CreditCard,
-    title: "Thanh toan",
-    description: "Thanh toan an toan qua nen tang tich hop. Khong phi an.",
-  },
-  {
-    icon: Key,
-    title: "Nhan xe",
-    description: "Nhan xe truc tiep voi chu xe. Kiem tra va bat dau hanh trinh.",
+    icon: KeyRound,
+    title: "Nhận xe và khởi hành",
+    description: "Hoàn tất thủ tục với chủ xe tại điểm hẹn rồi bắt đầu hành trình.",
   },
 ];
 
 export function HowItWorksSection() {
   return (
-    <section className="rounded-xl border border-border bg-card p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-foreground">Cach thuc hoat dong</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Thue xe chi trong 4 buoc don gian.
+    <section className="py-16 md:py-20">
+      <div className="mb-10 text-center">
+        <h2 className="text-3xl font-bold text-foreground">Bắt đầu hành trình chỉ với 3 bước</h2>
+        <p className="mt-2 text-base text-muted-foreground">
+          Dễ dàng, minh bạch và an tâm trong từng thao tác.
         </p>
       </div>
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {STEPS.map((step, index) => {
+
+      <div className="grid gap-8 md:grid-cols-3">
+        {STEPS.map((step) => {
           const Icon = step.icon;
           return (
-            <div key={step.title} className="flex flex-col items-start gap-3">
-              <div className="flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-full bg-primary/10">
-                  <Icon className="size-4 text-primary" strokeWidth={1.5} />
-                </span>
-                <span className="font-heading text-sm font-semibold text-muted-foreground">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
+            <div key={step.title} className="flex flex-col items-center text-center">
+              <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-[#dbe1ff] text-primary transition-colors">
+                <Icon className="h-7 w-7" strokeWidth={1.7} />
               </div>
-              <div>
-                <h3 className="font-semibold text-foreground">{step.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{step.description}</p>
-              </div>
+              <h3 className="text-xl font-semibold text-foreground">{step.title}</h3>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">{step.description}</p>
             </div>
           );
         })}

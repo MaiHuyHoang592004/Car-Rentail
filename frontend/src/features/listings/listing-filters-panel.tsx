@@ -1,7 +1,7 @@
 "use client";
 
 import type { UseFormReturn } from "react-hook-form";
-import { SlidersHorizontal, MapPin, X } from "lucide-react";
+import { CarFront, Fuel, MapPin, RotateCcw, Settings2, SlidersHorizontal } from "lucide-react";
 
 import type { ListingFilterState } from "@/features/listings/types";
 
@@ -12,206 +12,201 @@ type ListingFiltersPanelProps = {
 
 const CATEGORY_OPTIONS = [
   { value: "ALL", label: "Tất cả" },
-  { value: "SEDAN", label: "Sedan" },
-  { value: "SUV", label: "SUV" },
-  { value: "HATCHBACK", label: "Hatchback" },
-  { value: "LUXURY", label: "Hạng sang" },
-  { value: "SPORTS", label: "Thể thao" },
+  { value: "SEDAN", label: "Xe sedan" },
+  { value: "SUV", label: "SUV / CUV" },
+  { value: "PICKUP", label: "Xe bán tải" },
   { value: "MPV", label: "MPV" },
-  { value: "PICKUP", label: "Bán tải" },
+  { value: "HATCHBACK", label: "Hatchback" },
 ];
 
 const TRANSMISSION_OPTIONS = [
-  { value: "ALL", label: "Mọi hộp số" },
-  { value: "AUTO", label: "Tự động" },
-  { value: "MANUAL", label: "Số sàn" },
+  { value: "MANUAL", label: "Số sàn", icon: Settings2 },
+  { value: "AUTO", label: "Tự động", icon: RotateCcw },
 ];
 
 const FUEL_OPTIONS = [
-  { value: "ALL", label: "Mọi loại nhiên liệu" },
   { value: "GASOLINE", label: "Xăng" },
-  { value: "DIESEL", label: "Dầu" },
-  { value: "EV", label: "Điện" },
+  { value: "PETROL", label: "Xăng Petrol" },
+  { value: "DIESEL", label: "Dầu Diesel" },
+  { value: "EV", label: "Xe điện" },
   { value: "HYBRID", label: "Hybrid" },
 ];
 
+const SEAT_OPTIONS = ["4", "5", "7", "8", "16"];
+
 export function ListingFiltersPanel({ form, onReset }: ListingFiltersPanelProps) {
-  const { register, watch, setValue } = form;
+  const { register, setValue, watch } = form;
+  const category = watch("category");
+  const transmission = watch("transmission");
+  const fuelType = watch("fuelType");
+  const seats = watch("seats");
+  const maxPrice = watch("maxPrice") || "5000000";
 
   const hasActiveFilters =
     watch("city") ||
     watch("pickupDate") ||
     watch("returnDate") ||
-    watch("category") !== "ALL" ||
-    watch("transmission") !== "ALL" ||
-    watch("fuelType") !== "ALL" ||
-    watch("seats") ||
+    category !== "ALL" ||
+    transmission !== "ALL" ||
+    fuelType !== "ALL" ||
+    seats ||
     watch("minPrice") ||
     watch("maxPrice");
 
   return (
-    <section className="rounded-xl border border-border bg-card shadow-sm">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-4 py-3">
+    <aside className="space-y-6">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Bộ lọc tìm kiếm</h2>
+          <SlidersHorizontal className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold text-foreground">Bộ lọc</h2>
         </div>
         {hasActiveFilters ? (
           <button
             type="button"
             onClick={onReset}
-            className="flex items-center gap-1 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+            className="text-xs font-semibold text-primary hover:underline"
           >
-            <X className="h-3 w-3" />
-            Xóa lọc
+            Xóa tất cả
           </button>
         ) : null}
       </div>
 
-      <div className="p-4 space-y-5">
-        <div className="relative">
-          <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+      <div className="space-y-2">
+        <label className="text-sm font-semibold text-foreground">Thành phố</label>
+        <div className="relative flex items-center">
+          <MapPin className="pointer-events-none absolute left-3 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Thành phố hoặc địa điểm"
             {...register("city")}
-            className="h-11 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-12 w-full rounded-t-lg border-0 border-b-2 border-border bg-muted pl-10 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-0"
           />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Ngày nhận xe</label>
-            <input
-              type="date"
-              {...register("pickupDate")}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Ngày trả xe</label>
-            <input
-              type="date"
-              {...register("returnDate")}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
-            />
-          </div>
-        </div>
-
-        <div className="border-t border-border pt-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Loại xe
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {CATEGORY_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  watch("category") === opt.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-foreground hover:border-primary/50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  {...register("category")}
-                  value={opt.value}
-                  className="sr-only"
-                />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="border-t border-border pt-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Hộp số
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {TRANSMISSION_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  watch("transmission") === opt.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-foreground hover:border-primary/50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  {...register("transmission")}
-                  value={opt.value}
-                  className="sr-only"
-                />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="border-t border-border pt-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Nhiên liệu
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {FUEL_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  watch("fuelType") === opt.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-foreground hover:border-primary/50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  {...register("fuelType")}
-                  value={opt.value}
-                  className="sr-only"
-                />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="border-t border-border pt-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Số chỗ
-          </p>
-          <input
-            type="number"
-            min={1}
-            max={30}
-            placeholder="Số chỗ ngồi"
-            {...register("seats")}
-            className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2"
-          />
-        </div>
-
-        <div className="border-t border-border pt-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Khoảng giá (VND / ngày)
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="number"
-              min={0}
-              placeholder="Tối thiểu"
-              {...register("minPrice")}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2"
-            />
-            <input
-              type="number"
-              min={0}
-              placeholder="Tối đa"
-              {...register("maxPrice")}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2"
-            />
-          </div>
         </div>
       </div>
-    </section>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">Loại xe</h3>
+        <div className="flex flex-wrap gap-2">
+          {CATEGORY_OPTIONS.map((option) => (
+            <label
+              key={option.value}
+              className={[
+                "cursor-pointer rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
+                category === option.value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-[#d5e3fc] hover:text-foreground",
+              ].join(" ")}
+            >
+              <input type="radio" value={option.value} {...register("category")} className="sr-only" />
+              {option.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">Giá thuê (VND/ngày)</h3>
+        <input
+          type="range"
+          min={300000}
+          max={5000000}
+          step={100000}
+          value={maxPrice}
+          onChange={(event) =>
+            setValue("maxPrice", event.target.value, { shouldDirty: true, shouldValidate: true })
+          }
+          className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-[#e0e3e5] accent-primary"
+        />
+        <div className="flex justify-between text-xs font-medium text-muted-foreground">
+          <span>300.000đ</span>
+          <span>{Number(maxPrice).toLocaleString("vi-VN")}đ</span>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">Truyền động</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {TRANSMISSION_OPTIONS.map((option) => {
+            const Icon = option.icon;
+            return (
+              <label
+                key={option.value}
+                className={[
+                  "flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+                  transmission === option.value
+                    ? "border-primary bg-[#dbe1ff] text-primary"
+                    : "border-border bg-background text-foreground hover:border-primary/60",
+                ].join(" ")}
+              >
+                <input type="radio" value={option.value} {...register("transmission")} className="sr-only" />
+                <Icon className="h-4 w-4" />
+                {option.label}
+              </label>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => setValue("transmission", "ALL", { shouldDirty: true, shouldValidate: true })}
+          className="text-xs font-medium text-muted-foreground hover:text-primary"
+        >
+          Mọi hộp số
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">Nhiên liệu</h3>
+        <div className="space-y-2">
+          {FUEL_OPTIONS.map((option) => (
+            <label key={option.value} className="flex cursor-pointer items-center gap-3">
+              <input
+                type="radio"
+                value={option.value}
+                {...register("fuelType")}
+                className="h-5 w-5 rounded border-border text-primary focus:ring-primary"
+              />
+              <span className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                <Fuel className="h-4 w-4" />
+                {option.label}
+              </span>
+            </label>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setValue("fuelType", "ALL", { shouldDirty: true, shouldValidate: true })}
+          className="text-xs font-medium text-muted-foreground hover:text-primary"
+        >
+          Mọi loại nhiên liệu
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">Số chỗ</h3>
+        <div className="flex flex-wrap gap-2">
+          {SEAT_OPTIONS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() =>
+                setValue("seats", seats === option ? "" : option, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+              className={[
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                seats === option
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-[#d5e3fc] hover:text-foreground",
+              ].join(" ")}
+            >
+              <CarFront className="h-3.5 w-3.5" />
+              {option} chỗ
+            </button>
+          ))}
+        </div>
+      </div>
+    </aside>
   );
 }

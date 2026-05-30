@@ -1,8 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { CalendarDays, MapPin, Search } from "lucide-react";
+
+const HERO_IMAGE =
+  "https://lh3.googleusercontent.com/aida-public/AB6AXuCiKNyraDW6U-PI3b59GrtgAVbagTi3niJH9lQWdO4B2d2Ix5CJ2arIKjarpMiHWG1op3rxMQIfyYnijraTxpLjgLlrvt3D8u65WDQ_sN94VUSaNCFN7pko0MIiwdJkJ3F54aa0Vhee686MvLPGcL6MbmRbwvAYbiCDranB8HPhaMUMRbRnvPgedJW_t-O5nfpEciL2Nn0lOM99Wbneh3ceXY1CQV2kQwJojIYqcGF-KM42pqlJlJ2uGZ3-nFg2LjZtkOQPRwnWV10";
 
 function todayPlus(days: number): string {
   const d = new Date();
@@ -22,90 +25,90 @@ export function PublicHero() {
     if (city.trim()) params.set("city", city.trim());
     if (pickupDate) params.set("pickupDate", pickupDate);
     if (returnDate) params.set("returnDate", returnDate);
-    const query = params.toString();
-    const path = query ? "/listings?" + query : "/listings";
-    router.push(path);
+    router.push(params.size ? `/listings?${params.toString()}` : "/listings");
   }
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl" />
-      <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-secondary/20 blur-3xl" />
+    <section className="relative left-1/2 min-h-[620px] w-screen -translate-x-1/2 overflow-hidden">
+      <img
+        src={HERO_IMAGE}
+        alt="Xe sedan cao cap dang di qua cau do thi vao gio vang"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/70 via-slate-950/42 to-slate-950/18" />
 
-      <div className="relative px-6 py-10 md:px-10 md:py-14">
-        <div className="max-w-2xl space-y-5">
-          <h1 className="text-4xl font-bold leading-tight text-foreground md:text-5xl">
-            Thue xe tu lai de dang, minh bach va an toan
+      <div className="rf-shell-container relative z-10 flex min-h-[620px] items-center py-20">
+        <div className="w-full max-w-4xl text-center md:text-left">
+          <h1 className="max-w-3xl text-4xl font-bold leading-tight text-white md:text-6xl">
+            Thuê xe tự lái, hành trình tự do và minh bạch
           </h1>
-          <p className="text-base text-muted-foreground">
-            Tim kiem va dat xe theo thanh pho, ngay thue va ngan sach cua ban. Tat ca xe duoc xac minh, chu xe dang tin cay, va thanh toan bao mat.
+          <p className="mt-5 max-w-2xl text-base leading-7 text-white/86 md:text-lg">
+            Kết nối trực tiếp với chủ xe uy tín. Quy trình nhanh chóng, giá rõ ràng,
+            hỗ trợ xuyên suốt mỗi chuyến đi.
           </p>
 
-          <form onSubmit={handleSearch} className="mt-2">
-            <div className="flex flex-col gap-2 rounded-xl border border-border bg-background p-2 sm:flex-row sm:items-end">
-              <div className="flex-1 space-y-1">
-                <label className="px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Dia diem
-                </label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="VD: Ho Chi Minh, Ha Noi"
-                  className="h-10 w-full rounded-lg border-0 bg-transparent px-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
-                />
-              </div>
-              <div className="flex-1 space-y-1 sm:flex-[0.8]">
-                <label className="px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Ngay nhan
-                </label>
-                <input
-                  type="date"
-                  value={pickupDate}
-                  onChange={(e) => setPickupDate(e.target.value)}
-                  className="h-10 w-full rounded-lg border-0 bg-transparent px-2 text-sm text-foreground focus:outline-none"
-                />
-              </div>
-              <div className="flex-1 space-y-1 sm:flex-[0.8]">
-                <label className="px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Ngay tra
-                </label>
-                <input
-                  type="date"
-                  value={returnDate}
-                  onChange={(e) => setReturnDate(e.target.value)}
-                  className="h-10 w-full rounded-lg border-0 bg-transparent px-2 text-sm text-foreground focus:outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 sm:w-auto"
-              >
-                <Search className="size-4" />
-                Tim xe
-              </button>
-            </div>
-          </form>
+          <form
+            onSubmit={handleSearch}
+            className="mt-8 grid gap-3 rounded-[1.75rem] bg-white/92 p-3 text-left shadow-[0_28px_80px_-32px_rgba(15,23,42,0.55)] backdrop-blur md:grid-cols-[1.1fr_1fr_1fr_auto] md:items-end"
+          >
+            <SearchField label="Địa điểm" icon={<MapPin className="h-5 w-5" />}>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Bạn muốn đi đâu?"
+                className="h-11 w-full border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-0"
+              />
+            </SearchField>
 
-          <div className="flex flex-wrap gap-3 pt-1">
-            <TrustPill text="Xe da xac minh" />
-            <TrustPill text="Gia minh bach" />
-            <TrustPill text="Thanh toan an toan" />
-            <TrustPill text="Ho tro khi co su co" />
-          </div>
+            <SearchField label="Ngày nhận" icon={<CalendarDays className="h-5 w-5" />}>
+              <input
+                type="date"
+                value={pickupDate}
+                onChange={(e) => setPickupDate(e.target.value)}
+                className="h-11 w-full border-0 bg-transparent px-0 text-sm text-foreground outline-none focus:ring-0"
+              />
+            </SearchField>
+
+            <SearchField label="Ngày trả" icon={<CalendarDays className="h-5 w-5" />}>
+              <input
+                type="date"
+                value={returnDate}
+                onChange={(e) => setReturnDate(e.target.value)}
+                className="h-11 w-full border-0 bg-transparent px-0 text-sm text-foreground outline-none focus:ring-0"
+              />
+            </SearchField>
+
+            <button
+              type="submit"
+              className="inline-flex h-13 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-[#0053db]"
+            >
+              <Search className="h-4 w-4" />
+              Tìm xe ngay
+            </button>
+          </form>
         </div>
       </div>
     </section>
   );
 }
 
-function TrustPill({ text }: { text: string }) {
+function SearchField({
+  label,
+  icon,
+  children,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">
-      <svg className="size-3 text-emerald-600" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M10 3L5 8.5L2 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      {text}
-    </span>
+    <label className="block rounded-xl bg-[#f2f4f6] px-4 py-2">
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+      <span className="mt-1 flex items-center gap-2 text-muted-foreground">
+        <span className="text-muted-foreground">{icon}</span>
+        {children}
+      </span>
+    </label>
   );
 }

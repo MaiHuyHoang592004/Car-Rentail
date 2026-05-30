@@ -49,75 +49,75 @@
 }
 
 :root {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-heading: "Manrope", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Be Vietnam Pro", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", "Consolas", monospace;
-  --background: #faf8ff;
-  --foreground: #191b23;
+  --background: #f7f9fb;
+  --foreground: #1e293b;
   --card: #ffffff;
-  --card-foreground: #191b23;
+  --card-foreground: #1e293b;
   --popover: #ffffff;
-  --popover-foreground: #191b23;
-  --primary: #003fb1;
+  --popover-foreground: #1e293b;
+  --primary: #004ac6;
   --primary-foreground: #ffffff;
-  --secondary: #fd761a;
+  --secondary: #515f74;
   --secondary-foreground: #ffffff;
-  --muted: #ededf8;
-  --muted-foreground: #434654;
-  --accent: #f3f3fe;
-  --accent-foreground: #191b23;
-  --destructive: #ba1a1a;
+  --muted: #eceef0;
+  --muted-foreground: #57657a;
+  --accent: #f2f4f6;
+  --accent-foreground: #1e293b;
+  --destructive: #ef4444;
   --border: #c3c5d7;
   --input: #c3c5d7;
-  --ring: #1353d8;
-  --chart-1: #003fb1;
-  --chart-2: #fd761a;
-  --chart-3: #852b00;
-  --chart-4: #7383d9;
-  --chart-5: #ad3b00;
-  --radius: 0.5rem;
+  --ring: #2563eb;
+  --chart-1: #004ac6;
+  --chart-2: #10b981;
+  --chart-3: #f59e0b;
+  --chart-4: #3b82f6;
+  --chart-5: #d97706;
+  --radius: 0.75rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: #191b23;
-  --sidebar-primary: #003fb1;
+  --sidebar-foreground: #1e293b;
+  --sidebar-primary: #004ac6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f3f3fe;
-  --sidebar-accent-foreground: #191b23;
+  --sidebar-accent: #f2f4f6;
+  --sidebar-accent-foreground: #1e293b;
   --sidebar-border: #c3c5d7;
-  --sidebar-ring: #1353d8;
+  --sidebar-ring: #2563eb;
 }
 
 .dark {
-  --background: #191b23;
-  --foreground: #f0f0fb;
-  --card: #2e3039;
-  --card-foreground: #f0f0fb;
-  --popover: #2e3039;
-  --popover-foreground: #f0f0fb;
-  --primary: #b5c4ff;
-  --primary-foreground: #00174d;
-  --secondary: #ffb690;
-  --secondary-foreground: #341100;
-  --muted: #434654;
-  --muted-foreground: #c3c5d7;
-  --accent: #434654;
-  --accent-foreground: #f0f0fb;
+  --background: #111827;
+  --foreground: #eff1f3;
+  --card: #1f2937;
+  --card-foreground: #eff1f3;
+  --popover: #1f2937;
+  --popover-foreground: #eff1f3;
+  --primary: #b4c5ff;
+  --primary-foreground: #00174b;
+  --secondary: #c7d2fe;
+  --secondary-foreground: #0f172a;
+  --muted: #273245;
+  --muted-foreground: #c3c6d7;
+  --accent: #273245;
+  --accent-foreground: #eff1f3;
   --destructive: #ffb4ab;
-  --border: #737686;
-  --input: #737686;
-  --ring: #b5c4ff;
-  --chart-1: #b5c4ff;
-  --chart-2: #ffb690;
-  --chart-3: #ffd4c5;
-  --chart-4: #d4dcff;
-  --chart-5: #ffdbca;
-  --sidebar: #2e3039;
-  --sidebar-foreground: #f0f0fb;
-  --sidebar-primary: #b5c4ff;
-  --sidebar-primary-foreground: #00174d;
-  --sidebar-accent: #434654;
-  --sidebar-accent-foreground: #f0f0fb;
-  --sidebar-border: #737686;
-  --sidebar-ring: #b5c4ff;
+  --border: #475569;
+  --input: #475569;
+  --ring: #b4c5ff;
+  --chart-1: #b4c5ff;
+  --chart-2: #6ee7b7;
+  --chart-3: #fbbf24;
+  --chart-4: #93c5fd;
+  --chart-5: #f59e0b;
+  --sidebar: #111827;
+  --sidebar-foreground: #eff1f3;
+  --sidebar-primary: #b4c5ff;
+  --sidebar-primary-foreground: #00174b;
+  --sidebar-accent: #273245;
+  --sidebar-accent-foreground: #eff1f3;
+  --sidebar-border: #475569;
+  --sidebar-ring: #b4c5ff;
 }
 
 @layer base {
@@ -135,5 +135,19 @@
   h3,
   h4 {
     font-family: var(--font-heading), var(--font-sans), sans-serif;
+  }
+}
+
+@layer components {
+  .rf-shell-container {
+    @apply mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .rf-section-card {
+    @apply rounded-3xl border border-border/70 bg-card shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)];
+  }
+
+  .rf-subtle-card {
+    @apply rounded-2xl border border-border/70 bg-card shadow-[0_12px_28px_-20px_rgba(15,23,42,0.28)];
   }
 }

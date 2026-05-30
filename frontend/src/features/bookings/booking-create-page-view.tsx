@@ -28,9 +28,16 @@ type VerificationGateState = {
 type BookingCreatePageViewProps = {
   listingId: string;
   isGuest: boolean;
+  initialPickupDate?: string;
+  initialReturnDate?: string;
 };
 
-export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageViewProps) {
+export function BookingCreatePageView({
+  listingId,
+  isGuest,
+  initialPickupDate = "",
+  initialReturnDate = "",
+}: BookingCreatePageViewProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: listing } = useQuery({
@@ -41,8 +48,8 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
   const form = useForm<BookingCreateFormState>({
     resolver: zodResolver(bookingCreateSchema),
     defaultValues: {
-      pickupDate: "",
-      returnDate: "",
+      pickupDate: initialPickupDate,
+      returnDate: initialReturnDate,
       pickupLocation: "",
       returnLocation: "",
       selectedExtraIds: [],
@@ -141,59 +148,73 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
 
   return (
     <AppShell activePath="/listings">
-      <div className="space-y-5">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-foreground">Dat xe</h1>
+      <div className="space-y-6">
+        <section className="rf-section-card p-6 md:p-8">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary/80">
+                Hoàn tất đặt xe
+              </p>
+              <h1 className="mt-2 text-3xl font-bold text-foreground md:text-4xl">Dat xe</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                Màn này giữ nguyên flow tạo booking và idempotency hiện tại, chỉ thay đổi cấu trúc hiển thị theo Stitch.
+              </p>
+            </div>
           <Link
             href={`/listings/${listingData.id}`}
-            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             Quay lai
           </Link>
-        </div>
+          </div>
+        </section>
 
-        {isGuest ? (
-          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm text-amber-900">Ban can dang nhap de hoan tat dat xe.</p>
-            <Link
-              href={`/login?next=/listings/${listingData.id}/book`}
-              className="mt-3 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-            >
-              Dang nhap de dat xe
-            </Link>
-          </section>
-        ) : null}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Hệ thống sẽ giữ xe trong 15 phút sau khi bạn gửi yêu cầu.
+            </div>
 
-        {overlap ? (
-          <section className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-            <p className="text-sm font-semibold text-rose-900">Trung booking</p>
-            <p className="mt-1 text-sm text-rose-800">{overlap}</p>
-            <Link
-              href="/me/bookings"
-              className="mt-3 inline-flex rounded-full bg-rose-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
-            >
-              Xem cac booking cua ban
-            </Link>
-          </section>
-        ) : null}
+            {isGuest ? (
+              <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm text-amber-900">Ban can dang nhap de hoan tat dat xe.</p>
+                <Link
+                  href={`/login?next=/listings/${listingData.id}/book`}
+                  className="mt-3 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                >
+                  Dang nhap de dat xe
+                </Link>
+              </section>
+            ) : null}
 
-        {verificationGate ? (
-          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-semibold text-amber-900">Email chua duoc xac minh</p>
-            <p className="mt-1 text-sm text-amber-800">{verificationGate.message}</p>
-            <Link
-              href="/me/profile"
-              className="mt-3 inline-flex rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
-            >
-              Xac minh email
-            </Link>
-          </section>
-        ) : null}
+            {overlap ? (
+              <section className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <p className="text-sm font-semibold text-rose-900">Trung booking</p>
+                <p className="mt-1 text-sm text-rose-800">{overlap}</p>
+                <Link
+                  href="/me/bookings"
+                  className="mt-3 inline-flex rounded-full bg-rose-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
+                >
+                  Xem cac booking cua ban
+                </Link>
+              </section>
+            ) : null}
 
-        {submitError ? <ApiErrorPanel error={submitError} /> : null}
+            {verificationGate ? (
+              <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-amber-900">Email chua duoc xac minh</p>
+                <p className="mt-1 text-sm text-amber-800">{verificationGate.message}</p>
+                <Link
+                  href="/me/profile"
+                  className="mt-3 inline-flex rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
+                >
+                  Xac minh email
+                </Link>
+              </section>
+            ) : null}
 
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1 space-y-5">
+            {submitError ? <ApiErrorPanel error={submitError} /> : null}
+
             <BookingSectionCard
               title="Thoi gian thue"
               icon={<CalendarDays className="h-5 w-5" />}
@@ -212,7 +233,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
                       },
                     })}
                     min={getTodayIsoDate()}
-                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+                    className="h-12 w-full rounded-2xl border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                   />
                   {errors.pickupDate ? (
                     <p className="mt-1 text-xs text-rose-700">{errors.pickupDate.message}</p>
@@ -231,7 +252,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
                       },
                     })}
                     min={pickupDate || getTodayIsoDate()}
-                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+                    className="h-12 w-full rounded-2xl border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
                   />
                   {errors.returnDate ? (
                     <p className="mt-1 text-xs text-rose-700">{errors.returnDate.message}</p>
@@ -253,7 +274,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
                     type="text"
                     {...form.register("pickupLocation")}
                     placeholder={listingData.address}
-                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2"
+                    className="h-12 w-full rounded-2xl border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2"
                   />
                 </div>
                 <div>
@@ -264,7 +285,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
                     type="text"
                     {...form.register("returnLocation")}
                     placeholder={listingData.address}
-                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2"
+                    className="h-12 w-full rounded-2xl border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-primary/30 focus:ring-2"
                   />
                 </div>
               </div>
@@ -275,32 +296,37 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
                 title="Dich vu them"
                 icon={<PlusCircle className="h-5 w-5" />}
               >
-                <div className="flex flex-col gap-2">
+                <div className="grid gap-3 md:grid-cols-2">
                   {listingData.extras.map((extra) => {
                     const checked = selectedExtraIds.includes(extra.id);
                     return (
                       <label
                         key={extra.id}
-                        className={`flex items-center justify-between rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                        className={`rounded-2xl border px-4 py-4 transition-colors ${
                           checked
                             ? "border-primary bg-primary/5"
                             : "border-border bg-background hover:border-primary/50"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <span className="text-sm font-semibold text-foreground">
+                              {extra.name}
+                            </span>
+                            <p className="text-xs text-muted-foreground">
+                              Tien ich bo sung cho chuyen di.
+                            </p>
+                          </div>
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleExtra(extra.id)}
-                            className="size-4 rounded border-input accent-primary"
+                            className="mt-1 size-4 rounded border-input accent-primary"
                           />
-                          <span className="text-sm font-medium text-foreground">
-                            {extra.name}
-                          </span>
                         </div>
-                        <span className="text-sm font-semibold text-foreground">
+                        <div className="mt-4 text-sm font-semibold text-foreground">
                           {extra.price.toLocaleString("vi-VN")} {extra.currency}
-                        </span>
+                        </div>
                       </label>
                     );
                   })}
@@ -320,7 +346,7 @@ export function BookingCreatePageView({ listingId, isGuest }: BookingCreatePageV
             ) : null}
           </div>
 
-          <div className="w-full lg:sticky lg:top-6 lg:w-80 lg:shrink-0">
+          <div className="lg:sticky lg:top-24">
             <BookingPriceSummary
               listing={listingData}
               pickupDate={pickupDate}
