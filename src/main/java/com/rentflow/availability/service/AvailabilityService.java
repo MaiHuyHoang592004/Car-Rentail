@@ -31,6 +31,7 @@ import java.util.UUID;
 public class AvailabilityService {
 
     private static final int DAYS_TO_GENERATE = 365;
+    private static final int MAX_EXTEND_DAYS = 730;
 
     private final AvailabilityCalendarRepository availabilityRepository;
     private final ListingRepository listingRepository;
@@ -159,6 +160,114 @@ public class AvailabilityService {
                 AvailabilityStatus.FREE, AvailabilityStatus.BLOCKED);
         log.info("Unblocked {} dates for listing {}", updated, listingId);
         return updated;
+    }
+
+    @Transactional
+    public int blockDateRange(UUID listingId, LocalDate from, LocalDate to, UUID hostId) {
+        checkOwnership(listingId, hostId);
+        validateInclusiveRange(from, to);
+
+        List<AvailabilityCalendar> rows = availabilityRepository
+                .findByListingIdAndAvailableDateBetweenOrderByAvailableDateAsc(listingId, from, to);
+        List<LocalDate> conflicts = rows.stream()
+                .filter(row -> row.getStatus() == AvailabilityStatus.HOLD || row.getStatus() == AvailabilityStatus.BOOKED)
+                .map(AvailabilityCalendar::getAvailableDate)
+                .toList();
+        if (!conflicts.isEmpty()) {
+            throw new BusinessRuleException("AVAILABILITY_CONFLICT",
+                    "Cannot block range because some dates are reserved: " + summarizeDates(conflicts));
+        }
+
+        List<LocalDate> freeDates = rows.stream()
+                .filter(row -> row.getStatus() == AvailabilityStatus.FREE)
+                .map(AvailabilityCalendar::getAvailableDate)
+                .toList();
+        if (freeDates.isEmpty()) {
+            return 0;
+        }
+
+        int updated = availabilityRepository.updateStatusByDates(
+                listingId,
+                freeDates,
+                AvailabilityStatus.BLOCKED,
+                AvailabilityStatus.FREE);
+        log.info("Blocked {} dates for listing {} ({} to {})", updated, listingId, from, to);
+        return updated;
+    }
+
+    @Transactional
+    public int unblockDateRange(UUID listingId, LocalDate from, LocalDate to, UUID hostId) {
+        checkOwnership(listingId, hostId);
+        validateInclusiveRange(from, to);
+
+        List<AvailabilityCalendar> rows = availabilityRepository
+                .findByListingIdAndAvailableDateBetweenOrderByAvailableDateAsc(listingId, from, to);
+        List<LocalDate> conflicts = rows.stream()
+                .filter(row -> row.getStatus() == AvailabilityStatus.HOLD || row.getStatus() == AvailabilityStatus.BOOKED)
+                .map(AvailabilityCalendar::getAvailableDate)
+                .toList();
+        if (!conflicts.isEmpty()) {
+            throw new BusinessRuleException("AVAILABILITY_CONFLICT",
+                    "Cannot unblock range because some dates are reserved: " + summarizeDates(conflicts));
+        }
+
+        List<LocalDate> blockedDates = rows.stream()
+                .filter(row -> row.getStatus() == AvailabilityStatus.BLOCKED)
+                .map(AvailabilityCalendar::getAvailableDate)
+                .toList();
+        if (blockedDates.isEmpty()) {
+            return 0;
+        }
+
+        int updated = availabilityRepository.updateStatusByDates(
+                listingId,
+                blockedDates,
+                AvailabilityStatus.FREE,
+                AvailabilityStatus.BLOCKED);
+        log.info("Unblocked {} dates for listing {} ({} to {})", updated, listingId, from, to);
+        return updated;
+    }
+
+    @Transactional
+    public int extendAvailability(UUID listingId, LocalDate throughDate, UUID hostId) {
+        checkOwnership(listingId, hostId);
+        if (throughDate == null) {
+            throw new IllegalArgumentException("throughDate is required");
+        }
+
+        LocalDate today = LocalDate.now(clock);
+        LocalDate maxAllowedDate = today.plusDays(MAX_EXTEND_DAYS);
+        if (throughDate.isAfter(maxAllowedDate)) {
+            throw new BusinessRuleException("AVAILABILITY_EXTEND_LIMIT",
+                    "throughDate must be on or before " + maxAllowedDate);
+        }
+
+        LocalDate startDate = availabilityRepository.findMaxAvailableDateByListingId(listingId)
+                .map(date -> date.plusDays(1))
+                .orElse(today);
+        if (throughDate.isBefore(startDate)) {
+            return 0;
+        }
+
+        int inserted = availabilityRepository.insertAvailabilityRange(listingId, startDate, throughDate);
+        log.info("Extended {} availability dates for listing {} through {}", inserted, listingId, throughDate);
+        return inserted;
+    }
+
+    private void validateInclusiveRange(LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            throw new IllegalArgumentException("from and to are required");
+        }
+        if (to.isBefore(from)) {
+            throw new IllegalArgumentException("to must be on or after from");
+        }
+    }
+
+    private String summarizeDates(List<LocalDate> dates) {
+        if (dates.size() <= 5) {
+            return dates.toString();
+        }
+        return dates.subList(0, 5) + " and " + (dates.size() - 5) + " more";
     }
 
     private HostDateStatus toHostDateStatus(AvailabilityCalendar row) {

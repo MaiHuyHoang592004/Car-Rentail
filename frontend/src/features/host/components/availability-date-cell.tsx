@@ -56,6 +56,7 @@ export function AvailabilityDateCell({ day, selected, onToggle }: AvailabilityDa
       <p className="text-[10px] text-muted-foreground">{weekday}</p>
       <p className="font-semibold">{dayLabel}</p>
       <p className="mt-0.5 text-[10px] opacity-80">{statusLabel(day.status)}</p>
+      {day.bookingId ? <p className="mt-1 truncate text-[10px] opacity-70">#{day.bookingId.slice(0, 8)}</p> : null}
     </button>
   );
 }

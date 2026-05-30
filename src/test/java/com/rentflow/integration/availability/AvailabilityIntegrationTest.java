@@ -185,6 +185,44 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("block-range updates inclusive FREE dates")
+    void blockRange_updatesInclusiveRange() throws Exception {
+        String listingId = createAndApproveListing();
+
+        mockMvc.perform(post("/api/v1/host/listings/{id}/availability/block-range", listingId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            { "from": "2026-07-10", "to": "2026-07-12" }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedCount").value(3));
+
+        assertThat(statusFor(listingId, LocalDate.of(2026, 7, 10))).isEqualTo(AvailabilityStatus.BLOCKED);
+        assertThat(statusFor(listingId, LocalDate.of(2026, 7, 11))).isEqualTo(AvailabilityStatus.BLOCKED);
+        assertThat(statusFor(listingId, LocalDate.of(2026, 7, 12))).isEqualTo(AvailabilityStatus.BLOCKED);
+    }
+
+    @Test
+    @DisplayName("extend adds only missing future dates")
+    void extend_addsMissingFutureDates() throws Exception {
+        String listingId = createAndApproveListing();
+        long before = availabilityRepository.countByListingId(UUID.fromString(listingId));
+
+        mockMvc.perform(post("/api/v1/host/listings/{id}/availability/extend", listingId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            { "throughDate": "2027-06-29" }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedCount").value(30));
+
+        long after = availabilityRepository.countByListingId(UUID.fromString(listingId));
+        assertThat(after).isEqualTo(before + 30);
+    }
+
+    @Test
     @DisplayName("guest cannot access host availability view - returns 401")
     void guestCannotAccessHostView_returns401() throws Exception {
         String listingId = createAndApproveListing();
@@ -319,5 +357,12 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
             org.springframework.test.web.servlet.MvcResult result) throws Exception {
         return new com.fasterxml.jackson.databind.ObjectMapper()
                 .readTree(result.getResponse().getContentAsString());
+    }
+
+    private AvailabilityStatus statusFor(String listingId, LocalDate date) {
+        return availabilityRepository.findById(
+                        new com.rentflow.availability.entity.AvailabilityId(UUID.fromString(listingId), date))
+                .orElseThrow()
+                .getStatus();
     }
 }

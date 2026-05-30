@@ -62,3 +62,38 @@ export async function unblockAvailabilityDates(
   );
   return data.updatedCount;
 }
+
+export async function blockAvailabilityRange(
+  listingId: string,
+  from: string,
+  to: string,
+): Promise<number> {
+  const data = await api.post<AvailabilityUpdateResponse>(
+    `/host/listings/${listingId}/availability/block-range`,
+    { from, to },
+  );
+  return data.updatedCount;
+}
+
+export async function unblockAvailabilityRange(
+  listingId: string,
+  from: string,
+  to: string,
+): Promise<number> {
+  const data = await api.post<AvailabilityUpdateResponse>(
+    `/host/listings/${listingId}/availability/unblock-range`,
+    { from, to },
+  );
+  return data.updatedCount;
+}
+
+export async function extendAvailabilityThroughDate(
+  listingId: string,
+  throughDate: string,
+): Promise<number> {
+  const data = await api.post<AvailabilityUpdateResponse>(
+    `/host/listings/${listingId}/availability/extend`,
+    { throughDate },
+  );
+  return data.updatedCount;
+}

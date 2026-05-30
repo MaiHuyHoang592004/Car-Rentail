@@ -1,7 +1,9 @@
 package com.rentflow.availability.controller;
 
 import com.rentflow.availability.dto.AvailabilityUpdateResponse;
+import com.rentflow.availability.dto.DateRangeRequest;
 import com.rentflow.availability.dto.DateListRequest;
+import com.rentflow.availability.dto.ExtendAvailabilityRequest;
 import com.rentflow.availability.dto.HostAvailabilityResponse;
 import com.rentflow.availability.service.AvailabilityService;
 import com.rentflow.common.security.UserPrincipal;
@@ -50,6 +52,36 @@ public class HostAvailabilityController {
             @AuthenticationPrincipal UserPrincipal principal) {
         availabilityService.checkOwnership(id, principal.getUserId());
         int count = availabilityService.unblockDates(id, request.dates(), principal.getUserId());
+        return ResponseEntity.ok(new AvailabilityUpdateResponse(count));
+    }
+
+    @PostMapping("/{id}/availability/block-range")
+    public ResponseEntity<AvailabilityUpdateResponse> blockDateRange(
+            @PathVariable UUID id,
+            @RequestBody DateRangeRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        availabilityService.checkOwnership(id, principal.getUserId());
+        int count = availabilityService.blockDateRange(id, request.from(), request.to(), principal.getUserId());
+        return ResponseEntity.ok(new AvailabilityUpdateResponse(count));
+    }
+
+    @PostMapping("/{id}/availability/unblock-range")
+    public ResponseEntity<AvailabilityUpdateResponse> unblockDateRange(
+            @PathVariable UUID id,
+            @RequestBody DateRangeRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        availabilityService.checkOwnership(id, principal.getUserId());
+        int count = availabilityService.unblockDateRange(id, request.from(), request.to(), principal.getUserId());
+        return ResponseEntity.ok(new AvailabilityUpdateResponse(count));
+    }
+
+    @PostMapping("/{id}/availability/extend")
+    public ResponseEntity<AvailabilityUpdateResponse> extendAvailability(
+            @PathVariable UUID id,
+            @RequestBody ExtendAvailabilityRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        availabilityService.checkOwnership(id, principal.getUserId());
+        int count = availabilityService.extendAvailability(id, request.throughDate(), principal.getUserId());
         return ResponseEntity.ok(new AvailabilityUpdateResponse(count));
     }
 }

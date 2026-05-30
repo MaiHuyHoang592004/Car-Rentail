@@ -200,6 +200,137 @@ class AvailabilityServiceTest {
     }
 
     @Nested
+    @DisplayName("blockDateRange")
+    class BlockDateRange {
+
+        @Test
+        @DisplayName("with reserved date in range - throws AVAILABILITY_CONFLICT")
+        void blockDateRange_withReservedDate_throwsConflict() {
+            AvailabilityCalendar holdRow = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 5, 15));
+            holdRow.setStatus(AvailabilityStatus.HOLD);
+            AvailabilityCalendar freeRow = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 5, 16));
+            freeRow.setStatus(AvailabilityStatus.FREE);
+
+            when(availabilityRepository.findByListingIdAndAvailableDateBetweenOrderByAvailableDateAsc(
+                    LISTING_ID,
+                    LocalDate.of(2026, 5, 15),
+                    LocalDate.of(2026, 5, 16)))
+                    .thenReturn(List.of(holdRow, freeRow));
+
+            assertThatThrownBy(() -> availabilityService.blockDateRange(
+                    LISTING_ID,
+                    LocalDate.of(2026, 5, 15),
+                    LocalDate.of(2026, 5, 16),
+                    HOST_ID))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasFieldOrPropertyWithValue("code", "AVAILABILITY_CONFLICT");
+
+            verify(availabilityRepository, never()).updateStatusByDates(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("with inclusive FREE range - updates only FREE dates")
+        void blockDateRange_withInclusiveRange_updatesFreeDates() {
+            AvailabilityCalendar first = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 5, 15));
+            first.setStatus(AvailabilityStatus.FREE);
+            AvailabilityCalendar second = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 5, 16));
+            second.setStatus(AvailabilityStatus.BLOCKED);
+            AvailabilityCalendar third = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 5, 17));
+            third.setStatus(AvailabilityStatus.FREE);
+
+            when(availabilityRepository.findByListingIdAndAvailableDateBetweenOrderByAvailableDateAsc(
+                    LISTING_ID,
+                    LocalDate.of(2026, 5, 15),
+                    LocalDate.of(2026, 5, 17)))
+                    .thenReturn(List.of(first, second, third));
+            when(availabilityRepository.updateStatusByDates(
+                    eq(LISTING_ID),
+                    any(),
+                    eq(AvailabilityStatus.BLOCKED),
+                    eq(AvailabilityStatus.FREE)))
+                    .thenReturn(2);
+
+            int updated = availabilityService.blockDateRange(
+                    LISTING_ID,
+                    LocalDate.of(2026, 5, 15),
+                    LocalDate.of(2026, 5, 17),
+                    HOST_ID);
+
+            assertThat(updated).isEqualTo(2);
+            verify(availabilityRepository).updateStatusByDates(
+                    eq(LISTING_ID),
+                    eq(List.of(LocalDate.of(2026, 5, 15), LocalDate.of(2026, 5, 17))),
+                    eq(AvailabilityStatus.BLOCKED),
+                    eq(AvailabilityStatus.FREE));
+        }
+    }
+
+    @Nested
+    @DisplayName("unblockDateRange")
+    class UnblockDateRange {
+
+        @Test
+        @DisplayName("with HOLD in range - throws AVAILABILITY_CONFLICT")
+        void unblockDateRange_withReservedDate_throwsConflict() {
+            AvailabilityCalendar holdRow = new AvailabilityCalendar(LISTING_ID, LocalDate.of(2026, 5, 15));
+            holdRow.setStatus(AvailabilityStatus.HOLD);
+
+            when(availabilityRepository.findByListingIdAndAvailableDateBetweenOrderByAvailableDateAsc(
+                    LISTING_ID,
+                    LocalDate.of(2026, 5, 15),
+                    LocalDate.of(2026, 5, 15)))
+                    .thenReturn(List.of(holdRow));
+
+            assertThatThrownBy(() -> availabilityService.unblockDateRange(
+                    LISTING_ID,
+                    LocalDate.of(2026, 5, 15),
+                    LocalDate.of(2026, 5, 15),
+                    HOST_ID))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasFieldOrPropertyWithValue("code", "AVAILABILITY_CONFLICT");
+        }
+    }
+
+    @Nested
+    @DisplayName("extendAvailability")
+    class ExtendAvailability {
+
+        @Test
+        @DisplayName("extends only missing dates after current max date")
+        void extendAvailability_extendsOnlyMissingDates() {
+            when(availabilityRepository.findMaxAvailableDateByListingId(LISTING_ID))
+                    .thenReturn(Optional.of(LocalDate.of(2026, 5, 20)));
+            when(availabilityRepository.insertAvailabilityRange(
+                    LISTING_ID,
+                    LocalDate.of(2026, 5, 21),
+                    LocalDate.of(2026, 6, 10)))
+                    .thenReturn(21);
+
+            int inserted = availabilityService.extendAvailability(
+                    LISTING_ID,
+                    LocalDate.of(2026, 6, 10),
+                    HOST_ID);
+
+            assertThat(inserted).isEqualTo(21);
+        }
+
+        @Test
+        @DisplayName("when throughDate is already covered - returns zero")
+        void extendAvailability_whenAlreadyCovered_returnsZero() {
+            when(availabilityRepository.findMaxAvailableDateByListingId(LISTING_ID))
+                    .thenReturn(Optional.of(LocalDate.of(2026, 6, 30)));
+
+            int inserted = availabilityService.extendAvailability(
+                    LISTING_ID,
+                    LocalDate.of(2026, 6, 15),
+                    HOST_ID);
+
+            assertThat(inserted).isZero();
+            verify(availabilityRepository, never()).insertAvailabilityRange(any(), any(), any());
+        }
+    }
+
+    @Nested
     @DisplayName("getPublicAvailability")
     class GetPublicAvailability {
 

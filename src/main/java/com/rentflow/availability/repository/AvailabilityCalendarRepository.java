@@ -62,6 +62,9 @@ public interface AvailabilityCalendarRepository extends JpaRepository<Availabili
     @Query("SELECT COUNT(ac) FROM AvailabilityCalendar ac WHERE ac.listingId = :listingId")
     long countByListingId(@Param("listingId") UUID listingId);
 
+    @Query("SELECT MAX(ac.availableDate) FROM AvailabilityCalendar ac WHERE ac.listingId = :listingId")
+    Optional<LocalDate> findMaxAvailableDateByListingId(@Param("listingId") UUID listingId);
+
     @Modifying
     @Query(value = """
             INSERT INTO availability_calendar
@@ -104,4 +107,23 @@ public interface AvailabilityCalendarRepository extends JpaRepository<Availabili
             @Param("dates") List<LocalDate> dates,
             @Param("targetStatus") AvailabilityStatus targetStatus,
             @Param("currentStatus") AvailabilityStatus currentStatus);
+
+    @Query("""
+            SELECT COUNT(ac)
+            FROM AvailabilityCalendar ac
+            JOIN Listing l ON l.id = ac.listingId
+            WHERE l.hostId = :hostId
+              AND ac.status = :status
+            """)
+    long countByHostIdAndStatus(
+            @Param("hostId") UUID hostId,
+            @Param("status") AvailabilityStatus status);
+
+    @Query("""
+            SELECT COUNT(ac)
+            FROM AvailabilityCalendar ac
+            JOIN Listing l ON l.id = ac.listingId
+            WHERE l.hostId = :hostId
+            """)
+    long countByHostId(@Param("hostId") UUID hostId);
 }
