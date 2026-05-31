@@ -17,4 +17,6 @@ public interface ListingPhotoRepository extends JpaRepository<ListingPhoto, UUID
     Optional<ListingPhoto> findByIdAndListingId(UUID id, UUID listingId);
 
     List<ListingPhoto> findByListingIdInOrderByDisplayOrderAsc(Collection<UUID> listingIds);
+
+    boolean existsByFileId(UUID fileId);
 }

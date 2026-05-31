@@ -1,6 +1,8 @@
 package com.rentflow.file.controller;
 
 import com.rentflow.file.dto.AddVehiclePhotoRequest;
+import com.rentflow.file.dto.CreatePhotoUploadIntentRequest;
+import com.rentflow.file.dto.FileUploadIntentResponse;
 import com.rentflow.file.dto.UpdateVehiclePhotoRequest;
 import com.rentflow.file.dto.VehiclePhotoResponse;
 import com.rentflow.file.service.FileService;
@@ -28,6 +30,13 @@ import java.util.UUID;
 public class HostVehiclePhotoController {
 
     private final FileService fileService;
+
+    @PostMapping("/upload-intents")
+    public ResponseEntity<FileUploadIntentResponse> createVehiclePhotoUploadIntent(
+            @PathVariable UUID vehicleId,
+            @Valid @RequestBody CreatePhotoUploadIntentRequest request) {
+        return ResponseEntity.ok(fileService.createVehiclePhotoUploadIntent(vehicleId, request));
+    }
 
     @PostMapping
     public ResponseEntity<VehiclePhotoResponse> addVehiclePhoto(

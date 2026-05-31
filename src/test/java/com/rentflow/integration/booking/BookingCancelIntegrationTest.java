@@ -4,6 +4,7 @@ import com.rentflow.auth.entity.AuthUser;
 import com.rentflow.auth.entity.Role;
 import com.rentflow.auth.entity.UserStatus;
 import com.rentflow.auth.repository.AuthUserRepository;
+import com.rentflow.audit.repository.AuditLogRepository;
 import com.rentflow.availability.entity.AvailabilityCalendar;
 import com.rentflow.availability.entity.AvailabilityId;
 import com.rentflow.availability.entity.AvailabilityStatus;
@@ -75,6 +76,7 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @Autowired private BookingRepository bookingRepository;
     @Autowired private BookingTimelineEntryRepository bookingTimelineEntryRepository;
     @Autowired private AvailabilityCalendarRepository availabilityRepository;
+    @Autowired private AuditLogRepository auditLogRepository;
     @Autowired private IdempotencyKeyRepository idempotencyKeyRepository;
     @Autowired private BookingPaymentRepository bookingPaymentRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
@@ -93,6 +95,7 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         bookingTimelineEntryRepository.deleteAll();
+        auditLogRepository.deleteAll();
         paymentTransactionRepository.deleteAll();
         bookingPaymentRepository.deleteAll();
         availabilityRepository.deleteAll();
@@ -209,6 +212,9 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
 
         BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
+        assertThat(bookingTimelineEntryRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
+                .extracting(entry -> entry.getEventType())
+                .contains("PAYMENT_VOIDED", "BOOKING_CANCELLED");
     }
 
     @Test
@@ -315,6 +321,14 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
         assertThat(payment.getCapturedAmount()).isEqualByComparingTo("750000.00");
         assertThat(payment.getProviderStatus()).isEqualTo("VOIDED");
+
+        List<PaymentTransaction> txns = paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId());
+        assertThat(txns).hasSize(2);
+        assertThat(txns.get(0).getType()).isEqualTo(PaymentTransactionType.CAPTURE);
+        assertThat(txns.get(1).getType()).isEqualTo(PaymentTransactionType.VOID);
+        assertThat(bookingTimelineEntryRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
+                .extracting(entry -> entry.getEventType())
+                .containsSubsequence("PAYMENT_CAPTURED", "PAYMENT_VOIDED", "BOOKING_CANCELLED");
     }
 
     @Test
@@ -402,6 +416,42 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
         assertThat(notifications)
                 .extracting(n -> n.getType().name())
                 .contains(NotificationType.PAYMENT_VOID_RETRY_REQUIRED.name());
+    }
+
+    @Test
+    void cancelConfirmedPartialPenaltyAuditDetailsAreSanitized() throws Exception {
+        Booking booking = saveBooking(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.now().plusDays(2));
+        booking.setReturnDate(booking.getPickupDate().plusDays(2));
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
+                """);
+        bookingRepository.save(booking);
+        saveBookedAvailability(booking);
+        BookingPayment payment = saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.captureHold(any())).thenReturn(new CoreBankCaptureHoldResult(
+                new CoreBankCaptureHoldResponse("payment-order-1", "journal-1", "CAPTURED"),
+                "{\"paymentOrderId\":\"payment-order-1\",\"journalId\":\"journal-1\",\"status\":\"CAPTURED\"}"));
+        when(coreBankPaymentClient.voidHold(any())).thenReturn(new CoreBankVoidHoldResult(
+                new CoreBankVoidHoldResponse("hold-1", "VOIDED"),
+                "{\"holdId\":\"hold-1\",\"status\":\"VOIDED\"}"));
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Late cancel"}
+                                """))
+                .andExpect(status().isOk());
+
+        assertThat(auditLogRepository.findAll())
+                .filteredOn(log -> payment.getId().equals(log.getTargetId()))
+                .extracting(log -> log.getDetails())
+                .allSatisfy(details -> {
+                    assertThat((String) details).contains("\"providerPaymentOrderId\": \"[REDACTED]\"");
+                    assertThat((String) details).contains("\"providerHoldId\": \"[REDACTED]\"");
+                });
     }
 
     @Test
@@ -563,7 +613,7 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
         availabilityRepository.saveAll(List.of(first, second));
     }
 
-    private void saveAuthorizedPayment(UUID bookingId) {
+    private BookingPayment saveAuthorizedPayment(UUID bookingId) {
         BookingPayment payment = new BookingPayment();
         payment.setBookingId(bookingId);
         payment.setSelectedBankId(UUID.fromString("00000000-0000-0000-0000-000000000111"));
@@ -578,6 +628,6 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
         payment.setProviderPaymentOrderId("payment-order-1");
         payment.setProviderHoldId("hold-1");
         payment.setProviderStatus("AUTHORIZED");
-        bookingPaymentRepository.save(payment);
+        return bookingPaymentRepository.save(payment);
     }
 }

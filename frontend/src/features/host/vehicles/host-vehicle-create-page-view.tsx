@@ -12,7 +12,12 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { WorkspaceSidebar } from "@/components/rentflow/workspace-sidebar";
 import { HostWorkspaceNav } from "@/features/host/components/host-workspace-nav";
 import { vehicleFormSchema, type VehicleFormState } from "@/features/host/forms";
-import { addHostVehiclePhoto, createHostVehicle } from "@/features/host/vehicles/api";
+import {
+  addHostVehiclePhoto,
+  createHostVehicle,
+  createHostVehiclePhotoUploadIntent,
+  finalizeFileUpload,
+} from "@/features/host/vehicles/api";
 import { VehicleFormFields } from "@/features/host/vehicles/vehicle-form-fields";
 import {
   VehiclePhotoUpload,
@@ -105,11 +110,21 @@ export function HostVehicleCreatePageView() {
     const selectedPhotos = photosRef.current;
     for (const [index, photo] of selectedPhotos.entries()) {
       try {
-        await addHostVehiclePhoto(vehicleId, {
-          bucket: "rentflow-local",
-          objectKey: buildVehiclePhotoObjectKey(vehicleId, photo.file.name),
+        const intent = await createHostVehiclePhotoUploadIntent(vehicleId, {
           contentType: photo.file.type || "image/jpeg",
           sizeBytes: photo.file.size,
+        });
+        const uploadResponse = await fetch(intent.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": photo.file.type || "image/jpeg" },
+          body: photo.file,
+        });
+        if (!uploadResponse.ok) {
+          throw new Error("UPLOAD_BINARY_FAILED");
+        }
+        await finalizeFileUpload(intent.fileId);
+        await addHostVehiclePhoto(vehicleId, {
+          fileId: intent.fileId,
           primary: photo.primary || index === 0,
         });
       } catch {
@@ -311,12 +326,4 @@ export function HostVehicleCreatePageView() {
       </div>
     </WorkspaceSidebar>
   );
-}
-
-function buildVehiclePhotoObjectKey(vehicleId: string, fileName: string): string {
-  const safeName = fileName.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(-80);
-  const uniquePart = typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `vehicles/${vehicleId}/${uniquePart}-${safeName}`;
 }

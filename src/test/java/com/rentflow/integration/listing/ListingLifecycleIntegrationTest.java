@@ -230,6 +230,88 @@ class ListingLifecycleIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void hostListingDetail_returnsSuspensionMetadataForAdminSuspendedListing() throws Exception {
+        String vehicleId = createVehicle();
+        String listingId = createListing(vehicleId, "My Listing");
+
+        mockMvc.perform(post("/api/v1/host/listings/" + listingId + "/submit")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/approve")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/suspend")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "reason": "  Missing registration proof  ",
+                                  "source": "ADMIN_REVIEW",
+                                  "suspensionUntil": "2026-06-15T10:30:00Z"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUSPENDED"))
+                .andExpect(jsonPath("$.suspensionReason").value("Missing registration proof"))
+                .andExpect(jsonPath("$.suspensionSource").value("ADMIN_REVIEW"))
+                .andExpect(jsonPath("$.suspensionUntil").value("2026-06-15T10:30:00Z"));
+
+        mockMvc.perform(get("/api/v1/host/listings/" + listingId)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUSPENDED"))
+                .andExpect(jsonPath("$.suspensionReason").value("Missing registration proof"))
+                .andExpect(jsonPath("$.suspensionSource").value("ADMIN_REVIEW"))
+                .andExpect(jsonPath("$.suspensionUntil").value("2026-06-15T10:30:00Z"));
+    }
+
+    @Test
+    void hostListingDetail_keepsSuspendedListingReadableWhenMetadataMissing() throws Exception {
+        String vehicleId = createVehicle();
+        String listingId = createListing(vehicleId, "My Listing");
+
+        mockMvc.perform(post("/api/v1/host/listings/" + listingId + "/submit")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/listings/" + listingId + "/approve")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/host/vehicles/" + vehicleId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "status": "SUSPENDED" }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/host/listings/" + listingId)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUSPENDED"))
+                .andExpect(jsonPath("$.suspensionReason").doesNotExist())
+                .andExpect(jsonPath("$.suspensionSource").doesNotExist())
+                .andExpect(jsonPath("$.suspensionUntil").doesNotExist());
+    }
+
+    @Test
+    void nonSuspendedListingDetail_keepsSuspensionFieldsNull() throws Exception {
+        String vehicleId = createVehicle();
+        String listingId = createListing(vehicleId, "Draft Listing");
+
+        mockMvc.perform(get("/api/v1/host/listings/" + listingId)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.suspensionReason").doesNotExist())
+                .andExpect(jsonPath("$.suspensionSource").doesNotExist())
+                .andExpect(jsonPath("$.suspensionUntil").doesNotExist());
+    }
+
+    @Test
     void resumeSuspendedListing_transitionsToActiveWhenVehicleActive() throws Exception {
         String vehicleId = createVehicle();
         String listingId = createListing(vehicleId, "My Listing");

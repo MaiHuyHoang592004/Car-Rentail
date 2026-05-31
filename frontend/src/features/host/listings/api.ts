@@ -59,6 +59,9 @@ type RawListingDetail = {
   instantBook: boolean;
   cancellationPolicy: "FLEXIBLE" | "MODERATE" | "STRICT";
   status: RawListingStatus;
+  suspensionReason?: string | null;
+  suspensionSource?: string | null;
+  suspensionUntil?: string | null;
   vehicleSummary: RawVehicleSummary | null;
   extras?: RawExtra[];
   createdAt: string;
@@ -118,6 +121,9 @@ export function mapListingSummary(raw: RawListingSummary): HostListingViewModel 
     instantBook: false,
     cancellationPolicy: "FLEXIBLE" as const,
     status: raw.status,
+    suspensionReason: null,
+    suspensionSource: null,
+    suspensionUntil: null,
     extras: [],
   };
 }
@@ -137,6 +143,9 @@ export function mapListingDetail(raw: RawListingDetail): HostListingViewModel {
     instantBook: raw.instantBook,
     cancellationPolicy: raw.cancellationPolicy,
     status: raw.status,
+    suspensionReason: raw.suspensionReason ?? null,
+    suspensionSource: raw.suspensionSource ?? null,
+    suspensionUntil: raw.suspensionUntil ?? null,
     extras: (raw.extras ?? []).map(mapExtra),
   };
 }

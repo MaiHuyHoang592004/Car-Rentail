@@ -13,6 +13,8 @@ type VehicleRowProps = {
 
 export function VehicleRow({ vehicle }: VehicleRowProps) {
   const canCreateListing = vehicle.status === "ACTIVE";
+  const plateNumberDisplay = vehicle.plateNumber ?? "Khong doc duoc";
+  const vinDisplay = vehicle.vin ?? "Khong doc duoc";
 
   return (
     <article className="rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]">
@@ -38,10 +40,8 @@ export function VehicleRow({ vehicle }: VehicleRowProps) {
             <span>{vehicle.seats} cho</span>
           </div>
           <div className="text-xs text-muted-foreground">
-            <span>Bien so: <strong className="text-foreground">{vehicle.plateNumber}</strong></span>
-            {vehicle.vin ? (
-              <span className="ml-3">VIN: <strong className="text-foreground">{vehicle.vin}</strong></span>
-            ) : null}
+            <span>Bien so: <strong className="text-foreground">{plateNumberDisplay}</strong></span>
+            <span className="ml-3">VIN: <strong className="text-foreground">{vinDisplay}</strong></span>
           </div>
         </div>
 

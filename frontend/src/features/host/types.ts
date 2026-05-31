@@ -15,8 +15,13 @@ export type HostVehicleViewModel = {
   seats: number;
   status: HostVehicleStatus;
   city: string;
-  plateNumber: string;
-  vin: string;
+  plateNumber: string | null;
+  vin: string | null;
+  identifierIntegrity: {
+    plateNumberReadable: boolean;
+    vinReadable: boolean;
+    hasUnreadableEncryptedFields: boolean;
+  };
   primaryPhotoUrl?: string | null;
   photos?: {
     id: string;
@@ -41,6 +46,9 @@ export type HostListingViewModel = {
   instantBook: boolean;
   cancellationPolicy: "FLEXIBLE" | "MODERATE" | "STRICT";
   status: HostListingStatus;
+  suspensionReason?: string | null;
+  suspensionSource?: string | null;
+  suspensionUntil?: string | null;
   extras: HostListingExtraViewModel[];
 };
 

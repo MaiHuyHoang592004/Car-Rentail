@@ -10,6 +10,7 @@ import com.rentflow.common.security.SecurityContext;
 import com.rentflow.file.dto.AddListingPhotoRequest;
 import com.rentflow.file.dto.AddVehiclePhotoRequest;
 import com.rentflow.file.dto.CreateDisputeAttachmentUploadRequest;
+import com.rentflow.file.dto.CreatePhotoUploadIntentRequest;
 import com.rentflow.file.dto.FileUploadIntentResponse;
 import com.rentflow.file.dto.ListingPhotoResponse;
 import com.rentflow.file.dto.SignedFileUrlResponse;
@@ -51,6 +52,8 @@ public class FileService {
     private static final long PHOTO_MAX_BYTES = 10L * 1024 * 1024;
     private static final long DISPUTE_ATTACHMENT_MAX_BYTES = 10L * 1024 * 1024;
     private static final long VEHICLE_PHOTO_MAX_COUNT = 8L;
+    private static final String VEHICLE_PHOTO_BUCKET = "rentflow-vehicle-photos";
+    private static final String LISTING_PHOTO_BUCKET = "rentflow-listing-photos";
     private static final String DISPUTE_ATTACHMENT_BUCKET = "rentflow-dispute-attachments";
 
     private final FileMetadataRepository fileMetadataRepository;
@@ -79,26 +82,41 @@ public class FileService {
     }
 
     @Transactional
-    public ListingPhotoResponse addListingPhoto(UUID listingId, AddListingPhotoRequest request) {
+    public FileUploadIntentResponse createListingPhotoUploadIntent(UUID listingId, CreatePhotoUploadIntentRequest request) {
         validatePhotoInput(request.contentType(), request.sizeBytes(), "Listing photo");
         UUID hostId = securityContext.currentUserId();
         Listing listing = listingRepository.findByIdAndHostId(listingId, hostId)
                 .orElseThrow(() -> new ListingNotFoundException(listingId.toString()));
 
-        FileMetadata metadata = new FileMetadata();
-        metadata.setOwnerUserId(hostId);
-        metadata.setPurpose(FilePurpose.LISTING_PHOTO);
-        metadata.setBucket(request.bucket().trim());
-        metadata.setObjectKey(request.objectKey().trim());
-        metadata.setContentType(request.contentType().trim().toLowerCase());
-        metadata.setSizeBytes(request.sizeBytes());
-        metadata.setChecksum(request.checksum());
+        FileMetadata metadata = createPendingPhotoMetadata(
+                hostId,
+                FilePurpose.LISTING_PHOTO,
+                LISTING_PHOTO_BUCKET,
+                "listings/" + listingId + "/" + UUID.randomUUID(),
+                request,
+                listing.getStatus() == ListingStatus.ACTIVE ? FileVisibility.PUBLIC : FileVisibility.PRIVATE);
+        Signed signed = buildSignedUrl(metadata, "upload");
+        return new FileUploadIntentResponse(
+                metadata.getId(),
+                metadata.getBucket(),
+                metadata.getObjectKey(),
+                signed.url(),
+                signed.expiresAt());
+    }
+
+    @Transactional
+    public ListingPhotoResponse addListingPhoto(UUID listingId, AddListingPhotoRequest request) {
+        UUID hostId = securityContext.currentUserId();
+        Listing listing = listingRepository.findByIdAndHostId(listingId, hostId)
+                .orElseThrow(() -> new ListingNotFoundException(listingId.toString()));
+        FileMetadata metadata = requireAttachablePhotoFile(request.fileId(), hostId, FilePurpose.LISTING_PHOTO);
         metadata.setVisibility(listing.getStatus() == ListingStatus.ACTIVE ? FileVisibility.PUBLIC : FileVisibility.PRIVATE);
-        metadata.setStatus(FileStatus.ACTIVE);
         metadata = fileMetadataRepository.save(metadata);
 
-        long currentCount = listingPhotoRepository.countByListingId(listingId);
-        boolean primary = Boolean.TRUE.equals(request.primary()) || currentCount == 0;
+        int displayOrder = request.displayOrder() != null
+                ? request.displayOrder()
+                : (int) listingPhotoRepository.countByListingId(listingId);
+        boolean primary = Boolean.TRUE.equals(request.primary()) || listingPhotoRepository.countByListingId(listingId) == 0;
         if (primary) {
             clearListingPrimary(listingId);
         }
@@ -106,20 +124,10 @@ public class FileService {
         ListingPhoto photo = new ListingPhoto();
         photo.setListingId(listingId);
         photo.setFileId(metadata.getId());
-        photo.setDisplayOrder((int) currentCount);
+        photo.setDisplayOrder(displayOrder);
         photo.setPrimary(primary);
         photo = listingPhotoRepository.save(photo);
-
-        Signed signed = buildSignedUrl(metadata);
-        return new ListingPhotoResponse(
-                photo.getId(),
-                photo.getListingId(),
-                photo.getFileId(),
-                photo.isPrimary(),
-                photo.getDisplayOrder(),
-                metadata.getVisibility().name(),
-                signed.url(),
-                signed.expiresAt());
+        return toListingPhotoResponse(photo, metadata);
     }
 
     @Transactional(readOnly = true)
@@ -172,7 +180,7 @@ public class FileService {
     }
 
     @Transactional
-    public VehiclePhotoResponse addVehiclePhoto(UUID vehicleId, AddVehiclePhotoRequest request) {
+    public FileUploadIntentResponse createVehiclePhotoUploadIntent(UUID vehicleId, CreatePhotoUploadIntentRequest request) {
         validatePhotoInput(request.contentType(), request.sizeBytes(), "Vehicle photo");
         UUID hostId = securityContext.currentUserId();
         assertVehicleOwner(vehicleId, hostId);
@@ -182,16 +190,32 @@ public class FileService {
             throw new ValidationException("Vehicle can have at most 8 photos");
         }
 
-        FileMetadata metadata = new FileMetadata();
-        metadata.setOwnerUserId(hostId);
-        metadata.setPurpose(FilePurpose.VEHICLE_PHOTO);
-        metadata.setBucket(request.bucket().trim());
-        metadata.setObjectKey(request.objectKey().trim());
-        metadata.setContentType(request.contentType().trim().toLowerCase());
-        metadata.setSizeBytes(request.sizeBytes());
-        metadata.setChecksum(request.checksum());
+        FileMetadata metadata = createPendingPhotoMetadata(
+                hostId,
+                FilePurpose.VEHICLE_PHOTO,
+                VEHICLE_PHOTO_BUCKET,
+                "vehicles/" + vehicleId + "/" + UUID.randomUUID(),
+                request,
+                FileVisibility.PRIVATE);
+        Signed signed = buildSignedUrl(metadata, "upload");
+        return new FileUploadIntentResponse(
+                metadata.getId(),
+                metadata.getBucket(),
+                metadata.getObjectKey(),
+                signed.url(),
+                signed.expiresAt());
+    }
+
+    @Transactional
+    public VehiclePhotoResponse addVehiclePhoto(UUID vehicleId, AddVehiclePhotoRequest request) {
+        UUID hostId = securityContext.currentUserId();
+        assertVehicleOwner(vehicleId, hostId);
+        long currentCount = vehiclePhotoRepository.countByVehicleId(vehicleId);
+        if (currentCount >= VEHICLE_PHOTO_MAX_COUNT) {
+            throw new ValidationException("Vehicle can have at most 8 photos");
+        }
+        FileMetadata metadata = requireAttachablePhotoFile(request.fileId(), hostId, FilePurpose.VEHICLE_PHOTO);
         metadata.setVisibility(FileVisibility.PRIVATE);
-        metadata.setStatus(FileStatus.ACTIVE);
         metadata = fileMetadataRepository.save(metadata);
 
         boolean primary = Boolean.TRUE.equals(request.primary()) || currentCount == 0;
@@ -202,7 +226,7 @@ public class FileService {
         VehiclePhoto photo = new VehiclePhoto();
         photo.setVehicleId(vehicleId);
         photo.setFileId(metadata.getId());
-        photo.setDisplayOrder((int) currentCount);
+        photo.setDisplayOrder(request.displayOrder() != null ? request.displayOrder() : (int) currentCount);
         photo.setPrimary(primary);
         photo = vehiclePhotoRepository.save(photo);
 
@@ -361,14 +385,18 @@ public class FileService {
         if (!metadata.getOwnerUserId().equals(securityContext.currentUserId())) {
             throw new AccessDeniedException();
         }
-        if (metadata.getPurpose() != FilePurpose.DISPUTE_ATTACHMENT) {
-            throw new ValidationException("Only dispute attachment uploads can be finalized here");
-        }
         if (metadata.getStatus() == FileStatus.DELETED) {
             throw new ResourceNotFoundException("FILE_NOT_FOUND", "File", fileId.toString());
         }
-        metadata.setStatus(FileStatus.ACTIVE);
-        metadata = fileMetadataRepository.save(metadata);
+        if (metadata.getPurpose() != FilePurpose.DISPUTE_ATTACHMENT
+                && metadata.getPurpose() != FilePurpose.VEHICLE_PHOTO
+                && metadata.getPurpose() != FilePurpose.LISTING_PHOTO) {
+            throw new ValidationException("File purpose does not support finalize upload");
+        }
+        if (metadata.getStatus() == FileStatus.PENDING_UPLOAD) {
+            metadata.setStatus(FileStatus.ACTIVE);
+            metadata = fileMetadataRepository.save(metadata);
+        }
         Signed signed = buildSignedUrl(metadata);
         return new SignedFileUrlResponse(metadata.getId(), metadata.getVisibility().name(), signed.url(), signed.expiresAt());
     }
@@ -386,12 +414,56 @@ public class FileService {
     }
 
     private void validatePhotoInput(String contentType, Long sizeBytes, String label) {
+        if (contentType == null || contentType.isBlank()) {
+            throw new ValidationException(label + " contentType must not be blank");
+        }
         if (!contentType.toLowerCase().startsWith("image/")) {
             throw new ValidationException(label + " contentType must be an image/* MIME type");
+        }
+        if (sizeBytes == null || sizeBytes <= 0) {
+            throw new ValidationException(label + " size must be > 0");
         }
         if (sizeBytes > PHOTO_MAX_BYTES) {
             throw new ValidationException(label + " must be <= 10MB");
         }
+    }
+
+    private FileMetadata createPendingPhotoMetadata(
+            UUID ownerId,
+            FilePurpose purpose,
+            String bucket,
+            String objectKey,
+            CreatePhotoUploadIntentRequest request,
+            FileVisibility visibility) {
+        FileMetadata metadata = new FileMetadata();
+        metadata.setOwnerUserId(ownerId);
+        metadata.setPurpose(purpose);
+        metadata.setBucket(bucket);
+        metadata.setObjectKey(objectKey);
+        metadata.setContentType(request.contentType().trim().toLowerCase());
+        metadata.setSizeBytes(request.sizeBytes());
+        metadata.setChecksum(request.checksum());
+        metadata.setVisibility(visibility);
+        metadata.setStatus(FileStatus.PENDING_UPLOAD);
+        return fileMetadataRepository.save(metadata);
+    }
+
+    private FileMetadata requireAttachablePhotoFile(UUID fileId, UUID ownerId, FilePurpose expectedPurpose) {
+        FileMetadata metadata = fileMetadataRepository.findById(fileId)
+                .orElseThrow(() -> new ResourceNotFoundException("FILE_NOT_FOUND", "File", fileId.toString()));
+        if (!metadata.getOwnerUserId().equals(ownerId)) {
+            throw new AccessDeniedException();
+        }
+        if (metadata.getPurpose() != expectedPurpose) {
+            throw new ValidationException("File purpose does not match photo type");
+        }
+        if (metadata.getStatus() != FileStatus.ACTIVE) {
+            throw new ValidationException("File upload must be finalized before attaching photo");
+        }
+        if (listingPhotoRepository.existsByFileId(fileId) || vehiclePhotoRepository.existsByFileId(fileId)) {
+            throw new ValidationException("File is already attached to a photo");
+        }
+        return metadata;
     }
 
     private void validateDisputeAttachmentInput(String contentType, Long sizeBytes) {
@@ -460,6 +532,10 @@ public class FileService {
     private ListingPhotoResponse toListingPhotoResponse(ListingPhoto photo) {
         FileMetadata metadata = fileMetadataRepository.findByIdAndStatus(photo.getFileId(), FileStatus.ACTIVE)
                 .orElseThrow(() -> new ResourceNotFoundException("FILE_NOT_FOUND", "File", photo.getFileId().toString()));
+        return toListingPhotoResponse(photo, metadata);
+    }
+
+    private ListingPhotoResponse toListingPhotoResponse(ListingPhoto photo, FileMetadata metadata) {
         Signed signed = buildSignedUrl(metadata);
         return new ListingPhotoResponse(
                 photo.getId(),

@@ -48,6 +48,18 @@ function buildFormFromListing(listing: HostListingViewModel): HostListingFormSta
   };
 }
 
+function formatSuspensionUntil(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export function HostListingDetailPageView({ listingId }: HostListingDetailPageViewProps) {
   const queryClient = useQueryClient();
 
@@ -251,6 +263,11 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
     return null;
   }
 
+  const suspensionUntilLabel = formatSuspensionUntil(currentListing.suspensionUntil);
+  const hasSuspensionMetadata = Boolean(
+    currentListing.suspensionReason || currentListing.suspensionSource || suspensionUntilLabel,
+  );
+
   function renderExtraRow(extra: HostListingExtraViewModel) {
     return (
       <div
@@ -390,7 +407,34 @@ export function HostListingDetailPageView({ listingId }: HostListingDetailPageVi
 
         {guidanceMessage() ? (
           <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            {guidanceMessage()}
+            <div className="space-y-2">
+              <p>{guidanceMessage()}</p>
+              {currentListing.status === "SUSPENDED" ? (
+                hasSuspensionMetadata ? (
+                  <div className="space-y-1 text-sm">
+                    {currentListing.suspensionReason ? (
+                      <p>
+                        <span className="font-semibold">Ly do tam ngung:</span> {currentListing.suspensionReason}
+                      </p>
+                    ) : null}
+                    {currentListing.suspensionSource ? (
+                      <p>
+                        <span className="font-semibold">Nguon tam ngung:</span> {currentListing.suspensionSource}
+                      </p>
+                    ) : null}
+                    {suspensionUntilLabel ? (
+                      <p>
+                        <span className="font-semibold">Hieu luc den:</span> {suspensionUntilLabel}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm">
+                    Trang thai tam ngung dang co hieu luc, nhung he thong khong co them thong tin ly do hoac thoi han.
+                  </p>
+                )
+              ) : null}
+            </div>
           </section>
         ) : null}
 

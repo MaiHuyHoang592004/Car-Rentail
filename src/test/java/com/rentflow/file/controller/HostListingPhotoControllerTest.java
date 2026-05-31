@@ -1,6 +1,8 @@
 package com.rentflow.file.controller;
 
 import com.rentflow.file.dto.AddListingPhotoRequest;
+import com.rentflow.file.dto.CreatePhotoUploadIntentRequest;
+import com.rentflow.file.dto.FileUploadIntentResponse;
 import com.rentflow.file.dto.ListingPhotoResponse;
 import com.rentflow.file.service.FileService;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +38,7 @@ class HostListingPhotoControllerTest {
         UUID photoId = UUID.randomUUID();
         UUID fileId = UUID.randomUUID();
         when(fileService.addListingPhoto(eq(listingId), eq(new AddListingPhotoRequest(
-                "bucket-a", "obj/key.jpg", "image/jpeg", 2048L, "abc123", true))))
+                fileId, true, null))))
                 .thenReturn(new ListingPhotoResponse(
                         photoId, listingId, fileId, true, 0, "PRIVATE", "https://files.local/url",
                         Instant.parse("2026-05-29T00:10:00Z")));
@@ -45,17 +47,41 @@ class HostListingPhotoControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "bucket":"bucket-a",
-                                  "objectKey":"obj/key.jpg",
-                                  "contentType":"image/jpeg",
-                                  "sizeBytes":2048,
-                                  "checksum":"abc123",
+                                  "fileId":"%s",
                                   "primary":true
                                 }
-                                """))
+                                """.formatted(fileId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(photoId.toString()))
                 .andExpect(jsonPath("$.fileId").value(fileId.toString()))
                 .andExpect(jsonPath("$.visibility").value("PRIVATE"));
+    }
+
+    @Test
+    void createListingPhotoUploadIntentReturns200() throws Exception {
+        UUID listingId = UUID.randomUUID();
+        UUID fileId = UUID.randomUUID();
+        when(fileService.createListingPhotoUploadIntent(eq(listingId), eq(new CreatePhotoUploadIntentRequest(
+                "image/jpeg", 2048L, "abc123"))))
+                .thenReturn(new FileUploadIntentResponse(
+                        fileId,
+                        "rentflow-listing-photos",
+                        "listings/" + listingId + "/" + fileId,
+                        "https://upload.local/file-1",
+                        Instant.parse("2026-05-29T00:10:00Z")));
+
+        mockMvc.perform(post("/api/v1/host/listings/{id}/photos/upload-intents", listingId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "contentType":"image/jpeg",
+                                  "sizeBytes":2048,
+                                  "checksum":"abc123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileId").value(fileId.toString()))
+                .andExpect(jsonPath("$.bucket").value("rentflow-listing-photos"))
+                .andExpect(jsonPath("$.uploadUrl").value("https://upload.local/file-1"));
     }
 }

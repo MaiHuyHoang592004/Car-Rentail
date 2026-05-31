@@ -25,11 +25,13 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.startsWith;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -69,18 +71,35 @@ class FileMetadataIntegrationTest extends BaseIntegrationTest {
     void addListingPhotoForDraftListingCreatesPrivateMetadata() throws Exception {
         Listing draftListing = saveListing(host, ListingStatus.DRAFT);
 
+        String fileId = parseJson(mockMvc.perform(post("/api/v1/host/listings/{id}/photos/upload-intents", draftListing.getId())
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "contentType":"image/jpeg",
+                                  "sizeBytes":4096,
+                                  "checksum":"abc123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bucket").value("rentflow-listing-photos"))
+                .andExpect(jsonPath("$.uploadUrl", startsWith("http")))
+                .andReturn()).get("fileId").asText();
+
+        mockMvc.perform(post("/api/v1/files/{fileId}/finalize", fileId)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileId").value(fileId));
+
         mockMvc.perform(post("/api/v1/host/listings/{id}/photos", draftListing.getId())
                         .header("Authorization", "Bearer " + hostToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "bucket":"rentflow-private",
-                                  "objectKey":"listings/photo-a.jpg",
-                                  "contentType":"image/jpeg",
-                                  "sizeBytes":4096,
+                                  "fileId":"%s",
                                   "primary":true
                                 }
-                                """))
+                                """.formatted(fileId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.listingId").value(draftListing.getId().toString()))
                 .andExpect(jsonPath("$.visibility").value("PRIVATE"))
@@ -90,6 +109,7 @@ class FileMetadataIntegrationTest extends BaseIntegrationTest {
         FileMetadata metadata = fileMetadataRepository.findAll().get(0);
         assertThat(metadata.getOwnerUserId()).isEqualTo(host.getId());
         assertThat(metadata.getVisibility()).isEqualTo(FileVisibility.PRIVATE);
+        assertThat(metadata.getStatus()).isEqualTo(com.rentflow.file.entity.FileStatus.ACTIVE);
     }
 
     @Test
@@ -97,42 +117,11 @@ class FileMetadataIntegrationTest extends BaseIntegrationTest {
         Listing draftListing = saveListing(host, ListingStatus.DRAFT);
         Listing activeListing = saveListing(host, ListingStatus.ACTIVE);
 
-        mockMvc.perform(post("/api/v1/host/listings/{id}/photos", draftListing.getId())
-                        .header("Authorization", "Bearer " + hostToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "bucket":"rentflow-private",
-                                  "objectKey":"listings/private.jpg",
-                                  "contentType":"image/jpeg",
-                                  "sizeBytes":4096
-                                }
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.visibility").value("PRIVATE"));
+        String privateFileId = createAndAttachListingPhoto(draftListing.getId(), true);
+        String publicFileId = createAndAttachListingPhoto(activeListing.getId(), false);
 
-        mockMvc.perform(post("/api/v1/host/listings/{id}/photos", activeListing.getId())
-                        .header("Authorization", "Bearer " + hostToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "bucket":"rentflow-public",
-                                  "objectKey":"listings/public.jpg",
-                                  "contentType":"image/jpeg",
-                                  "sizeBytes":4096
-                                }
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.visibility").value("PUBLIC"));
-
-        FileMetadata privateFile = fileMetadataRepository.findAll().stream()
-                .filter(file -> file.getVisibility() == FileVisibility.PRIVATE)
-                .findFirst()
-                .orElseThrow();
-        FileMetadata publicFile = fileMetadataRepository.findAll().stream()
-                .filter(file -> file.getVisibility() == FileVisibility.PUBLIC)
-                .findFirst()
-                .orElseThrow();
+        FileMetadata privateFile = fileMetadataRepository.findById(UUID.fromString(privateFileId)).orElseThrow();
+        FileMetadata publicFile = fileMetadataRepository.findById(UUID.fromString(publicFileId)).orElseThrow();
 
         mockMvc.perform(get("/api/v1/files/{id}/signed-url", privateFile.getId())
                         .header("Authorization", "Bearer " + otherToken))
@@ -145,6 +134,42 @@ class FileMetadataIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.fileId").value(publicFile.getId().toString()))
                 .andExpect(jsonPath("$.visibility").value("PUBLIC"))
                 .andExpect(jsonPath("$.signedUrl").exists());
+    }
+
+    private String createAndAttachListingPhoto(UUID listingId, boolean primary) throws Exception {
+        String fileId = parseJson(mockMvc.perform(post("/api/v1/host/listings/{id}/photos/upload-intents", listingId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "contentType":"image/jpeg",
+                                  "sizeBytes":4096
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()).get("fileId").asText();
+
+        mockMvc.perform(post("/api/v1/files/{fileId}/finalize", fileId)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/host/listings/{id}/photos", listingId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fileId":"%s",
+                                  "primary":%s
+                                }
+                                """.formatted(fileId, primary)))
+                .andExpect(status().isCreated());
+
+        return fileId;
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode parseJson(MvcResult result) throws Exception {
+        return new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(result.getResponse().getContentAsString());
     }
 
     private AuthUser saveUser(String email, Role role) {

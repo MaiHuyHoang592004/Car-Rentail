@@ -3,6 +3,8 @@ import type { HostVehicleViewModel } from "@/features/host/types";
 import type {
   CreateVehicleInput,
   AddVehiclePhotoInput,
+  CreateVehiclePhotoUploadIntentInput,
+  FileUploadIntentResponse,
   HostVehicleFilterValue,
   HostVehicleSelectOption,
   UpdateVehicleInput,
@@ -14,6 +16,7 @@ import type {
 export type {
   CreateVehicleInput,
   AddVehiclePhotoInput,
+  CreateVehiclePhotoUploadIntentInput,
   HostVehicleFilterValue,
   HostVehicleSelectOption,
   UpdateVehicleInput,
@@ -42,6 +45,7 @@ function mapVehicleResponseToViewModel(r: VehicleResponse): HostVehicleViewModel
     city: r.city,
     plateNumber: r.plateNumber,
     vin: r.vin,
+    identifierIntegrity: r.identifierIntegrity,
     primaryPhotoUrl: r.primaryPhotoUrl,
     photos: r.photos?.map((photo) => ({
       id: photo.id,
@@ -135,6 +139,17 @@ export async function addHostVehiclePhoto(
   body: AddVehiclePhotoInput,
 ): Promise<VehiclePhotoResponse> {
   return api.post<VehiclePhotoResponse>(`/host/vehicles/${vehicleId}/photos`, body);
+}
+
+export async function createHostVehiclePhotoUploadIntent(
+  vehicleId: string,
+  body: CreateVehiclePhotoUploadIntentInput,
+): Promise<FileUploadIntentResponse> {
+  return api.post<FileUploadIntentResponse>(`/host/vehicles/${vehicleId}/photos/upload-intents`, body);
+}
+
+export async function finalizeFileUpload(fileId: string): Promise<void> {
+  await api.post(`/files/${fileId}/finalize`, {});
 }
 
 export async function getHostActiveVehicles(): Promise<HostVehicleSelectOption[]> {

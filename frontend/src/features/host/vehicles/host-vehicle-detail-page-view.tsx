@@ -132,6 +132,8 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
   }
 
   const canArchive = vehicle.status !== "ARCHIVED";
+  const plateNumberDisplay = vehicle.plateNumber ?? "Khong the doc bien so hien tai.";
+  const vinDisplay = vehicle.vin ?? "Khong the doc VIN hien tai.";
 
   return (
     <WorkspaceSidebar sidebar={<HostWorkspaceNav />} activePath="/host/vehicles">
@@ -165,14 +167,18 @@ export function HostVehicleDetailPageView({ vehicleId }: HostVehicleDetailPageVi
           </section>
         ) : null}
 
+        {vehicle.identifierIntegrity.hasUnreadableEncryptedFields ? (
+          <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Mot so du lieu dinh danh cua xe hien khong the doc duoc. Ban van co the quan ly xe, nhung can kiem tra lai bien so/VIN.
+          </section>
+        ) : null}
+
         {/* Form */}
         <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <div className="mb-4 rounded-lg border border-border bg-background p-3">
             <p className="text-xs text-muted-foreground">
-              Bien so: <strong className="text-foreground">{vehicle.plateNumber}</strong>
-              {vehicle.vin ? (
-                <span className="ml-3">VIN: <strong className="text-foreground">{vehicle.vin}</strong></span>
-              ) : null}
+              Bien so: <strong className="text-foreground">{plateNumberDisplay}</strong>
+              <span className="ml-3">VIN: <strong className="text-foreground">{vinDisplay}</strong></span>
             </p>
           </div>
 

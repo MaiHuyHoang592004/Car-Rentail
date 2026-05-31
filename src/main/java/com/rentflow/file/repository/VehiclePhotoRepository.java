@@ -14,4 +14,6 @@ public interface VehiclePhotoRepository extends JpaRepository<VehiclePhoto, UUID
     List<VehiclePhoto> findByVehicleIdOrderByDisplayOrderAsc(UUID vehicleId);
 
     Optional<VehiclePhoto> findByIdAndVehicleId(UUID id, UUID vehicleId);
+
+    boolean existsByFileId(UUID fileId);
 }

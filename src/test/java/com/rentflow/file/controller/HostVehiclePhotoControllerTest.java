@@ -1,6 +1,8 @@
 package com.rentflow.file.controller;
 
 import com.rentflow.file.dto.AddVehiclePhotoRequest;
+import com.rentflow.file.dto.CreatePhotoUploadIntentRequest;
+import com.rentflow.file.dto.FileUploadIntentResponse;
 import com.rentflow.file.dto.VehiclePhotoResponse;
 import com.rentflow.file.service.FileService;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +38,7 @@ class HostVehiclePhotoControllerTest {
         UUID photoId = UUID.randomUUID();
         UUID fileId = UUID.randomUUID();
         when(fileService.addVehiclePhoto(eq(vehicleId), eq(new AddVehiclePhotoRequest(
-                "bucket-a", "vehicles/key.jpg", "image/jpeg", 2048L, "abc123", true))))
+                fileId, true, null))))
                 .thenReturn(new VehiclePhotoResponse(
                         photoId, vehicleId, fileId, true, 0, "PRIVATE", "https://files.local/url",
                         Instant.parse("2026-05-29T00:10:00Z")));
@@ -45,18 +47,42 @@ class HostVehiclePhotoControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "bucket":"bucket-a",
-                                  "objectKey":"vehicles/key.jpg",
-                                  "contentType":"image/jpeg",
-                                  "sizeBytes":2048,
-                                  "checksum":"abc123",
+                                  "fileId":"%s",
                                   "primary":true
                                 }
-                                """))
+                                """.formatted(fileId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(photoId.toString()))
                 .andExpect(jsonPath("$.vehicleId").value(vehicleId.toString()))
                 .andExpect(jsonPath("$.fileId").value(fileId.toString()))
                 .andExpect(jsonPath("$.visibility").value("PRIVATE"));
+    }
+
+    @Test
+    void createVehiclePhotoUploadIntentReturns200() throws Exception {
+        UUID vehicleId = UUID.randomUUID();
+        UUID fileId = UUID.randomUUID();
+        when(fileService.createVehiclePhotoUploadIntent(eq(vehicleId), eq(new CreatePhotoUploadIntentRequest(
+                "image/jpeg", 2048L, "abc123"))))
+                .thenReturn(new FileUploadIntentResponse(
+                        fileId,
+                        "rentflow-vehicle-photos",
+                        "vehicles/" + vehicleId + "/" + fileId,
+                        "https://upload.local/file-1",
+                        Instant.parse("2026-05-29T00:10:00Z")));
+
+        mockMvc.perform(post("/api/v1/host/vehicles/{vehicleId}/photos/upload-intents", vehicleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "contentType":"image/jpeg",
+                                  "sizeBytes":2048,
+                                  "checksum":"abc123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileId").value(fileId.toString()))
+                .andExpect(jsonPath("$.bucket").value("rentflow-vehicle-photos"))
+                .andExpect(jsonPath("$.uploadUrl").value("https://upload.local/file-1"));
     }
 }

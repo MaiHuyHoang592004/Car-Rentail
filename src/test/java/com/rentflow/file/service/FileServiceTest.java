@@ -4,10 +4,13 @@ import com.rentflow.auth.entity.Role;
 import com.rentflow.common.exception.AccessDeniedException;
 import com.rentflow.file.dto.AddListingPhotoRequest;
 import com.rentflow.file.dto.AddVehiclePhotoRequest;
+import com.rentflow.file.dto.CreatePhotoUploadIntentRequest;
+import com.rentflow.file.dto.FileUploadIntentResponse;
 import com.rentflow.file.dto.ListingPhotoResponse;
 import com.rentflow.file.dto.SignedFileUrlResponse;
 import com.rentflow.file.dto.VehiclePhotoResponse;
 import com.rentflow.file.entity.FileMetadata;
+import com.rentflow.file.entity.FilePurpose;
 import com.rentflow.file.entity.FileStatus;
 import com.rentflow.file.entity.FileVisibility;
 import com.rentflow.file.entity.ListingPhoto;
@@ -72,45 +75,44 @@ class FileServiceTest {
     }
 
     @Test
-    void addListingPhotoForDraftListingDefaultsToPrivate() {
+    void createListingPhotoUploadIntentForDraftListingDefaultsToPrivate() {
         Listing listing = new Listing();
         listing.setId(listingId);
         listing.setHostId(hostId);
         listing.setStatus(ListingStatus.DRAFT);
         when(securityContext.currentUserId()).thenReturn(hostId);
         when(listingRepository.findByIdAndHostId(listingId, hostId)).thenReturn(Optional.of(listing));
-        when(listingPhotoRepository.countByListingId(listingId)).thenReturn(0L);
-        when(listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId)).thenReturn(List.of());
-        doReturn(savedFile(FileVisibility.PRIVATE)).when(fileMetadataRepository).save(any(FileMetadata.class));
-        doReturn(savedPhoto()).when(listingPhotoRepository).save(any(ListingPhoto.class));
+        doReturn(savedPendingFile(FilePurpose.LISTING_PHOTO, FileVisibility.PRIVATE)).when(fileMetadataRepository).save(any(FileMetadata.class));
 
-        ListingPhotoResponse response = service.addListingPhoto(listingId, new AddListingPhotoRequest(
-                "bucket-a", "path/a.jpg", "image/jpeg", 1024L, null, true));
+        FileUploadIntentResponse response = service.createListingPhotoUploadIntent(listingId, new CreatePhotoUploadIntentRequest(
+                "image/jpeg", 1024L, null));
 
         ArgumentCaptor<FileMetadata> captor = ArgumentCaptor.forClass(FileMetadata.class);
         org.mockito.Mockito.verify(fileMetadataRepository).save(captor.capture());
+        assertThat(captor.getValue().getPurpose()).isEqualTo(FilePurpose.LISTING_PHOTO);
+        assertThat(captor.getValue().getBucket()).isEqualTo("rentflow-listing-photos");
         assertThat(captor.getValue().getVisibility()).isEqualTo(FileVisibility.PRIVATE);
-        assertThat(response.visibility()).isEqualTo("PRIVATE");
-        assertThat(response.signedUrl()).contains("https://files.test.local/files/");
+        assertThat(captor.getValue().getStatus()).isEqualTo(FileStatus.PENDING_UPLOAD);
+        assertThat(response.uploadUrl()).contains("https://files.test.local/files/");
     }
 
     @Test
-    void addListingPhotoForActiveListingBecomesPublic() {
+    void createListingPhotoUploadIntentForActiveListingBecomesPublic() {
         Listing listing = new Listing();
         listing.setId(listingId);
         listing.setHostId(hostId);
         listing.setStatus(ListingStatus.ACTIVE);
         when(securityContext.currentUserId()).thenReturn(hostId);
         when(listingRepository.findByIdAndHostId(listingId, hostId)).thenReturn(Optional.of(listing));
-        when(listingPhotoRepository.countByListingId(listingId)).thenReturn(0L);
-        when(listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId)).thenReturn(List.of());
-        doReturn(savedFile(FileVisibility.PUBLIC)).when(fileMetadataRepository).save(any(FileMetadata.class));
-        doReturn(savedPhoto()).when(listingPhotoRepository).save(any(ListingPhoto.class));
+        doReturn(savedPendingFile(FilePurpose.LISTING_PHOTO, FileVisibility.PUBLIC)).when(fileMetadataRepository).save(any(FileMetadata.class));
 
-        ListingPhotoResponse response = service.addListingPhoto(listingId, new AddListingPhotoRequest(
-                "bucket-a", "path/b.jpg", "image/jpeg", 1024L, null, false));
+        service.createListingPhotoUploadIntent(listingId, new CreatePhotoUploadIntentRequest(
+                "image/jpeg", 1024L, null));
 
-        assertThat(response.visibility()).isEqualTo("PUBLIC");
+        ArgumentCaptor<FileMetadata> captor = ArgumentCaptor.forClass(FileMetadata.class);
+        org.mockito.Mockito.verify(fileMetadataRepository).save(captor.capture());
+        assertThat(captor.getValue().getBucket()).isEqualTo("rentflow-listing-photos");
+        assertThat(captor.getValue().getVisibility()).isEqualTo(FileVisibility.PUBLIC);
     }
 
     @Test
@@ -124,13 +126,18 @@ class FileServiceTest {
 
         when(securityContext.currentUserId()).thenReturn(hostId);
         when(listingRepository.findByIdAndHostId(listingId, hostId)).thenReturn(Optional.of(listing));
+        FileMetadata file = savedFile(FilePurpose.LISTING_PHOTO, FileVisibility.PUBLIC);
+        file.setStatus(FileStatus.ACTIVE);
+        when(fileMetadataRepository.findById(existingPrimary.getFileId())).thenReturn(Optional.of(file));
+        when(fileMetadataRepository.save(any(FileMetadata.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(listingPhotoRepository.countByListingId(listingId)).thenReturn(1L);
         when(listingPhotoRepository.findByListingIdOrderByDisplayOrderAsc(listingId)).thenReturn(List.of(existingPrimary));
-        doReturn(savedFile(FileVisibility.PUBLIC)).when(fileMetadataRepository).save(any(FileMetadata.class));
         doReturn(savedPhoto()).when(listingPhotoRepository).save(any(ListingPhoto.class));
+        when(listingPhotoRepository.existsByFileId(existingPrimary.getFileId())).thenReturn(false);
+        when(vehiclePhotoRepository.existsByFileId(existingPrimary.getFileId())).thenReturn(false);
 
         service.addListingPhoto(listingId, new AddListingPhotoRequest(
-                "bucket-a", "path/c.jpg", "image/jpeg", 1024L, null, true));
+                existingPrimary.getFileId(), true, null));
 
         assertThat(existingPrimary.isPrimary()).isFalse();
     }
@@ -138,7 +145,7 @@ class FileServiceTest {
     @Test
     void signedUrlForPrivateFileDeniedForNonOwner() {
         UUID fileId = UUID.randomUUID();
-        FileMetadata file = savedFile(FileVisibility.PRIVATE);
+        FileMetadata file = savedFile(FilePurpose.LISTING_PHOTO, FileVisibility.PRIVATE);
         file.setId(fileId);
         file.setOwnerUserId(UUID.randomUUID());
         when(fileMetadataRepository.findByIdAndStatus(fileId, FileStatus.ACTIVE)).thenReturn(Optional.of(file));
@@ -152,7 +159,7 @@ class FileServiceTest {
     @Test
     void signedUrlForPublicFileAllowed() {
         UUID fileId = UUID.randomUUID();
-        FileMetadata file = savedFile(FileVisibility.PUBLIC);
+        FileMetadata file = savedFile(FilePurpose.LISTING_PHOTO, FileVisibility.PUBLIC);
         file.setId(fileId);
         file.setOwnerUserId(UUID.randomUUID());
         when(fileMetadataRepository.findByIdAndStatus(fileId, FileStatus.ACTIVE)).thenReturn(Optional.of(file));
@@ -173,17 +180,58 @@ class FileServiceTest {
         when(securityContext.currentUserId()).thenReturn(hostId);
         when(vehicleRepository.findByIdAndHostId(vehicleId, hostId)).thenReturn(Optional.of(vehicle));
         when(vehiclePhotoRepository.countByVehicleId(vehicleId)).thenReturn(0L);
-        doReturn(savedFile(FileVisibility.PRIVATE)).when(fileMetadataRepository).save(any(FileMetadata.class));
-        doReturn(savedVehiclePhoto(vehicleId, true)).when(vehiclePhotoRepository).save(any(VehiclePhoto.class));
+        UUID fileId = UUID.randomUUID();
+        FileMetadata file = savedFile(FilePurpose.VEHICLE_PHOTO, FileVisibility.PRIVATE);
+        file.setId(fileId);
+        file.setStatus(FileStatus.ACTIVE);
+        when(fileMetadataRepository.findById(fileId)).thenReturn(Optional.of(file));
+        when(fileMetadataRepository.save(any(FileMetadata.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(vehiclePhotoRepository.existsByFileId(fileId)).thenReturn(false);
+        when(listingPhotoRepository.existsByFileId(fileId)).thenReturn(false);
+        doReturn(savedVehiclePhoto(vehicleId, true, fileId)).when(vehiclePhotoRepository).save(any(VehiclePhoto.class));
 
         VehiclePhotoResponse response = service.addVehiclePhoto(vehicleId, new AddVehiclePhotoRequest(
-                "bucket-a", "vehicles/a.jpg", "image/jpeg", 1024L, null, false));
+                fileId, false, null));
 
         assertThat(response.primary()).isTrue();
         assertThat(response.visibility()).isEqualTo("PRIVATE");
     }
 
-    private FileMetadata savedFile(FileVisibility visibility) {
+    @Test
+    void finalizeUploadPromotesPendingPhotoFileToActive() {
+        UUID fileId = UUID.randomUUID();
+        FileMetadata file = savedPendingFile(FilePurpose.VEHICLE_PHOTO, FileVisibility.PRIVATE);
+        file.setId(fileId);
+        when(securityContext.currentUserId()).thenReturn(hostId);
+        when(fileMetadataRepository.findById(fileId)).thenReturn(Optional.of(file));
+        when(fileMetadataRepository.save(any(FileMetadata.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SignedFileUrlResponse response = service.finalizeUpload(fileId);
+
+        assertThat(file.getStatus()).isEqualTo(FileStatus.ACTIVE);
+        assertThat(response.fileId()).isEqualTo(fileId);
+    }
+
+    @Test
+    void addVehiclePhotoRejectsNonFinalizedFile() {
+        UUID vehicleId = UUID.randomUUID();
+        UUID fileId = UUID.randomUUID();
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(vehicleId);
+        vehicle.setHostId(hostId);
+        FileMetadata file = savedPendingFile(FilePurpose.VEHICLE_PHOTO, FileVisibility.PRIVATE);
+        file.setId(fileId);
+        when(securityContext.currentUserId()).thenReturn(hostId);
+        when(vehicleRepository.findByIdAndHostId(vehicleId, hostId)).thenReturn(Optional.of(vehicle));
+        when(vehiclePhotoRepository.countByVehicleId(vehicleId)).thenReturn(0L);
+        when(fileMetadataRepository.findById(fileId)).thenReturn(Optional.of(file));
+
+        assertThatThrownBy(() -> service.addVehiclePhoto(vehicleId, new AddVehiclePhotoRequest(fileId, true, null)))
+                .isInstanceOf(com.rentflow.common.exception.ValidationException.class)
+                .hasMessageContaining("finalized");
+    }
+
+    private FileMetadata savedFile(FilePurpose purpose, FileVisibility visibility) {
         FileMetadata file = new FileMetadata();
         file.setId(UUID.randomUUID());
         file.setOwnerUserId(hostId);
@@ -191,8 +239,15 @@ class FileServiceTest {
         file.setObjectKey("path/key.jpg");
         file.setContentType("image/jpeg");
         file.setSizeBytes(1000L);
+        file.setPurpose(purpose);
         file.setVisibility(visibility);
         file.setStatus(FileStatus.ACTIVE);
+        return file;
+    }
+
+    private FileMetadata savedPendingFile(FilePurpose purpose, FileVisibility visibility) {
+        FileMetadata file = savedFile(purpose, visibility);
+        file.setStatus(FileStatus.PENDING_UPLOAD);
         return file;
     }
 
@@ -206,11 +261,11 @@ class FileServiceTest {
         return photo;
     }
 
-    private VehiclePhoto savedVehiclePhoto(UUID vehicleId, boolean primary) {
+    private VehiclePhoto savedVehiclePhoto(UUID vehicleId, boolean primary, UUID fileId) {
         VehiclePhoto photo = new VehiclePhoto();
         photo.setId(UUID.randomUUID());
         photo.setVehicleId(vehicleId);
-        photo.setFileId(UUID.randomUUID());
+        photo.setFileId(fileId);
         photo.setDisplayOrder(0);
         photo.setPrimary(primary);
         return photo;

@@ -58,6 +58,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -80,6 +81,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
@@ -233,6 +235,9 @@ class BookingServiceTest {
         verify(availabilityRepository).saveAll(rows);
         verify(rateLimitService).consumeBookingCreate(CUSTOMER_ID);
         verify(idempotencyService).complete(eq(IDEMPOTENCY_ID), eq(201), any());
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("BOOKING_HELD"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
+        verify(auditLogService).record(eq(CUSTOMER_ID), eq("CUSTOMER"), eq("BOOKING_CREATE"), eq("BOOKING"), eq(BOOKING_ID), eq("SUCCEEDED"), any());
+        verify(outboxService).append(eq("BOOKING"), eq(BOOKING_ID), eq("BOOKING_HELD"), any());
         verify(idempotencyFailureMarker, never()).markFailed(any());
     }
 
@@ -808,7 +813,7 @@ class BookingServiceTest {
         assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
         assertThat(response.voidRetryRequired()).isTrue();
         assertThat(response.code()).isEqualTo("PAYMENT_VOID_RETRY_REQUIRED");
-        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("CANCELLATION_PENALTY_CAPTURED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("PAYMENT_CAPTURED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
         verify(bookingTimelineService).append(eq(BOOKING_ID), eq("PAYMENT_VOID_RETRY_REQUIRED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
         verify(adminNotificationService).notifyPaymentVoidRetryRequired(eq(BOOKING_ID), eq(payment.getId()), eq(1));
     }
@@ -832,6 +837,7 @@ class BookingServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
         verify(paymentProvider).voidAuthorization(any());
         verify(paymentProvider, never()).capture(any());
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("PAYMENT_VOIDED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
         verify(adminNotificationService, never()).notifyPaymentVoidRetryRequired(any(), any(), any(Integer.class));
     }
 
@@ -861,9 +867,11 @@ class BookingServiceTest {
         assertThat(payment.getAuthorizedAmount()).isEqualByComparingTo("1500000.00");
         assertThat(payment.getCapturedAmount()).isEqualByComparingTo("750000.00");
         assertThat(payment.getProviderStatus()).isEqualTo("VOIDED");
-        verify(paymentProvider).capture(any());
-        verify(paymentProvider).voidAuthorization(any());
-        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("CANCELLATION_PENALTY_CAPTURED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
+        InOrder providerOrder = inOrder(paymentProvider);
+        providerOrder.verify(paymentProvider).capture(any());
+        providerOrder.verify(paymentProvider).voidAuthorization(any());
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("PAYMENT_CAPTURED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("PAYMENT_VOIDED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
         verify(bookingTimelineService).append(eq(BOOKING_ID), eq("BOOKING_CANCELLED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
     }
 
@@ -1029,6 +1037,7 @@ class BookingServiceTest {
         assertThat(response.voidRetryRequired()).isTrue();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
         assertThat(payment.getProviderStatus()).isEqualTo("VOID_RETRY_REQUIRED");
+        verify(bookingTimelineService).append(eq(BOOKING_ID), eq("PAYMENT_CAPTURED"), eq(CUSTOMER_ID), eq("CUSTOMER"), any());
     }
 
     private void mockCancelProceed() {

@@ -55,6 +55,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -330,6 +331,7 @@ public class BookingService {
 
         saveBookingExtras(booking.getId(), price.extras());
         availabilityReserver.hold(lockedAvailability, booking.getId(), holdToken, holdExpiresAt);
+        emitBookingHeldSignals(booking, price.totalAmount(), price.currency());
 
         JsonNode priceSnapshotNode = readTree(priceSnapshotJson);
         JsonNode policySnapshotNode = readTree(policySnapshotJson);
@@ -403,6 +405,7 @@ public class BookingService {
         try {
             VoidResult voidResult = callVoid(payment);
             applyVoidSuccess(payment, voidResult);
+            emitPaymentVoidedSignals(booking, payment, BigDecimal.ZERO);
             finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
             return CancelOutcome.completed();
         } catch (RuntimeException e) {
@@ -429,21 +432,19 @@ public class BookingService {
         if (calc.penaltyAmount().compareTo(BigDecimal.ZERO) <= 0) {
             VoidResult voidResult = callVoid(payment);
             applyVoidSuccess(payment, voidResult);
+            emitPaymentVoidedSignals(booking, payment, BigDecimal.ZERO);
             finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
             return CancelOutcome.completed();
         }
 
         CaptureResult captureResult = callCapture(payment, calc.penaltyAmount());
         applyCaptureSuccess(payment, captureResult, calc.penaltyAmount());
-        bookingTimelineService.append(
-                booking.getId(),
-                "CANCELLATION_PENALTY_CAPTURED",
-                securityContext.currentUserId(),
-                resolveActorType(securityContext.currentUserId(), booking),
-                serialize(Map.of("amount", calc.penaltyAmount(), "currency", payment.getCurrency())));
+        emitPaymentCapturedSignals(booking, payment, calc.penaltyAmount());
         try {
             VoidResult voidResult = callVoid(payment);
             applyVoidSuccess(payment, voidResult);
+            BigDecimal voidedAmount = totalAmount.subtract(calc.penaltyAmount());
+            emitPaymentVoidedSignals(booking, payment, voidedAmount.max(BigDecimal.ZERO));
             finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
             return CancelOutcome.completed();
         } catch (RuntimeException e) {
@@ -627,6 +628,19 @@ public class BookingService {
         emitCancellationSignals(booking, cancellationReason);
     }
 
+    private void emitBookingHeldSignals(Booking booking, BigDecimal totalAmount, String currency) {
+        UUID actorId = securityContext.currentUserId();
+        String actorType = resolveActorType(actorId, booking);
+        String details = serialize(Map.of(
+                "bookingId", booking.getId(),
+                "status", booking.getStatus().name(),
+                "totalAmount", totalAmount,
+                "currency", currency));
+        bookingTimelineService.append(booking.getId(), "BOOKING_HELD", actorId, actorType, details);
+        auditLogService.record(actorId, actorType, "BOOKING_CREATE", "BOOKING", booking.getId(), "SUCCEEDED", details);
+        outboxService.append("BOOKING", booking.getId(), "BOOKING_HELD", details);
+    }
+
     private void emitCancellationSignals(Booking booking, String cancellationReason) {
         UUID actorId = securityContext.currentUserId();
         String actorType = resolveActorType(actorId, booking);
@@ -637,6 +651,24 @@ public class BookingService {
         bookingTimelineService.append(booking.getId(), "BOOKING_CANCELLED", actorId, actorType, details);
         auditLogService.record(actorId, actorType, "BOOKING_CANCEL", "BOOKING", booking.getId(), "SUCCEEDED", details);
         outboxService.append("BOOKING", booking.getId(), "BOOKING_CANCELLED", details);
+    }
+
+    private void emitPaymentCapturedSignals(Booking booking, BookingPayment payment, BigDecimal amount) {
+        UUID actorId = securityContext.currentUserId();
+        String actorType = resolveActorType(actorId, booking);
+        String details = serialize(paymentDetails(payment, amount));
+        bookingTimelineService.append(booking.getId(), "PAYMENT_CAPTURED", actorId, actorType, details);
+        auditLogService.record(actorId, actorType, "PAYMENT_CAPTURE", "BOOKING_PAYMENT", payment.getId(), "SUCCEEDED", details);
+        outboxService.append("BOOKING_PAYMENT", payment.getId(), "PAYMENT_CAPTURED", details);
+    }
+
+    private void emitPaymentVoidedSignals(Booking booking, BookingPayment payment, BigDecimal amount) {
+        UUID actorId = securityContext.currentUserId();
+        String actorType = resolveActorType(actorId, booking);
+        String details = serialize(paymentDetails(payment, amount));
+        bookingTimelineService.append(booking.getId(), "PAYMENT_VOIDED", actorId, actorType, details);
+        auditLogService.record(actorId, actorType, "PAYMENT_VOID", "BOOKING_PAYMENT", payment.getId(), "SUCCEEDED", details);
+        outboxService.append("BOOKING_PAYMENT", payment.getId(), "PAYMENT_VOIDED", details);
     }
 
     private void emitVoidRetryRequiredSignals(
@@ -659,6 +691,19 @@ public class BookingService {
                     payment.getId(),
                     payment.getVoidRetryCount() == null ? 0 : payment.getVoidRetryCount());
         }
+    }
+
+    private Map<String, Object> paymentDetails(BookingPayment payment, BigDecimal amount) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("paymentId", payment.getId());
+        details.put("bookingId", payment.getBookingId());
+        details.put("amount", amount);
+        details.put("currency", payment.getCurrency());
+        details.put("status", payment.getStatus().name());
+        details.put("providerStatus", payment.getProviderStatus());
+        details.put("providerPaymentOrderId", payment.getProviderPaymentOrderId());
+        details.put("providerHoldId", payment.getProviderHoldId());
+        return details;
     }
 
     private String resolveActorType(UUID actorId, Booking booking) {

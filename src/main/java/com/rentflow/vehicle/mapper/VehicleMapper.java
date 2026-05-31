@@ -5,11 +5,13 @@ import com.rentflow.vehicle.dto.CreateVehicleRequest;
 import com.rentflow.vehicle.dto.UpdateVehicleRequest;
 import com.rentflow.vehicle.dto.VehicleResponse;
 import com.rentflow.vehicle.entity.Vehicle;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@Slf4j
 public class VehicleMapper {
 
     private final EncryptionUtil encryptionUtil;
@@ -54,11 +56,30 @@ public class VehicleMapper {
     }
 
     public VehicleResponse toResponse(Vehicle vehicle, List<VehicleResponse.Photo> photos) {
+        DecryptedField plate = decryptField(vehicle.getId(), "plateNumber", vehicle.getPlateNumberEncrypted());
+        DecryptedField vin = decryptField(vehicle.getId(), "vin", vehicle.getVinEncrypted());
         return VehicleResponse.from(
-            vehicle,
-            encryptionUtil.decrypt(vehicle.getPlateNumberEncrypted()),
-            encryptionUtil.decrypt(vehicle.getVinEncrypted()),
-            photos
+                vehicle,
+                plate.value(),
+                plate.readable(),
+                vin.value(),
+                vin.readable(),
+                photos
         );
+    }
+
+    private DecryptedField decryptField(java.util.UUID vehicleId, String fieldName, String ciphertext) {
+        if (ciphertext == null || ciphertext.isBlank()) {
+            return new DecryptedField(null, true);
+        }
+        try {
+            return new DecryptedField(encryptionUtil.decrypt(ciphertext), true);
+        } catch (RuntimeException ex) {
+            log.warn("Vehicle identifier decryption failed for vehicle {} field {}", vehicleId, fieldName);
+            return new DecryptedField(null, false);
+        }
+    }
+
+    private record DecryptedField(String value, boolean readable) {
     }
 }

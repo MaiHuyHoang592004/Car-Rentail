@@ -18,8 +18,13 @@ export interface VehicleResponse {
   seats: number;
   status: HostVehicleStatus;
   city: string;
-  plateNumber: string;
-  vin: string;
+  plateNumber: string | null;
+  vin: string | null;
+  identifierIntegrity: {
+    plateNumberReadable: boolean;
+    vinReadable: boolean;
+    hasUnreadableEncryptedFields: boolean;
+  };
   primaryPhotoUrl?: string | null;
   photos?: VehiclePhotoResponse[];
 }
@@ -36,12 +41,23 @@ export interface VehiclePhotoResponse {
 }
 
 export interface AddVehiclePhotoInput {
-  bucket: string;
-  objectKey: string;
+  fileId: string;
+  primary?: boolean;
+  displayOrder?: number;
+}
+
+export interface CreateVehiclePhotoUploadIntentInput {
   contentType: string;
   sizeBytes: number;
   checksum?: string;
-  primary?: boolean;
+}
+
+export interface FileUploadIntentResponse {
+  fileId: string;
+  bucket: string;
+  objectKey: string;
+  uploadUrl: string;
+  expiresAt: string;
 }
 
 export interface VehiclePageResponse<T> {

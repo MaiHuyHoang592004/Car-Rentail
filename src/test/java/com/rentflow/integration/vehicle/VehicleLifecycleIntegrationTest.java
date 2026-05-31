@@ -130,6 +130,33 @@ class VehicleLifecycleIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void getVehicle_returnsIntegrityFlagsWhenPlateAndVinCannotBeDecrypted() throws Exception {
+        Vehicle vehicle = saveCorruptedVehicle();
+
+        mockMvc.perform(get("/api/v1/host/vehicles/" + vehicle.getId())
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.plateNumber").doesNotExist())
+                .andExpect(jsonPath("$.vin").doesNotExist())
+                .andExpect(jsonPath("$.identifierIntegrity.plateNumberReadable").value(false))
+                .andExpect(jsonPath("$.identifierIntegrity.vinReadable").value(false))
+                .andExpect(jsonPath("$.identifierIntegrity.hasUnreadableEncryptedFields").value(true));
+    }
+
+    @Test
+    void listVehicles_returnsPageWhenOneVehicleHasUnreadableIdentifiers() throws Exception {
+        saveCorruptedVehicle();
+
+        mockMvc.perform(get("/api/v1/host/vehicles")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].identifierIntegrity.plateNumberReadable").value(false))
+                .andExpect(jsonPath("$.content[0].identifierIntegrity.vinReadable").value(false))
+                .andExpect(jsonPath("$.content[0].identifierIntegrity.hasUnreadableEncryptedFields").value(true));
+    }
+
+    @Test
     void listVehicles_filtersbyStatus() throws Exception {
         createVehicle("SEDAN", "BMW", "3 Series", 2022, "AA-1", "AUTO", "PETROL", 5);
 
@@ -252,6 +279,25 @@ class VehicleLifecycleIntegrationTest extends BaseIntegrationTest {
             .andExpect(status().isCreated())
             .andReturn();
         return parseJson(result).get("id").asText();
+    }
+
+    private Vehicle saveCorruptedVehicle() {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setHostId(hostUserId);
+        vehicle.setCategory(VehicleCategory.SEDAN);
+        vehicle.setMake("Toyota");
+        vehicle.setModel("Corolla");
+        vehicle.setManufactureYear(2021);
+        vehicle.setPlateNumberEncrypted("not-base64");
+        vehicle.setPlateNumberHash("hash-1");
+        vehicle.setVinEncrypted("still-not-base64");
+        vehicle.setVinHash("hash-2");
+        vehicle.setTransmission(TransmissionType.AUTO);
+        vehicle.setFuelType(FuelType.PETROL);
+        vehicle.setSeats(5);
+        vehicle.setStatus(VehicleStatus.ACTIVE);
+        vehicle.setCity("Hanoi");
+        return vehicleRepository.save(vehicle);
     }
 
     private JsonNode parseJson(MvcResult result) throws Exception {

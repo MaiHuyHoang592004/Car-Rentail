@@ -23,11 +23,18 @@ public record VehicleResponse(
     String city,
     String plateNumber,
     String vin,
+    IdentifierIntegrity identifierIntegrity,
     String primaryPhotoUrl,
     List<Photo> photos,
     Instant createdAt,
     Instant updatedAt
 ) {
+    public record IdentifierIntegrity(
+        boolean plateNumberReadable,
+        boolean vinReadable,
+        boolean hasUnreadableEncryptedFields
+    ) {}
+
     public record Photo(
         UUID id,
         UUID fileId,
@@ -36,14 +43,21 @@ public record VehicleResponse(
         String signedUrl
     ) {}
 
-    public static VehicleResponse from(Vehicle vehicle, String decryptedPlate, String decryptedVin) {
-        return from(vehicle, decryptedPlate, decryptedVin, List.of());
+    public static VehicleResponse from(
+            Vehicle vehicle,
+            String decryptedPlate,
+            boolean plateNumberReadable,
+            String decryptedVin,
+            boolean vinReadable) {
+        return from(vehicle, decryptedPlate, plateNumberReadable, decryptedVin, vinReadable, List.of());
     }
 
     public static VehicleResponse from(
             Vehicle vehicle,
             String decryptedPlate,
+            boolean plateNumberReadable,
             String decryptedVin,
+            boolean vinReadable,
             List<Photo> photos) {
         return new VehicleResponse(
             vehicle.getId(),
@@ -58,6 +72,10 @@ public record VehicleResponse(
             vehicle.getCity(),
             decryptedPlate,
             decryptedVin,
+            new IdentifierIntegrity(
+                    plateNumberReadable,
+                    vinReadable,
+                    !plateNumberReadable || !vinReadable),
             photos.stream().filter(Photo::primary).findFirst()
                     .or(() -> photos.stream().findFirst())
                     .map(Photo::signedUrl)

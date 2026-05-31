@@ -165,6 +165,30 @@ describe("HostVehicleCreatePageView", () => {
       .mockResolvedValueOnce(
         jsonResponse(
           {
+            fileId: "file-1",
+            bucket: "rentflow-vehicle-photos",
+            objectKey: "vehicles/vh-photos/file-1",
+            uploadUrl: "https://upload.local/file-1",
+            expiresAt: "2026-05-29T00:10:00Z",
+          },
+          200,
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            fileId: "file-1",
+            visibility: "PRIVATE",
+            signedUrl: "https://files.local/photo-1",
+            signedUrlExpiresAt: "2026-05-29T00:10:00Z",
+          },
+          200,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
             id: "photo-1",
             vehicleId: "vh-photos",
             fileId: "file-1",
@@ -202,18 +226,97 @@ describe("HostVehicleCreatePageView", () => {
     await user.click(screen.getByRole("button", { name: /Luu nhap/i }));
     await user.click(screen.getByRole("button", { name: /Luu vao Draft/i }));
 
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(5));
 
-    const [photoUrl, photoInit] = fetchSpy.mock.calls[1] as [string, RequestInit];
+    const [intentUrl, intentInit] = fetchSpy.mock.calls[1] as [string, RequestInit];
+    expect(intentUrl).toBe("/api/v1/host/vehicles/vh-photos/photos/upload-intents");
+    expect(intentInit.method).toBe("POST");
+    expect(JSON.parse(String(intentInit.body))).toMatchObject({
+      contentType: "image/jpeg",
+      sizeBytes: 5,
+    });
+
+    const [uploadUrl, uploadInit] = fetchSpy.mock.calls[2] as [string, RequestInit];
+    expect(uploadUrl).toBe("https://upload.local/file-1");
+    expect(uploadInit.method).toBe("PUT");
+
+    const [finalizeUrl, finalizeInit] = fetchSpy.mock.calls[3] as [string, RequestInit];
+    expect(finalizeUrl).toBe("/api/v1/files/file-1/finalize");
+    expect(finalizeInit.method).toBe("POST");
+
+    const [photoUrl, photoInit] = fetchSpy.mock.calls[4] as [string, RequestInit];
     expect(photoUrl).toBe("/api/v1/host/vehicles/vh-photos/photos");
     expect(photoInit.method).toBe("POST");
     expect(JSON.parse(String(photoInit.body))).toMatchObject({
-      bucket: "rentflow-local",
-      contentType: "image/jpeg",
-      sizeBytes: 5,
+      fileId: "file-1",
       primary: true,
     });
     expect(routerPush).toHaveBeenCalledWith("/host/vehicles?status=DRAFT");
+  }, 10000);
+
+  it("keeps vehicle creation successful when binary photo upload fails", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            id: "vh-upload-fail",
+            category: "SUV",
+            make: "Toyota",
+            model: "Fortuner",
+            year: 2024,
+            transmission: "AUTO",
+            fuelType: "PETROL",
+            seats: 7,
+            status: "DRAFT",
+            city: "Ho Chi Minh",
+            plateNumber: "51H-888.88",
+            vin: "VIN123456789",
+          },
+          201,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            fileId: "file-fail",
+            bucket: "rentflow-vehicle-photos",
+            objectKey: "vehicles/vh-upload-fail/file-fail",
+            uploadUrl: "https://upload.local/file-fail",
+            expiresAt: "2026-05-29T00:10:00Z",
+          },
+          200,
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 500 }));
+
+    const user = userEvent.setup();
+    const { container } = wrap(<HostVehicleCreatePageView />);
+
+    await user.upload(
+      screen.getByLabelText(/Chọn ảnh xe/i),
+      new File(["photo"], "front-view.jpg", { type: "image/jpeg" }),
+    );
+
+    const selects = container.querySelectorAll("select");
+    await user.selectOptions(selects[0]!, "Toyota");
+    await user.selectOptions(selects[1]!, "Fortuner");
+    await user.selectOptions(selects[2]!, "2024");
+    await user.selectOptions(selects[3]!, "Ho Chi Minh");
+
+    const inputs = container.querySelectorAll<HTMLInputElement>('input[type="text"]');
+    await user.type(inputs[0]!, "51H-888.88");
+    await user.type(inputs[1]!, "VIN123456789");
+
+    await user.click(screen.getByRole("button", { name: /SUV/i }));
+    await user.click(screen.getByRole("button", { name: /Xang$/i }));
+    await user.click(screen.getByRole("button", { name: /7 cho/i }));
+    await user.click(screen.getByRole("button", { name: /Luu nhap/i }));
+    await user.click(screen.getByRole("button", { name: /Luu vao Draft/i }));
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith("/host/vehicles/vh-upload-fail"));
+    expect(toastError).toHaveBeenCalledWith(
+      "Xe đã được tạo, một số ảnh tải lên thất bại. Vui lòng thử lại ở chi tiết xe.",
+    );
   }, 10000);
 
   it("previews selected vehicle photos before submit", async () => {

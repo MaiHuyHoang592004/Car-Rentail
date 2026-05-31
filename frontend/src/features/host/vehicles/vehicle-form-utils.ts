@@ -12,7 +12,7 @@ export function buildVehicleFormFromViewModel(vehicle: HostVehicleViewModel): Ve
     seats: String(vehicle.seats),
     status: vehicle.status,
     city: vehicle.city,
-    plateNumber: vehicle.plateNumber,
-    vin: vehicle.vin,
+    plateNumber: vehicle.plateNumber ?? "",
+    vin: vehicle.vin ?? "",
   };
 }
