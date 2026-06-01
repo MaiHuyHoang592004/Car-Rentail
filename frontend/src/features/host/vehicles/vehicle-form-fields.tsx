@@ -96,7 +96,7 @@ export function VehicleFormFields({
           </FormRow>
         </div>
       </section>
-""
+
       {/* Section 2: Dang ky xe */}
       <section>
         <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3">Dang ky xe</h3>
@@ -114,7 +114,7 @@ export function VehicleFormFields({
           </FormRow>
         </div>
       </section>
-""
+
       {/* Section 3: Thong so */}
       <section>
         <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3">Thong so</h3>
@@ -147,7 +147,7 @@ export function VehicleFormFields({
           </FormRow>
         </div>
       </section>
-""
+
       {!hideStatus ? (
         <section>
           <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3">Trang thai</h3>

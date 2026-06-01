@@ -35,7 +35,7 @@ const LOCATION_EDITABLE_STATUSES: BookingStatus[] = [
   "CONFIRMED",
 ];
 
-const PAY_NOW_VISIBLE_STATUSES: BookingStatus[] = ["HELD", "PENDING_HOST_APPROVAL", "CONFIRMED"];
+const PAY_NOW_VISIBLE_STATUSES: BookingStatus[] = ["HELD"];
 const MAX_EXPIRE_RETRIES = 3;
 const EXPIRE_RETRY_DELAY_MS = 5000;
 

@@ -32,8 +32,10 @@ services:
   postgrest:
     image: postgrest/postgrest:v12.2.0
     container_name: rentflow-postgrest
+    profiles:
+      - postgrest
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       PGRST_DB_URI: postgres://rentflow:rentflow@postgres:5432/rentflow
       PGRST_DB_SCHEMA: public

@@ -48,7 +48,7 @@ export function BookingsListPageView() {
               const label =
                 status === "ALL" || status === "HELD"
                   ? status
-                  : getBookingStatusLabel(status as any);
+                  : getBookingStatusLabel(status);
               return (
                 <button
                   key={status}

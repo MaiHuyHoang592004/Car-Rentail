@@ -29,6 +29,7 @@ import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
@@ -48,6 +49,7 @@ public class CoreBankCaptureService {
     private final CorrelationIdHelper correlationIdHelper;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate requiresNewTransactionTemplate;
 
     public CoreBankCaptureService(
             BookingRepository bookingRepository,
@@ -72,6 +74,8 @@ public class CoreBankCaptureService {
         this.correlationIdHelper = correlationIdHelper;
         this.objectMapper = objectMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.requiresNewTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.requiresNewTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     public PaymentDetailResponse capture(UUID paymentId, String idempotencyKey, CapturePaymentRequest request) {
@@ -99,8 +103,18 @@ public class CoreBankCaptureService {
                 transactionTemplate.executeWithoutResult(status -> markFailed(prepared, "PAYMENT_PROVIDER_UNAVAILABLE", e.getMessage()));
                 throw e;
             }
-            PaymentDetailResponse response = required(transactionTemplate.execute(status ->
-                    finalizeCapture(prepared, captureResult)));
+            PaymentDetailResponse response;
+            try {
+                response = required(transactionTemplate.execute(status ->
+                        finalizeCapture(prepared, captureResult)));
+            } catch (BusinessRuleException e) {
+                if (isUnsafeFinalization(e)) {
+                    markUnsafeRequiresNew(
+                            prepared,
+                            "CoreBank capture succeeded but local payment finalization was no longer safe");
+                }
+                throw e;
+            }
             idempotencyService.complete(idempotencyKeyId, 200, serializeResponse(response));
             return response;
         } catch (PaymentProviderUnavailableException e) {
@@ -166,6 +180,8 @@ public class CoreBankCaptureService {
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
 
+        validateCaptureFinalizationState(prepared, payment);
+
         BigDecimal updatedCaptured = payment.getCapturedAmount().add(prepared.amount());
         payment.setCapturedAmount(updatedCaptured);
         if (updatedCaptured.compareTo(payment.getAuthorizedAmount()) == 0) {
@@ -189,6 +205,20 @@ public class CoreBankCaptureService {
                 paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId()));
     }
 
+    private void validateCaptureFinalizationState(PreparedCaptureContext prepared, BookingPayment payment) {
+        BigDecimal remaining = payment.getAuthorizedAmount().subtract(payment.getCapturedAmount());
+        boolean invalid = payment.getProvider() != PaymentProviderType.COREBANK
+                || payment.getStatus() != PaymentStatus.AUTHORIZED
+                || payment.getProviderPaymentOrderId() == null
+                || payment.getProviderPaymentOrderId().isBlank()
+                || prepared.amount().compareTo(remaining) > 0;
+        if (invalid) {
+            throw new BusinessRuleException(
+                    "PAYMENT_FINALIZATION_UNSAFE",
+                    "Payment capture succeeded but local finalization was no longer safe");
+        }
+    }
+
     private void markFailed(PreparedCaptureContext prepared, String providerErrorCode, String providerErrorMessage) {
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
@@ -196,6 +226,17 @@ public class CoreBankCaptureService {
         tx.setProviderErrorCode(providerErrorCode);
         tx.setProviderErrorMessage(providerErrorMessage);
         paymentTransactionRepository.save(tx);
+    }
+
+    private void markUnsafeRequiresNew(PreparedCaptureContext prepared, String providerErrorMessage) {
+        requiresNewTransactionTemplate.executeWithoutResult(status -> {
+            PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
+                    .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
+            tx.setStatus(PaymentTransactionStatus.FAILED);
+            tx.setProviderErrorCode("PAYMENT_FINALIZATION_UNSAFE");
+            tx.setProviderErrorMessage(providerErrorMessage);
+            paymentTransactionRepository.save(tx);
+        });
     }
 
     private void requireCanMutate(UUID actorId, Booking booking) {
@@ -245,6 +286,10 @@ public class CoreBankCaptureService {
             throw new IllegalStateException("Transactional callback returned null unexpectedly");
         }
         return value;
+    }
+
+    private boolean isUnsafeFinalization(BusinessRuleException e) {
+        return "PAYMENT_FINALIZATION_UNSAFE".equals(e.getCode());
     }
 
     private record PreparedCaptureContext(

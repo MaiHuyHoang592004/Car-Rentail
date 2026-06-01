@@ -29,6 +29,7 @@ import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
@@ -48,6 +49,7 @@ public class CoreBankRefundService {
     private final CorrelationIdHelper correlationIdHelper;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate requiresNewTransactionTemplate;
 
     public CoreBankRefundService(
             BookingRepository bookingRepository,
@@ -72,6 +74,8 @@ public class CoreBankRefundService {
         this.correlationIdHelper = correlationIdHelper;
         this.objectMapper = objectMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.requiresNewTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.requiresNewTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     public PaymentDetailResponse refund(UUID paymentId, String idempotencyKey, RefundPaymentRequest request) {
@@ -97,8 +101,18 @@ public class CoreBankRefundService {
                         markFailed(prepared, "PAYMENT_PROVIDER_UNAVAILABLE", e.getMessage()));
                 throw e;
             }
-            PaymentDetailResponse response = required(transactionTemplate.execute(status ->
-                    finalizeRefund(prepared, refundResult)));
+            PaymentDetailResponse response;
+            try {
+                response = required(transactionTemplate.execute(status ->
+                        finalizeRefund(prepared, refundResult)));
+            } catch (BusinessRuleException e) {
+                if (isUnsafeFinalization(e)) {
+                    markUnsafeRequiresNew(
+                            prepared,
+                            "CoreBank refund succeeded but local payment finalization was no longer safe");
+                }
+                throw e;
+            }
             idempotencyService.complete(idempotencyKeyId, 200, serializeResponse(response));
             return response;
         } catch (PaymentProviderUnavailableException e) {
@@ -165,6 +179,8 @@ public class CoreBankRefundService {
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
 
+        validateRefundFinalizationState(prepared, payment);
+
         BigDecimal updatedRefunded = payment.getRefundedAmount().add(prepared.amount());
         payment.setRefundedAmount(updatedRefunded);
         if (updatedRefunded.compareTo(payment.getCapturedAmount()) == 0) {
@@ -187,6 +203,21 @@ public class CoreBankRefundService {
                 paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId()));
     }
 
+    private void validateRefundFinalizationState(PreparedRefundContext prepared, BookingPayment payment) {
+        BigDecimal remaining = payment.getCapturedAmount().subtract(payment.getRefundedAmount());
+        boolean invalid = payment.getProvider() != PaymentProviderType.COREBANK
+                || (payment.getStatus() != PaymentStatus.CAPTURED
+                && payment.getStatus() != PaymentStatus.PARTIALLY_REFUNDED)
+                || payment.getProviderPaymentOrderId() == null
+                || payment.getProviderPaymentOrderId().isBlank()
+                || prepared.amount().compareTo(remaining) > 0;
+        if (invalid) {
+            throw new BusinessRuleException(
+                    "PAYMENT_FINALIZATION_UNSAFE",
+                    "Payment refund succeeded but local finalization was no longer safe");
+        }
+    }
+
     private void markFailed(PreparedRefundContext prepared, String providerErrorCode, String providerErrorMessage) {
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
@@ -194,6 +225,17 @@ public class CoreBankRefundService {
         tx.setProviderErrorCode(providerErrorCode);
         tx.setProviderErrorMessage(providerErrorMessage);
         paymentTransactionRepository.save(tx);
+    }
+
+    private void markUnsafeRequiresNew(PreparedRefundContext prepared, String providerErrorMessage) {
+        requiresNewTransactionTemplate.executeWithoutResult(status -> {
+            PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
+                    .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
+            tx.setStatus(PaymentTransactionStatus.FAILED);
+            tx.setProviderErrorCode("PAYMENT_FINALIZATION_UNSAFE");
+            tx.setProviderErrorMessage(providerErrorMessage);
+            paymentTransactionRepository.save(tx);
+        });
     }
 
     private void requireCanMutate(UUID actorId, Booking booking) {
@@ -243,6 +285,10 @@ public class CoreBankRefundService {
             throw new IllegalStateException("Transactional callback returned null unexpectedly");
         }
         return value;
+    }
+
+    private boolean isUnsafeFinalization(BusinessRuleException e) {
+        return "PAYMENT_FINALIZATION_UNSAFE".equals(e.getCode());
     }
 
     private record PreparedRefundContext(

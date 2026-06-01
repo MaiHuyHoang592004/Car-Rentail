@@ -16,8 +16,14 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> 
     @Query(value = """
             SELECT *
             FROM outbox_events
-            WHERE status IN ('PENDING', 'RETRY')
-              AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
+            WHERE (
+                status IN ('PENDING', 'RETRY')
+                AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
+              )
+              OR (
+                status = 'PROCESSING'
+                AND next_attempt_at <= :now
+              )
             ORDER BY created_at ASC
             LIMIT :batchSize
             FOR UPDATE SKIP LOCKED
@@ -25,4 +31,12 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> 
     List<OutboxEvent> findPublishCandidatesForUpdate(
             @Param("now") Instant now,
             @Param("batchSize") int batchSize);
+
+    @Query(value = """
+            SELECT *
+            FROM outbox_events
+            WHERE id = :id
+            FOR UPDATE
+            """, nativeQuery = true)
+    java.util.Optional<OutboxEvent> findByIdForUpdate(@Param("id") UUID id);
 }

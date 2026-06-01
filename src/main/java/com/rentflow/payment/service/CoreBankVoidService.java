@@ -28,6 +28,7 @@ import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.UUID;
@@ -46,6 +47,7 @@ public class CoreBankVoidService {
     private final CorrelationIdHelper correlationIdHelper;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate requiresNewTransactionTemplate;
 
     public CoreBankVoidService(
             BookingRepository bookingRepository,
@@ -70,6 +72,8 @@ public class CoreBankVoidService {
         this.correlationIdHelper = correlationIdHelper;
         this.objectMapper = objectMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.requiresNewTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.requiresNewTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     public PaymentDetailResponse voidAuthorization(UUID paymentId, String idempotencyKey) {
@@ -95,8 +99,18 @@ public class CoreBankVoidService {
                 transactionTemplate.executeWithoutResult(status -> markFailed(prepared, "PAYMENT_PROVIDER_UNAVAILABLE", e.getMessage()));
                 throw e;
             }
-            PaymentDetailResponse response = required(transactionTemplate.execute(status ->
-                    finalizeVoid(prepared, voidResult)));
+            PaymentDetailResponse response;
+            try {
+                response = required(transactionTemplate.execute(status ->
+                        finalizeVoid(prepared, voidResult)));
+            } catch (BusinessRuleException e) {
+                if (isUnsafeFinalization(e)) {
+                    markUnsafeRequiresNew(
+                            prepared,
+                            "CoreBank void succeeded but local payment finalization was no longer safe");
+                }
+                throw e;
+            }
             idempotencyService.complete(idempotencyKeyId, 200, serializeResponse(response));
             return response;
         } catch (PaymentProviderUnavailableException e) {
@@ -159,6 +173,8 @@ public class CoreBankVoidService {
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
 
+        validateVoidFinalizationState(payment);
+
         payment.setStatus(PaymentStatus.VOIDED);
         payment.setProviderStatus(result.providerStatus());
         payment.setProviderMetadata(result.providerMetadataJson());
@@ -174,6 +190,16 @@ public class CoreBankVoidService {
                 paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId()));
     }
 
+    private void validateVoidFinalizationState(BookingPayment payment) {
+        try {
+            validateVoid(payment);
+        } catch (BusinessRuleException e) {
+            throw new BusinessRuleException(
+                    "PAYMENT_FINALIZATION_UNSAFE",
+                    "Payment void succeeded but local finalization was no longer safe");
+        }
+    }
+
     private void markFailed(PreparedVoidContext prepared, String providerErrorCode, String providerErrorMessage) {
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
@@ -181,6 +207,17 @@ public class CoreBankVoidService {
         tx.setProviderErrorCode(providerErrorCode);
         tx.setProviderErrorMessage(providerErrorMessage);
         paymentTransactionRepository.save(tx);
+    }
+
+    private void markUnsafeRequiresNew(PreparedVoidContext prepared, String providerErrorMessage) {
+        requiresNewTransactionTemplate.executeWithoutResult(status -> {
+            PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
+                    .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
+            tx.setStatus(PaymentTransactionStatus.FAILED);
+            tx.setProviderErrorCode("PAYMENT_FINALIZATION_UNSAFE");
+            tx.setProviderErrorMessage(providerErrorMessage);
+            paymentTransactionRepository.save(tx);
+        });
     }
 
     private void requireCanMutate(UUID actorId, Booking booking) {
@@ -229,6 +266,10 @@ public class CoreBankVoidService {
             throw new IllegalStateException("Transactional callback returned null unexpectedly");
         }
         return value;
+    }
+
+    private boolean isUnsafeFinalization(BusinessRuleException e) {
+        return "PAYMENT_FINALIZATION_UNSAFE".equals(e.getCode());
     }
 
     private record PreparedVoidContext(

@@ -146,7 +146,7 @@ describe("payment api", () => {
           },
           payment: {
             id: "pay-2",
-            status: "UNPAID",
+            status: "PENDING_TRANSFER",
             paymentMethod: "BANK_TRANSFER_QR",
             provider: "VIETQR_MANUAL",
             externalOrderRef: null,
@@ -175,7 +175,7 @@ describe("payment api", () => {
         "22222222-2222-4222-8222-222222222222",
       );
 
-      expect(result.payment.status).toBe("UNPAID");
+      expect(result.payment.status).toBe("PENDING_TRANSFER");
       expect(result.payment.transferInstruction).not.toBeNull();
       expect(result.payment.transferInstruction!.bankCode).toBe("VCB");
       expect(result.payment.transferInstruction!.accountNumber).toBe("1234567890");

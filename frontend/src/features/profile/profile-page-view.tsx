@@ -56,12 +56,15 @@ export function ProfilePageView() {
   // Sync profile data into form state — runs once when profile loads.
   useEffect(() => {
     if (profile && form.fullName === "") {
-      setForm({
-        fullName: profile.fullName,
-        phone: profile.phone,
-        dateOfBirth: profile.dateOfBirth,
-        addressLine: profile.addressLine,
-      });
+      const id = window.setTimeout(() => {
+        setForm({
+          fullName: profile.fullName,
+          phone: profile.phone,
+          dateOfBirth: profile.dateOfBirth,
+          addressLine: profile.addressLine,
+        });
+      }, 0);
+      return () => window.clearTimeout(id);
     }
   }, [profile, form.fullName]);
 

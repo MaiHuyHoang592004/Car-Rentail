@@ -22,7 +22,7 @@ import { getPaymentMethodLabel } from "@/lib/display-labels";
 import { formatMoney } from "@/lib/formatters";
 import { newIdempotencyKey } from "@/lib/idempotency";
 
-const PAYABLE_STATUSES = ["HELD", "PENDING_HOST_APPROVAL", "CONFIRMED"] as const;
+const PAYABLE_STATUSES = ["HELD"] as const;
 
 function PaymentStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
@@ -293,7 +293,7 @@ export function BookingPaymentPageView({ bookingId }: BookingPaymentPageViewProp
                       </div>
                     </div>
                     <p className="mt-3 border-t border-amber-200 pt-3 text-xs italic text-amber-800">
-                      Sau khi chuyen khoan thanh cong, he thong se tu dong xac nhan.
+                      Tao QR chi la huong dan chuyen khoan; he thong chua xac nhan da nhan tien.
                     </p>
                   </div>
                 ) : null}

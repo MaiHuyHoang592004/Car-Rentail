@@ -62,6 +62,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -156,12 +160,23 @@ class BookingServiceTest {
                 auditLogService,
                 outboxService,
                 adminNotificationService,
+                testTransactionManager(),
                 fixedClock,
                 15,
                 false);
         lenient().when(correlationIdHelper.getOrGenerate()).thenReturn("corr-1");
         lenient().when(paymentProviderRouter.route(PaymentProviderType.COREBANK)).thenReturn(paymentProvider);
-        lenient().when(paymentTransactionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        java.util.Map<UUID, PaymentTransaction> savedTransactions = new java.util.HashMap<>();
+        lenient().when(paymentTransactionRepository.save(any())).thenAnswer(i -> {
+            PaymentTransaction tx = i.getArgument(0);
+            if (tx.getId() == null) {
+                tx.setId(UUID.randomUUID());
+            }
+            savedTransactions.put(tx.getId(), tx);
+            return tx;
+        });
+        lenient().when(paymentTransactionRepository.findByIdForUpdate(any()))
+                .thenAnswer(i -> Optional.ofNullable(savedTransactions.get(i.getArgument(0))));
     }
 
     @Test
@@ -330,6 +345,7 @@ class BookingServiceTest {
                 auditLogService,
                 outboxService,
                 adminNotificationService,
+                testTransactionManager(),
                 fixedClock,
                 15,
                 true);
@@ -374,6 +390,7 @@ class BookingServiceTest {
                 auditLogService,
                 outboxService,
                 adminNotificationService,
+                testTransactionManager(),
                 fixedClock,
                 15,
                 false);
@@ -876,7 +893,6 @@ class BookingServiceTest {
         mockCancelProceed();
         when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
         when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
-        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
                 .isInstanceOf(BusinessRuleException.class)
@@ -892,7 +908,6 @@ class BookingServiceTest {
         mockCancelProceed();
         when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
         when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
-        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
                 .isInstanceOf(BusinessRuleException.class)
@@ -1268,5 +1283,26 @@ class BookingServiceTest {
         payment.setProviderPaymentOrderId("payment-order-1");
         payment.setProviderHoldId("hold-1");
         return payment;
+    }
+
+    private PlatformTransactionManager testTransactionManager() {
+        return new AbstractPlatformTransactionManager() {
+            @Override
+            protected Object doGetTransaction() {
+                return new Object();
+            }
+
+            @Override
+            protected void doBegin(Object transaction, TransactionDefinition definition) {
+            }
+
+            @Override
+            protected void doCommit(DefaultTransactionStatus status) {
+            }
+
+            @Override
+            protected void doRollback(DefaultTransactionStatus status) {
+            }
+        };
     }
 }

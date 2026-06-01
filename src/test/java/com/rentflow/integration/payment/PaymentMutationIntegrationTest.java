@@ -166,6 +166,39 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void captureProviderSuccessWithLocalDriftRecordsUnsafeAndDoesNotOverwritePayment() throws Exception {
+        Booking booking = saveBooking(customer.getId(), host.getId(), BookingStatus.CONFIRMED);
+        BookingPayment payment = saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.captureHold(any())).thenAnswer(invocation -> {
+            BookingPayment drifted = bookingPaymentRepository.findById(payment.getId()).orElseThrow();
+            drifted.setStatus(PaymentStatus.CAPTURED);
+            bookingPaymentRepository.saveAndFlush(drifted);
+            return new CoreBankCaptureHoldResult(
+                    new CoreBankCaptureHoldResponse("payment-order-1", "journal-unsafe", "CAPTURED"),
+                    "{\"paymentOrderId\":\"payment-order-1\",\"journalId\":\"journal-unsafe\",\"status\":\"CAPTURED\"}");
+        });
+
+        mockMvc.perform(post("/api/v1/payments/{paymentId}/capture", payment.getId())
+                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":1400000.00}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_FINALIZATION_UNSAFE"));
+
+        BookingPayment updated = bookingPaymentRepository.findById(payment.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(updated.getCapturedAmount()).isEqualByComparingTo("0.00");
+        PaymentTransaction tx = paymentTransactionRepository
+                .findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId())
+                .get(0);
+        assertThat(tx.getStatus()).isEqualTo(PaymentTransactionStatus.FAILED);
+        assertThat(tx.getProviderErrorCode()).isEqualTo("PAYMENT_FINALIZATION_UNSAFE");
+    }
+
+    @Test
     void voidByHostMarksPaymentVoided() throws Exception {
         Booking booking = saveBooking(customer.getId(), host.getId(), BookingStatus.CONFIRMED);
         BookingPayment payment = saveAuthorizedPayment(booking.getId());
@@ -182,6 +215,37 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
 
         BookingPayment updated = bookingPaymentRepository.findById(payment.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(PaymentStatus.VOIDED);
+    }
+
+    @Test
+    void voidProviderSuccessWithLocalDriftRecordsUnsafeAndDoesNotOverwritePayment() throws Exception {
+        Booking booking = saveBooking(customer.getId(), host.getId(), BookingStatus.CONFIRMED);
+        BookingPayment payment = saveAuthorizedPayment(booking.getId());
+        when(coreBankPaymentClient.voidHold(any())).thenAnswer(invocation -> {
+            BookingPayment drifted = bookingPaymentRepository.findById(payment.getId()).orElseThrow();
+            drifted.setStatus(PaymentStatus.CAPTURED);
+            drifted.setCapturedAmount(new BigDecimal("100000.00"));
+            bookingPaymentRepository.saveAndFlush(drifted);
+            return new CoreBankVoidHoldResult(
+                    new CoreBankVoidHoldResponse("hold-1", "VOIDED"),
+                    "{\"holdId\":\"hold-1\",\"status\":\"VOIDED\"}");
+        });
+
+        mockMvc.perform(post("/api/v1/payments/{paymentId}/void", payment.getId())
+                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_FINALIZATION_UNSAFE"));
+
+        BookingPayment updated = bookingPaymentRepository.findById(payment.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(updated.getCapturedAmount()).isEqualByComparingTo("100000.00");
+        PaymentTransaction tx = paymentTransactionRepository
+                .findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId())
+                .get(0);
+        assertThat(tx.getStatus()).isEqualTo(PaymentTransactionStatus.FAILED);
+        assertThat(tx.getProviderErrorCode()).isEqualTo("PAYMENT_FINALIZATION_UNSAFE");
     }
 
     @Test
@@ -232,6 +296,39 @@ class PaymentMutationIntegrationTest extends BaseIntegrationTest {
         BookingPayment partiallyRefunded = bookingPaymentRepository.findById(payment.getId()).orElseThrow();
         assertThat(partiallyRefunded.getRefundedAmount()).isEqualByComparingTo("400000.00");
         assertThat(partiallyRefunded.getStatus()).isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
+    }
+
+    @Test
+    void refundProviderSuccessWithAmountDriftRecordsUnsafeAndDoesNotOverRefund() throws Exception {
+        Booking booking = saveBooking(customer.getId(), host.getId(), BookingStatus.CONFIRMED);
+        BookingPayment payment = saveCapturedPayment(booking.getId());
+        when(coreBankPaymentClient.refund(any())).thenAnswer(invocation -> {
+            BookingPayment drifted = bookingPaymentRepository.findById(payment.getId()).orElseThrow();
+            drifted.setRefundedAmount(new BigDecimal("1300000.00"));
+            drifted.setStatus(PaymentStatus.PARTIALLY_REFUNDED);
+            bookingPaymentRepository.saveAndFlush(drifted);
+            return new CoreBankRefundResult(
+                    new CoreBankRefundResponse("payment-order-1", "refund-journal-unsafe", "PARTIALLY_REFUNDED"),
+                    "{\"paymentOrderId\":\"payment-order-1\",\"refundJournalId\":\"refund-journal-unsafe\",\"status\":\"PARTIALLY_REFUNDED\"}");
+        });
+
+        mockMvc.perform(post("/api/v1/payments/{paymentId}/refund", payment.getId())
+                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":200000.00,"reason":"Customer cancellation refund"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_FINALIZATION_UNSAFE"));
+
+        BookingPayment updated = bookingPaymentRepository.findById(payment.getId()).orElseThrow();
+        assertThat(updated.getRefundedAmount()).isEqualByComparingTo("1300000.00");
+        PaymentTransaction tx = paymentTransactionRepository
+                .findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId())
+                .get(0);
+        assertThat(tx.getStatus()).isEqualTo(PaymentTransactionStatus.FAILED);
+        assertThat(tx.getProviderErrorCode()).isEqualTo("PAYMENT_FINALIZATION_UNSAFE");
     }
 
     @Test
