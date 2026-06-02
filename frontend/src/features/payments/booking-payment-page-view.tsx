@@ -15,6 +15,7 @@ import {
   authorizeBookingPayment,
   getBookingPayment,
   listPaymentBanks,
+  simulateTransferConfirmation,
 } from "@/features/payments/api";
 import type { PaymentBank, PaymentDetail } from "@/features/payments/types";
 import { ApiError } from "@/lib/api-error";
@@ -127,6 +128,30 @@ export function BookingPaymentPageView({ bookingId }: BookingPaymentPageViewProp
     },
   });
 
+  const simulateConfirmationMutation = useMutation({
+    mutationFn: () => {
+      const idempotencyKey = newIdempotencyKey();
+      return simulateTransferConfirmation(bookingId, idempotencyKey);
+    },
+    onSuccess: (result) => {
+      toast.success("Ngân hàng sandbox đã xác nhận chuyển khoản.");
+      queryClient.setQueryData(["bookings", bookingId, "payment"], result);
+      queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", bookingId, "payment"] });
+    },
+    onError: (error: unknown) => {
+      if (error instanceof ApiError) {
+        if (error.code === "SANDBOX_PAYMENT_DISABLED") {
+          toast.error("Sandbox xác nhận chuyển khoản đang tắt trên backend.");
+        } else {
+          toast.error(error.message || "Không thể mô phỏng xác nhận chuyển khoản.");
+        }
+      } else {
+        toast.error("Không thể mô phỏng xác nhận chuyển khoản.");
+      }
+    },
+  });
+
   const handleAuthorize = useCallback(
     (bank: PaymentBank) => {
       if (!idempotencyKeyRef.current) {
@@ -176,6 +201,10 @@ export function BookingPaymentPageView({ bookingId }: BookingPaymentPageViewProp
   const isPending = authorizeMutation.isPending;
   const isCaptured = hasPayment && payment!.payment.status === "CAPTURED";
   const isFailed = hasPayment && payment!.payment.status === "FAILED";
+  const isPendingManualTransfer =
+    hasPayment
+    && payment!.payment.status === "PENDING_TRANSFER"
+    && payment!.payment.provider === "VIETQR_MANUAL";
   return (
     <AppShell activePath="/me/bookings">
       <div className="space-y-6">
@@ -289,8 +318,20 @@ export function BookingPaymentPageView({ bookingId }: BookingPaymentPageViewProp
                       </div>
                     </div>
                     <p className="mt-3 border-t border-amber-200 pt-3 text-xs italic text-amber-800">
-                      Sau khi chuyen khoan thanh cong, he thong se tu dong xac nhan.
+                      Đây là chuyển khoản mô phỏng, không gửi tiền thật. Dùng nút sandbox bên dưới để giả lập ngân hàng xác nhận.
                     </p>
+                    {isPendingManualTransfer ? (
+                      <button
+                        type="button"
+                        onClick={() => simulateConfirmationMutation.mutate()}
+                        disabled={simulateConfirmationMutation.isPending}
+                        className="mt-3 rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {simulateConfirmationMutation.isPending
+                          ? "Đang xác nhận..."
+                          : "Mô phỏng ngân hàng xác nhận"}
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </section>

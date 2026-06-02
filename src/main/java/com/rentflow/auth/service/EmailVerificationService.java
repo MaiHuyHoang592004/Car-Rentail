@@ -27,18 +27,43 @@ public class EmailVerificationService {
 
     private final AuthUserRepository authUserRepository;
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
+    private final EmailDeliveryService emailDeliveryService;
 
     @Transactional
     public void sendVerification(UUID userId) {
+        issueAndSendVerification(userId);
+    }
+
+    @Transactional
+    public boolean sendVerificationBestEffort(UUID userId) {
+        try {
+            issueAndSendVerification(userId);
+            return true;
+        } catch (BusinessRuleException ex) {
+            if (!"EMAIL_DELIVERY_FAILED".equals(ex.getCode())) {
+                throw ex;
+            }
+            log.warn("Verification email best-effort delivery failed for user {}: {}", userId, ex.getMessage());
+            return false;
+        }
+    }
+
+    private void issueAndSendVerification(UUID userId) {
         AuthUser user = authUserRepository.findById(userId).orElseThrow();
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
             return;
         }
         String raw = generateOpaqueToken();
         String hash = PasswordService.sha256(raw);
+        Instant expiresAt = Instant.now().plus(TOKEN_LIFETIME);
         emailVerificationTokenRepository.save(new EmailVerificationToken(
-                user.getId(), hash, Instant.now().plus(TOKEN_LIFETIME)));
-        log.info("[email-stub] verification requested for {}", user.getEmail());
+                user.getId(), hash, expiresAt));
+        try {
+            emailDeliveryService.sendVerificationEmail(user.getEmail(), raw, expiresAt);
+        } catch (EmailDeliveryException ex) {
+            log.warn("Verification email delivery failed for {}: {}", user.getEmail(), ex.getMessage());
+            throw new BusinessRuleException("EMAIL_DELIVERY_FAILED", "Verification email could not be sent");
+        }
     }
 
     @Transactional

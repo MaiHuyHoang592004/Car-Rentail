@@ -36,20 +36,7 @@ export function HostListingCreatePageView() {
     queryKey: ["host", "vehicles", "ACTIVE"],
     queryFn: async () => {
       const opts = await getHostActiveVehicles();
-      return opts.map((opt) => ({
-        id: opt.id,
-        make: opt.label.split(" ")[0] ?? "",
-        model: opt.label.replace(/^[^\s]+\s*/, "").replace(/\s*\(\d+\)$/, ""),
-        year: Number(opt.label.match(/\((\d+)\)$/)?.[1] ?? 0),
-        category: "",
-        transmission: "AUTO" as const,
-        fuelType: "",
-        seats: 0,
-        status: "ACTIVE" as const,
-        city: "",
-        plateNumber: "",
-        vin: "",
-      }));
+      return opts;
     },
   });
 

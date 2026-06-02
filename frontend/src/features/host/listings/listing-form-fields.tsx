@@ -5,14 +5,15 @@
   UseFormWatch,
 } from "react-hook-form";
 import type { HostListingFormState } from "@/features/host/forms";
-import type { HostVehicleViewModel, HostListingViewModel } from "@/features/host/types";
+import type { HostListingViewModel } from "@/features/host/types";
+import type { HostVehicleSelectOption } from "@/features/host/vehicles/types";
 
 type ListingFormFieldsProps = {
   register: UseFormRegister<HostListingFormState>;
   errors: FieldErrors<HostListingFormState>;
   setValue: UseFormSetValue<HostListingFormState>;
   watch: UseFormWatch<HostListingFormState>;
-  vehicleOptions: HostVehicleViewModel[];
+  vehicleOptions: HostVehicleSelectOption[];
   disableVehicleSelect?: boolean;
   readOnly?: boolean;
   listing?: HostListingViewModel;
@@ -61,7 +62,7 @@ export function ListingFormFields({
               <option value="">Chon xe hoat dong</option>
               {vehicleOptions.map((vehicle) => (
                 <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.make} {vehicle.model} ({vehicle.year})
+                  {vehicle.label}
                 </option>
               ))}
             </select>

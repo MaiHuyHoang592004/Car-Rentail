@@ -14,6 +14,7 @@ type Requirement = {
 const REQUIREMENTS: Requirement[] = [
   { test: (p) => p.startsWith("/admin"), roles: ["ADMIN"] },
   { test: (p) => p.startsWith("/host"), roles: ["HOST"] },
+  { test: (p) => p.startsWith("/onboarding"), roles: null },
   { test: (p) => p.startsWith("/me/bookings"), roles: ["CUSTOMER"] },
   { test: (p) => p.startsWith("/me"), roles: null },
   { test: (p) => p.startsWith("/bookings"), roles: ["CUSTOMER"] },
@@ -79,6 +80,7 @@ export const config = {
   matcher: [
     "/me/:path*",
     "/host/:path*",
+    "/onboarding/:path*",
     "/admin/:path*",
     "/bookings/:path*",
     "/listings/:id/book",

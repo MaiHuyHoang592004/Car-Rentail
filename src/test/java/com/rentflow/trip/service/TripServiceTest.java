@@ -3,6 +3,7 @@ package com.rentflow.trip.service;
 import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
@@ -19,17 +20,27 @@ import com.rentflow.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,10 +56,12 @@ class TripServiceTest {
 
     private TripService tripService;
     private Clock clock;
+    private AtomicInteger transactionCommits;
 
     @BeforeEach
     void setUp() {
         clock = Clock.fixed(Instant.parse("2026-05-29T00:00:00Z"), ZoneOffset.UTC);
+        transactionCommits = new AtomicInteger();
         tripService = new TripService(
                 bookingRepository,
                 listingRepository,
@@ -56,7 +69,8 @@ class TripServiceTest {
                 tripRecordRepository,
                 tripPaymentCaptureService,
                 securityContext,
-                clock);
+                clock,
+                transactionManager());
     }
 
     @Test
@@ -92,6 +106,7 @@ class TripServiceTest {
         UUID listingId = UUID.randomUUID();
         Booking booking = booking(bookingId, customerId, listingId, BookingStatus.IN_PROGRESS);
         TripRecord record = new TripRecord();
+        record.setId(UUID.randomUUID());
         record.setBookingId(bookingId);
         record.setCustomerId(customerId);
         record.setCheckInAt(Instant.parse("2026-05-28T00:00:00Z"));
@@ -100,19 +115,66 @@ class TripServiceTest {
         record.setNotes("start trip");
 
         when(securityContext.currentUserId()).thenReturn(customerId);
-        when(bookingRepository.findByIdForUpdate(bookingId)).thenReturn(Optional.of(booking));
-        when(tripRecordRepository.findByBookingId(bookingId)).thenReturn(Optional.of(record));
+        when(bookingRepository.findByIdForUpdate(bookingId)).thenReturn(Optional.of(booking), Optional.of(booking));
+        when(tripRecordRepository.findByBookingIdForUpdate(bookingId)).thenReturn(Optional.of(record), Optional.of(record));
         when(tripRecordRepository.save(any(TripRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doAnswer(invocation -> {
+            assertThat(transactionCommits).hasValue(1);
+            assertThat(record.getCheckOutAt()).isNull();
+            assertThat(booking.getStatus()).isEqualTo(BookingStatus.IN_PROGRESS);
+            return null;
+        }).when(tripPaymentCaptureService).captureRemainingForBooking(bookingId);
 
         TripRecordResponse response = tripService.checkOut(bookingId, new CheckOutRequest(12500, 70, "end trip"));
 
         assertThat(response.bookingStatus()).isEqualTo(BookingStatus.COMPLETED);
         assertThat(response.checkOutAt()).isEqualTo(Instant.parse("2026-05-29T00:00:00Z"));
         assertThat(response.checkOutOdometer()).isEqualTo(12500);
+        assertThat(transactionCommits).hasValue(2);
         verify(tripPaymentCaptureService).captureRemainingForBooking(bookingId);
         verify(tripRecordRepository).save(any(TripRecord.class));
         verify(bookingRepository).save(any(Booking.class));
+
+        InOrder inOrder = inOrder(bookingRepository, tripRecordRepository, tripPaymentCaptureService);
+        inOrder.verify(bookingRepository).findByIdForUpdate(bookingId);
+        inOrder.verify(tripRecordRepository).findByBookingIdForUpdate(bookingId);
+        inOrder.verify(tripPaymentCaptureService).captureRemainingForBooking(bookingId);
+        inOrder.verify(bookingRepository).findByIdForUpdate(bookingId);
+        inOrder.verify(tripRecordRepository).findByBookingIdForUpdate(bookingId);
+    }
+
+    @Test
+    void checkOutDoesNotCompleteTripWhenStateDriftsAfterCapture() {
+        UUID bookingId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID listingId = UUID.randomUUID();
+        Booking booking = booking(bookingId, customerId, listingId, BookingStatus.IN_PROGRESS);
+        TripRecord record = new TripRecord();
+        record.setId(UUID.randomUUID());
+        record.setBookingId(bookingId);
+        record.setCustomerId(customerId);
+        record.setCheckInAt(Instant.parse("2026-05-28T00:00:00Z"));
+        record.setCheckInOdometer(12345);
+        record.setCheckInFuelLevel(80);
+
+        when(securityContext.currentUserId()).thenReturn(customerId);
+        when(bookingRepository.findByIdForUpdate(bookingId)).thenReturn(Optional.of(booking), Optional.of(booking));
+        when(tripRecordRepository.findByBookingIdForUpdate(bookingId)).thenReturn(Optional.of(record));
+        doAnswer(invocation -> {
+            booking.setStatus(BookingStatus.CANCELLED);
+            return null;
+        }).when(tripPaymentCaptureService).captureRemainingForBooking(bookingId);
+
+        assertThatThrownBy(() -> tripService.checkOut(bookingId, new CheckOutRequest(12500, 70, "end trip")))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "BOOKING_INVALID_STATUS");
+
+        assertThat(record.getCheckOutAt()).isNull();
+        assertThat(record.getCheckOutOdometer()).isNull();
+        verify(tripPaymentCaptureService).captureRemainingForBooking(bookingId);
+        verify(tripRecordRepository, never()).save(any(TripRecord.class));
+        verify(bookingRepository, never()).save(any(Booking.class));
     }
 
     private Booking booking(UUID bookingId, UUID customerId, UUID listingId, BookingStatus status) {
@@ -137,5 +199,27 @@ class TripServiceTest {
         vehicle.setId(vehicleId);
         vehicle.setStatus(status);
         return vehicle;
+    }
+
+    private PlatformTransactionManager transactionManager() {
+        return new AbstractPlatformTransactionManager() {
+            @Override
+            protected Object doGetTransaction() {
+                return new Object();
+            }
+
+            @Override
+            protected void doBegin(Object transaction, TransactionDefinition definition) {
+            }
+
+            @Override
+            protected void doCommit(DefaultTransactionStatus status) {
+                transactionCommits.incrementAndGet();
+            }
+
+            @Override
+            protected void doRollback(DefaultTransactionStatus status) {
+            }
+        };
     }
 }

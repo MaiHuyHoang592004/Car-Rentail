@@ -20,6 +20,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Tag("integration")
@@ -41,14 +42,19 @@ class EmailVerificationIntegrationTest extends BaseIntegrationTest {
     @DisplayName("resend-verification creates a token for the current user")
     void resendVerification_createsToken() throws Exception {
         String token = registerAndLogin("verify-me@example.com", "Password@123");
+        AuthUser user = authUserRepository.findByEmail("verify-me@example.com").orElseThrow();
+        int beforeCount = emailVerificationTokenRepository.findAll().size();
 
         mockMvc.perform(post("/api/v1/users/me/resend-verification")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
 
         List<EmailVerificationToken> tokens = emailVerificationTokenRepository.findAll();
-        assertThat(tokens).hasSize(1);
-        assertThat(tokens.get(0).getExpiresAt()).isAfter(Instant.now());
+        assertThat(tokens).hasSize(beforeCount + 1);
+        assertThat(tokens)
+                .filteredOn(t -> t.getUserId().equals(user.getId()))
+                .isNotEmpty()
+                .allSatisfy(t -> assertThat(t.getExpiresAt()).isAfter(Instant.now()));
     }
 
     @Test
@@ -83,7 +89,20 @@ class EmailVerificationIntegrationTest extends BaseIntegrationTest {
                         .content("""
                                 { "token": "no-such-token" }
                                 """))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
+    }
+
+    @Test
+    @DisplayName("verify-email with blank token returns 400 validation error")
+    void verifyEmail_blankToken_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "token": "" }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     private String registerAndLogin(String email, String password) throws Exception {

@@ -42,6 +42,7 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final LoginAttemptTracker loginAttemptTracker;
+    private final EmailVerificationService emailVerificationService;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
@@ -70,7 +71,12 @@ public class AuthService {
 
         log.info("User registered: {} with roles {}", user.getEmail(), roles);
 
-        return userProfilePort.createRegisteredProfile(user, request.fullName(), roles);
+        RegisterResponse response = userProfilePort.createRegisteredProfile(user, request.fullName(), roles);
+        boolean verificationEmailSent = emailVerificationService.sendVerificationBestEffort(user.getId());
+        if (!verificationEmailSent) {
+            log.warn("Initial verification email was not sent for {}", user.getEmail());
+        }
+        return response;
     }
 
     @Transactional

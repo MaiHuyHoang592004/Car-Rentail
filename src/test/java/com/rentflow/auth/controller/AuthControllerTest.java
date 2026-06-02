@@ -133,4 +133,14 @@ class AuthControllerTest {
         verify(rateLimitService, times(2)).checkLoginAllowed("user@example.com", "203.0.113.10");
         verify(rateLimitService, times(2)).recordLoginFailure("user@example.com", "203.0.113.10");
     }
+
+    @Test
+    void verifyEmailMalformedJsonReturns400ValidationError() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Request body is malformed"));
+    }
 }

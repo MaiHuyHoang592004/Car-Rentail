@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/rentflow/app-shell";
@@ -10,7 +10,10 @@ import { PageHeader } from "@/components/rentflow/page-header";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { StatusBadge } from "@/components/rentflow/status-badge";
 import type { ProfileFormErrors, ProfileFormState, ProfileViewModel } from "@/features/profile/types";
-import { getProfile, resendVerificationEmail, updateProfile } from "@/features/profile/api";
+import { resendVerificationEmail, updateProfile } from "@/features/profile/api";
+import { AccountCompletionCard } from "@/features/onboarding/account-completion-card";
+import { SessionExpiredState, useAuthenticatedProfile } from "@/features/profile/use-authenticated-profile";
+import { ApiError } from "@/lib/api-error";
 
 function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
   const errors: ProfileFormErrors = {};
@@ -37,10 +40,7 @@ function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
 }
 
 export function ProfilePageView() {
-  const { data: profile, isLoading } = useQuery({
-    queryKey: ["profile"],
-    queryFn: getProfile,
-  });
+  const { profileQuery, isLoading, isGuest, loginHref } = useAuthenticatedProfile();
 
   if (isLoading) {
     return (
@@ -50,7 +50,15 @@ export function ProfilePageView() {
     );
   }
 
-  if (!profile) {
+  if (isGuest) {
+    return (
+      <AppShell activePath="/me/profile">
+        <SessionExpiredState loginHref={loginHref} />
+      </AppShell>
+    );
+  }
+
+  if (!profileQuery.data) {
     return (
       <AppShell activePath="/me/profile">
         <EmptyState title="Không tải được hồ sơ" />
@@ -58,7 +66,7 @@ export function ProfilePageView() {
     );
   }
 
-  return <ProfileContent profile={profile} />;
+  return <ProfileContent profile={profileQuery.data} />;
 }
 
 function ProfileContent({ profile }: { profile: ProfileViewModel }) {
@@ -87,8 +95,8 @@ function ProfileContent({ profile }: { profile: ProfileViewModel }) {
     onSuccess: () => {
       toast.success("Đã gửi lại email xác minh. Vui lòng kiểm tra hộp thư của bạn.");
     },
-    onError: () => {
-      toast.error("Không thể gửi lại email xác minh. Vui lòng thử lại.");
+    onError: (error) => {
+      toast.error(friendlyResendError(error));
     },
   });
 
@@ -129,6 +137,8 @@ function ProfileContent({ profile }: { profile: ProfileViewModel }) {
             {banner}
           </section>
         ) : null}
+
+        <AccountCompletionCard profile={profile} />
 
         {!profile.emailVerified ? (
           <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
@@ -242,4 +252,17 @@ function ProfileContent({ profile }: { profile: ProfileViewModel }) {
       </div>
     </AppShell>
   );
+}
+
+function friendlyResendError(error: unknown): string {
+  if (error instanceof ApiError && (error.status === 401 || error.code === "AUTH_INVALID_CREDENTIALS" || error.code === "AUTH_TOKEN_EXPIRED")) {
+    return "Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.";
+  }
+  if (error instanceof ApiError && (error.status === 403 || error.code === "ACCESS_DENIED")) {
+    return "Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.";
+  }
+  if (error instanceof ApiError && error.code === "EMAIL_DELIVERY_FAILED") {
+    return "Chưa gửi được email xác minh. Vui lòng thử lại sau.";
+  }
+  return "Không thể gửi lại email xác minh. Vui lòng thử lại.";
 }

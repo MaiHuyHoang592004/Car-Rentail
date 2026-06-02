@@ -32,6 +32,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -97,8 +98,12 @@ public class CoreBankRefundService {
                         markFailed(prepared, "PAYMENT_PROVIDER_UNAVAILABLE", e.getMessage()));
                 throw e;
             }
-            PaymentDetailResponse response = required(transactionTemplate.execute(status ->
+            FinalizedPaymentDetail finalized = required(transactionTemplate.execute(status ->
                     finalizeRefund(prepared, refundResult)));
+            if (finalized.unsafe()) {
+                throw new BusinessRuleException("PAYMENT_FINALIZATION_UNSAFE", finalized.unsafeReason());
+            }
+            PaymentDetailResponse response = finalized.response();
             idempotencyService.complete(idempotencyKeyId, 200, serializeResponse(response));
             return response;
         } catch (PaymentProviderUnavailableException e) {
@@ -153,10 +158,16 @@ public class CoreBankRefundService {
                 requestId,
                 payment.getId().toString(),
                 correlationId);
-        return new PreparedRefundContext(payment.getId(), booking.getId(), tx.getId(), request.amount(), command);
+        return new PreparedRefundContext(
+                payment.getId(),
+                booking.getId(),
+                tx.getId(),
+                request.amount(),
+                payment.getProviderPaymentOrderId(),
+                command);
     }
 
-    private PaymentDetailResponse finalizeRefund(PreparedRefundContext prepared, RefundResult result) {
+    private FinalizedPaymentDetail finalizeRefund(PreparedRefundContext prepared, RefundResult result) {
         // Lock booking before payment (canonical order)
         Booking booking = bookingRepository.findByIdForUpdate(prepared.bookingId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
@@ -164,6 +175,17 @@ public class CoreBankRefundService {
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
+
+        String unsafeReason = refundFinalizationUnsafeReason(prepared, payment, tx);
+        if (unsafeReason != null) {
+            markUnsafe(tx, unsafeReason, result);
+            return new FinalizedPaymentDetail(paymentDetailResponseFactory.create(
+                    booking,
+                    payment,
+                    paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId())),
+                    true,
+                    unsafeReason);
+        }
 
         BigDecimal updatedRefunded = payment.getRefundedAmount().add(prepared.amount());
         payment.setRefundedAmount(updatedRefunded);
@@ -181,10 +203,44 @@ public class CoreBankRefundService {
 
         bookingPaymentRepository.save(payment);
         paymentTransactionRepository.save(tx);
-        return paymentDetailResponseFactory.create(
+        return new FinalizedPaymentDetail(paymentDetailResponseFactory.create(
                 booking,
                 payment,
-                paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId()));
+                paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId())),
+                false,
+                null);
+    }
+
+    private String refundFinalizationUnsafeReason(
+            PreparedRefundContext prepared,
+            BookingPayment payment,
+            PaymentTransaction tx) {
+        if (tx.getStatus() != PaymentTransactionStatus.PENDING) {
+            return "CoreBank refund succeeded but local transaction is no longer pending";
+        }
+        if (payment.getProvider() != PaymentProviderType.COREBANK) {
+            return "CoreBank refund succeeded but payment provider changed";
+        }
+        if (payment.getStatus() != PaymentStatus.CAPTURED && payment.getStatus() != PaymentStatus.PARTIALLY_REFUNDED) {
+            return "CoreBank refund succeeded but payment is no longer refundable";
+        }
+        if (!Objects.equals(prepared.providerPaymentOrderId(), payment.getProviderPaymentOrderId())) {
+            return "CoreBank refund succeeded but provider payment order changed";
+        }
+        BigDecimal remaining = payment.getCapturedAmount().subtract(payment.getRefundedAmount());
+        if (remaining.compareTo(BigDecimal.ZERO) <= 0 || prepared.amount().compareTo(remaining) > 0) {
+            return "CoreBank refund succeeded but remaining refundable amount changed";
+        }
+        return null;
+    }
+
+    private void markUnsafe(PaymentTransaction tx, String errorMessage, RefundResult result) {
+        tx.setStatus(PaymentTransactionStatus.FAILED);
+        tx.setProviderErrorCode("PAYMENT_FINALIZATION_UNSAFE");
+        tx.setProviderErrorMessage(errorMessage);
+        tx.setProviderJournalId(result.providerJournalId());
+        tx.setProviderResponse(result.providerMetadataJson());
+        paymentTransactionRepository.save(tx);
     }
 
     private void markFailed(PreparedRefundContext prepared, String providerErrorCode, String providerErrorMessage) {
@@ -247,7 +303,15 @@ public class CoreBankRefundService {
             UUID bookingId,
             UUID transactionId,
             BigDecimal amount,
+            String providerPaymentOrderId,
             RefundCommand command
+    ) {
+    }
+
+    private record FinalizedPaymentDetail(
+            PaymentDetailResponse response,
+            boolean unsafe,
+            String unsafeReason
     ) {
     }
 

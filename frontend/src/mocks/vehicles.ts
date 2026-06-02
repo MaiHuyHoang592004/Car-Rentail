@@ -11,6 +11,12 @@ export const HOST_VEHICLE_STATUS_FILTERS: HostVehicleFilterValue[] = [
   "ARCHIVED",
 ];
 
+const READABLE_IDENTIFIER_INTEGRITY = {
+  plateNumberReadable: true,
+  vinReadable: true,
+  hasUnreadableEncryptedFields: false,
+};
+
 export const HOST_VEHICLES: HostVehicleViewModel[] = [
   {
     id: "veh-001",
@@ -25,6 +31,7 @@ export const HOST_VEHICLES: HostVehicleViewModel[] = [
     city: "Ho Chi Minh City",
     plateNumber: "51H-112.45",
     vin: "VF1TR87654A120001",
+    identifierIntegrity: READABLE_IDENTIFIER_INTEGRITY,
   },
   {
     id: "veh-002",
@@ -39,6 +46,7 @@ export const HOST_VEHICLES: HostVehicleViewModel[] = [
     city: "Da Nang",
     plateNumber: "43A-208.31",
     vin: "HF2DA76833K991274",
+    identifierIntegrity: READABLE_IDENTIFIER_INTEGRITY,
   },
   {
     id: "veh-003",
@@ -53,6 +61,7 @@ export const HOST_VEHICLES: HostVehicleViewModel[] = [
     city: "Hanoi",
     plateNumber: "30L-086.52",
     vin: "VF8VN28374J110992",
+    identifierIntegrity: READABLE_IDENTIFIER_INTEGRITY,
   },
   {
     id: "veh-004",
@@ -67,6 +76,7 @@ export const HOST_VEHICLES: HostVehicleViewModel[] = [
     city: "Can Tho",
     plateNumber: "65A-089.77",
     vin: "KIMRN55673P220114",
+    identifierIntegrity: READABLE_IDENTIFIER_INTEGRITY,
   },
   {
     id: "veh-005",
@@ -81,6 +91,7 @@ export const HOST_VEHICLES: HostVehicleViewModel[] = [
     city: "Ho Chi Minh City",
     plateNumber: "51D-550.19",
     vin: "FRDRA44509N994513",
+    identifierIntegrity: READABLE_IDENTIFIER_INTEGRITY,
   },
 ];
 

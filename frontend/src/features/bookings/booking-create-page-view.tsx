@@ -15,13 +15,21 @@ import { BookingSectionCard } from "@/features/bookings/booking-section-card";
 import { BookingPriceSummary } from "@/features/bookings/booking-price-summary";
 import { createBooking, type CreateBookingInput } from "@/features/bookings/api";
 import { getTodayIsoDate } from "@/features/bookings/date-utils";
+import {
+  deriveBookingEligibility,
+  mapBookingCreateError,
+  type BookingBlocker,
+} from "@/features/bookings/eligibility";
 import { bookingCreateSchema, type BookingCreateFormState } from "@/features/bookings/forms";
+import { useAuth } from "@/features/auth/auth-context";
 import { getListingDetailById } from "@/features/listings/api";
+import { getProfile } from "@/features/profile/api";
 import { ApiError } from "@/lib/api-error";
 import { handleApiError } from "@/lib/handle-api-error";
 import { newIdempotencyKey } from "@/lib/idempotency";
 
-type VerificationGateState = {
+type BlockerMessageState = {
+  blocker: BookingBlocker;
   message: string;
 };
 
@@ -40,9 +48,15 @@ export function BookingCreatePageView({
 }: BookingCreatePageViewProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const auth = useAuth();
   const { data: listing } = useQuery({
     queryKey: ["listings", listingId],
     queryFn: () => getListingDetailById(listingId),
+  });
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+    enabled: !isGuest && auth.status === "authenticated",
   });
   const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
   const form = useForm<BookingCreateFormState>({
@@ -57,7 +71,7 @@ export function BookingCreatePageView({
   });
   const [overlap, setOverlap] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
-  const [verificationGate, setVerificationGate] = useState<VerificationGateState | null>(null);
+  const [blockerMessage, setBlockerMessage] = useState<BlockerMessageState | null>(null);
   const [extraQuantities, setExtraQuantities] = useState<Record<string, number>>({});
   const selectedExtraIds = form.watch("selectedExtraIds");
   const pickupDate = form.watch("pickupDate");
@@ -68,6 +82,34 @@ export function BookingCreatePageView({
     return listing.extras.filter((extra) => selectedExtraIds.includes(extra.id));
   }, [listing, selectedExtraIds]);
   const listingData = listing!;
+  const profile = profileQuery.data ?? (
+    auth.user
+      ? {
+          id: auth.user.id,
+          email: auth.user.email,
+          emailVerified: auth.user.emailVerified,
+          roles: auth.user.roles.filter(
+            (role): role is "CUSTOMER" | "HOST" | "ADMIN" =>
+              role === "CUSTOMER" || role === "HOST" || role === "ADMIN",
+          ),
+          fullName: auth.user.fullName,
+          phone: auth.user.phone ?? "",
+          dateOfBirth: auth.user.dateOfBirth ?? "",
+          addressLine: auth.user.addressLine ?? "",
+          driverVerificationStatus: auth.user.driverVerificationStatus as
+            | "NOT_SUBMITTED"
+            | "PENDING"
+            | "APPROVED"
+            | "REJECTED"
+            | "EXPIRED",
+        }
+      : null
+  );
+  const eligibility = profile ? deriveBookingEligibility(profile) : null;
+  const canBook = isGuest ? false : (eligibility?.canBook ?? true);
+  const holdBannerMessage = canBook
+    ? "Hệ thống sẽ giữ xe trong 15 phút sau khi bạn gửi yêu cầu."
+    : "Sau khi hoàn tất xác minh, hệ thống sẽ giữ xe trong 15 phút để bạn thanh toán.";
 
   const createMutation = useMutation({
     mutationFn: (input: CreateBookingInput) => createBooking(input, idempotencyKeyRef.current),
@@ -79,16 +121,14 @@ export function BookingCreatePageView({
     onError: (err: unknown) =>
       handleApiError(err, {
         onCode: {
-          EMAIL_NOT_VERIFIED: (e) =>
-            setVerificationGate({
-              message: e.message || "Ban can xac minh email truoc khi dat xe.",
-            }),
-          BOOKING_OVERLAP_CUSTOMER: (e) =>
-            setOverlap(e.message || "Ban da co booking trung thoi gian."),
-          LISTING_NOT_AVAILABLE: (e) =>
-            form.setError("root", {
-              message: e.message || "Xe khong kha dung cho ngay da chon.",
-            }),
+          EMAIL_NOT_VERIFIED: applyKnownBookingError,
+          DRIVER_VERIFICATION_REQUIRED: applyKnownBookingError,
+          DRIVER_VERIFICATION_PENDING: applyKnownBookingError,
+          DRIVER_VERIFICATION_REJECTED: applyKnownBookingError,
+          BOOKING_OVERLAP_CUSTOMER: applyKnownBookingError,
+          LISTING_NOT_AVAILABLE: applyKnownBookingError,
+          IDEMPOTENCY_KEY_REQUIRED: applyKnownBookingError,
+          RATE_LIMIT_EXCEEDED: applyKnownBookingError,
           IDEMPOTENCY_KEY_CONFLICT: () => {
             idempotencyKeyRef.current = newIdempotencyKey();
             toast.error("Yeu cau da thay doi, vui long submit lai");
@@ -109,6 +149,26 @@ export function BookingCreatePageView({
       }),
   });
 
+  function applyKnownBookingError(error: ApiError) {
+    const presentation = mapBookingCreateError(error);
+    if (!presentation) {
+      setSubmitError(error);
+      return;
+    }
+    if (presentation.kind === "blocker") {
+      setBlockerMessage({
+        blocker: presentation.blocker,
+        message: presentation.message,
+      });
+      return;
+    }
+    if (presentation.kind === "overlap") {
+      setOverlap(presentation.message);
+      return;
+    }
+    form.setError("root", { message: presentation.message });
+  }
+
   function toggleExtra(extraId: string) {
     const next = selectedExtraIds.includes(extraId)
       ? selectedExtraIds.filter((id) => id !== extraId)
@@ -121,9 +181,12 @@ export function BookingCreatePageView({
       form.setError("root", { message: "Ban can dang nhap truoc khi tao booking." });
       return;
     }
+    if (!canBook) {
+      return;
+    }
     setOverlap(null);
     setSubmitError(null);
-    setVerificationGate(null);
+    setBlockerMessage(null);
     createMutation.mutate({
       listingId: listingData.id,
       pickupDate: values.pickupDate,
@@ -176,7 +239,7 @@ export function BookingCreatePageView({
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-5">
             <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Hệ thống sẽ giữ xe trong 15 phút sau khi bạn gửi yêu cầu.
+              {holdBannerMessage}
             </div>
 
             {isGuest ? (
@@ -188,6 +251,39 @@ export function BookingCreatePageView({
                 >
                   Dang nhap de dat xe
                 </Link>
+              </section>
+            ) : null}
+
+            {!isGuest && eligibility && !eligibility.canBook ? (
+              <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+                <p className="text-lg font-semibold text-amber-950">Bạn chưa thể đặt xe</p>
+                <p className="mt-2 text-sm text-amber-900">
+                  Để giữ xe và thanh toán, bạn cần hoàn tất:
+                </p>
+                <ul className="mt-3 space-y-2 text-sm text-amber-900">
+                  {eligibility.blockers.map((entry) => (
+                    <li key={entry.code} className="flex items-center gap-2">
+                      <span className="inline-flex size-5 items-center justify-center rounded-full border border-amber-400">
+                        {entry.code === "DRIVER_VERIFICATION_PENDING" ? "…" : "!"}
+                      </span>
+                      <span>{entry.label}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    href={eligibility.primaryCtaHref}
+                    className="inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                  >
+                    {eligibility.primaryCtaLabel}
+                  </Link>
+                  <Link
+                    href={`/listings/${listingData.id}`}
+                    className="inline-flex rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+                  >
+                    Quay lại chi tiết xe
+                  </Link>
+                </div>
               </section>
             ) : null}
 
@@ -204,15 +300,15 @@ export function BookingCreatePageView({
               </section>
             ) : null}
 
-            {verificationGate ? (
+            {blockerMessage ? (
               <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-sm font-semibold text-amber-900">Email chua duoc xac minh</p>
-                <p className="mt-1 text-sm text-amber-800">{verificationGate.message}</p>
+                <p className="text-sm font-semibold text-amber-900">Chua du dieu kien dat xe</p>
+                <p className="mt-1 text-sm text-amber-800">{blockerMessage.message}</p>
                 <Link
-                  href="/me/profile"
+                  href={blockerMessage.blocker.ctaHref}
                   className="mt-3 inline-flex rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
                 >
-                  Xac minh email
+                  {blockerMessage.blocker.ctaLabel}
                 </Link>
               </section>
             ) : null}
@@ -234,6 +330,7 @@ export function BookingCreatePageView({
                       onChange: () => {
                         setOverlap(null);
                         setSubmitError(null);
+                        setBlockerMessage(null);
                       },
                     })}
                     min={getTodayIsoDate()}
@@ -253,6 +350,7 @@ export function BookingCreatePageView({
                       onChange: () => {
                         setOverlap(null);
                         setSubmitError(null);
+                        setBlockerMessage(null);
                       },
                     })}
                     min={pickupDate || getTodayIsoDate()}
@@ -394,6 +492,9 @@ export function BookingCreatePageView({
               selectedExtras={extraQuantities}
               onBook={form.handleSubmit(handleSubmit)}
               isPending={createMutation.isPending}
+              submitLabel={canBook ? "Giữ xe trong 15 phút" : "Hoàn tất xác minh để đặt xe"}
+              submitDisabled={!canBook}
+              helperText={holdBannerMessage}
             />
           </div>
         </div>

@@ -40,6 +40,7 @@ class PaymentServiceTest {
     @Mock private CoreBankVoidService coreBankVoidService;
     @Mock private CoreBankRefundService coreBankRefundService;
     @Mock private PaymentReconciliationService paymentReconciliationService;
+    @Mock private SandboxTransferConfirmationService sandboxTransferConfirmationService;
 
     private PaymentService paymentService;
 
@@ -53,7 +54,8 @@ class PaymentServiceTest {
                 coreBankCaptureService,
                 coreBankVoidService,
                 coreBankRefundService,
-                paymentReconciliationService);
+                paymentReconciliationService,
+                sandboxTransferConfirmationService);
     }
 
     @Test
@@ -113,6 +115,16 @@ class PaymentServiceTest {
         paymentService.capturePayment(BOOKING_ID, "key", request);
 
         verify(coreBankCaptureService).capture(BOOKING_ID, "key", request);
+    }
+
+    @Test
+    void delegatesSimulateTransferConfirmation() {
+        PaymentDetailResponse response = mock(PaymentDetailResponse.class);
+        when(sandboxTransferConfirmationService.confirm(BOOKING_ID)).thenReturn(response);
+
+        paymentService.simulateTransferConfirmation(BOOKING_ID);
+
+        verify(sandboxTransferConfirmationService).confirm(BOOKING_ID);
     }
 
     @Test

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { CheckCircle2 } from "lucide-react";
 
 import { AppShell } from "@/components/rentflow/app-shell";
 import { ErrorBanner } from "@/components/rentflow/error-banner";
@@ -70,7 +71,7 @@ export function RegisterPageView() {
     try {
       await registerUser(values);
       toast.success("Tạo tài khoản thành công");
-      router.replace("/me/profile?onboarding=1");
+      router.replace(nextOnboardingHref(values.roles));
       router.refresh();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -109,7 +110,7 @@ export function RegisterPageView() {
       <div className="py-6">
         <AuthCard
           title="Tạo tài khoản RentFlow"
-          description="Đăng ký tài khoản để bắt đầu."
+          description="Chọn vai trò, tạo tài khoản và tiếp tục onboarding để sẵn sàng thuê hoặc cho thuê xe."
         >
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <AuthFormLayout
@@ -166,7 +167,7 @@ export function RegisterPageView() {
                 ) : null}
               </div>
 
-              <div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 <p className="mb-2 text-sm font-semibold text-foreground">Bạn muốn dùng RentFlow để làm gì?</p>
                 <div className="space-y-2">
                   {ROLE_OPTIONS.map((option) => {
@@ -177,16 +178,26 @@ export function RegisterPageView() {
                         type="button"
                         onClick={() => toggleRole(option.value)}
                         className={[
-                          "block w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                          "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left text-sm transition-colors",
                           selected
-                            ? "border-primary bg-primary/5 text-foreground"
-                            : "border-border bg-background text-foreground hover:bg-accent",
+                            ? "border-blue-300 bg-white text-foreground shadow-sm"
+                            : "border-slate-200 bg-white/70 text-foreground hover:bg-white",
                         ].join(" ")}
                         aria-pressed={selected}
                       >
-                        <span className="block font-semibold">{option.label}</span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
-                          {option.description}
+                        <span
+                          className={[
+                            "mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border",
+                            selected ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-transparent",
+                          ].join(" ")}
+                        >
+                          <CheckCircle2 className="size-3.5" />
+                        </span>
+                        <span>
+                          <span className="block font-semibold">{option.label}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {option.description}
+                          </span>
                         </span>
                       </button>
                     );
@@ -213,4 +224,14 @@ export function RegisterPageView() {
       </div>
     </AppShell>
   );
+}
+
+function nextOnboardingHref(roles: RegisterForm["roles"]): string {
+  if (roles.includes("CUSTOMER")) {
+    return "/onboarding/customer";
+  }
+  if (roles.includes("HOST")) {
+    return "/onboarding/host";
+  }
+  return "/me/profile";
 }

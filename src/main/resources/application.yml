@@ -32,6 +32,18 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:true}
+
   data:
     redis:
       repositories:
@@ -48,8 +60,14 @@ rentflow:
   auth:
     client-ip:
       trusted-proxies: ${RENTFLOW_AUTH_TRUSTED_PROXIES:}
+  mail:
+    enabled: ${RENTFLOW_MAIL_ENABLED:false}
+    from: ${RENTFLOW_MAIL_FROM:no-reply@rentflow.local}
+    frontend-base-url: ${RENTFLOW_FRONTEND_BASE_URL:http://localhost:3002}
   payment:
     require-email-verification: ${RENTFLOW_PAYMENT_REQUIRE_EMAIL_VERIFICATION:true}
+    sandbox-transfer-confirmation:
+      enabled: ${RENTFLOW_PAYMENT_SANDBOX_TRANSFER_CONFIRMATION_ENABLED:false}
     bank-transfer:
       account-number: ${RENTFLOW_BANK_TRANSFER_ACCOUNT_NUMBER:1234567890}
       account-name: ${RENTFLOW_BANK_TRANSFER_ACCOUNT_NAME:RENTFLOW ESCROW}
@@ -84,6 +102,7 @@ rentflow:
       fixed-delay-ms: ${OUTBOX_PUBLISHER_FIXED_DELAY_MS:60000}
       max-attempts: ${OUTBOX_PUBLISHER_MAX_ATTEMPTS:5}
       backoff-seconds: ${OUTBOX_PUBLISHER_BACKOFF_SECONDS:60}
+      processing-timeout-seconds: ${OUTBOX_PUBLISHER_PROCESSING_TIMEOUT_SECONDS:300}
   rate-limit:
     enabled: ${RENTFLOW_RATE_LIMIT_ENABLED:true}
     login:
@@ -120,6 +139,8 @@ management:
     health:
       show-details: when-authorized
   health:
+    mail:
+      enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
     db:
       enabled: true
 

@@ -72,6 +72,20 @@ function listingResponse(): Response {
   });
 }
 
+function profileResponse(overrides?: Partial<typeof authedSession.user>): Response {
+  return jsonResponse({
+    id: authedSession.user.id,
+    email: authedSession.user.email,
+    emailVerified: overrides?.emailVerified ?? true,
+    roles: overrides?.roles ?? ["CUSTOMER"],
+    fullName: authedSession.user.fullName,
+    phone: "",
+    dateOfBirth: null,
+    addressLine: "",
+    driverVerificationStatus: overrides?.driverVerificationStatus ?? "APPROVED",
+  });
+}
+
 function isoOffset(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -86,6 +100,7 @@ describe("BookingCreatePageView", () => {
     vi.stubGlobal("fetch", fetchSpy);
     routerPush.mockClear();
   });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -94,6 +109,7 @@ describe("BookingCreatePageView", () => {
     const pickup = isoOffset(1);
     const ret = isoOffset(3);
     fetchSpy.mockResolvedValueOnce(listingResponse());
+    fetchSpy.mockResolvedValueOnce(profileResponse());
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
@@ -126,10 +142,11 @@ describe("BookingCreatePageView", () => {
     await userEvent.click(screen.getByRole("button", { name: /Giữ xe trong 15 phút/ }));
 
     await waitFor(() => expect(routerPush).toHaveBeenCalledWith("/bookings/bk-99"));
-    const [url, init] = fetchSpy.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe("/api/v1/bookings");
-    expect(init.method).toBe("POST");
-    const headers = new Headers(init.headers);
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe("/api/v1/users/me");
+    const [postUrl, postInit] = fetchSpy.mock.calls[2] as [string, RequestInit];
+    expect(postUrl).toBe("/api/v1/bookings");
+    expect(postInit.method).toBe("POST");
+    const headers = new Headers(postInit.headers);
     expect(headers.get("Idempotency-Key")).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     );
@@ -137,6 +154,7 @@ describe("BookingCreatePageView", () => {
 
   it("shows overlap banner on 409 BOOKING_OVERLAP_CUSTOMER", async () => {
     fetchSpy.mockResolvedValueOnce(listingResponse());
+    fetchSpy.mockResolvedValueOnce(profileResponse());
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
@@ -160,6 +178,7 @@ describe("BookingCreatePageView", () => {
 
   it("blocks submit with validation when return ≤ pickup", async () => {
     fetchSpy.mockResolvedValueOnce(listingResponse());
+    fetchSpy.mockResolvedValueOnce(profileResponse());
     wrap(<BookingCreatePageView listingId="lst-001" isGuest={false} />);
     await screen.findByText(/Dat xe/);
     const sameDay = isoOffset(1);
@@ -169,16 +188,39 @@ describe("BookingCreatePageView", () => {
     await userEvent.click(screen.getByRole("button", { name: /Giữ xe trong 15 phút/ }));
 
     expect(screen.getByText("Ngày trả phải sau ngày nhận.")).toBeInTheDocument();
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("shows verify-email CTA on 403 EMAIL_NOT_VERIFIED", async () => {
+  it("shows blocker card and does not submit when profile is not eligible", async () => {
     fetchSpy.mockResolvedValueOnce(listingResponse());
+    fetchSpy.mockResolvedValueOnce(
+      profileResponse({
+        emailVerified: false,
+        driverVerificationStatus: "NOT_SUBMITTED",
+      }),
+    );
+    wrap(<BookingCreatePageView listingId="lst-001" isGuest={false} />);
+    await screen.findByText(/Dat xe/);
+
+    await waitFor(() =>
+      expect(screen.getByText("Bạn chưa thể đặt xe")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Xác minh email")).toBeInTheDocument();
+    expect(screen.getByText("Xác minh giấy phép lái xe")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Hoàn tất xác minh để đặt xe/ }),
+    ).toBeDisabled();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("maps backend driver-verification blocker to friendly Vietnamese message", async () => {
+    fetchSpy.mockResolvedValueOnce(listingResponse());
+    fetchSpy.mockResolvedValueOnce(profileResponse());
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
-          code: "EMAIL_NOT_VERIFIED",
-          message: "Email is not verified",
+          code: "DRIVER_VERIFICATION_PENDING",
+          message: "Driver verification is pending approval",
         },
         403,
       ),
@@ -192,10 +234,10 @@ describe("BookingCreatePageView", () => {
     await userEvent.click(screen.getByRole("button", { name: /Giữ xe trong 15 phút/ }));
 
     await waitFor(() =>
-      expect(screen.getByText("Email chua duoc xac minh")).toBeInTheDocument(),
+      expect(screen.getByText("GPLX của bạn đang chờ duyệt.")).toBeInTheDocument(),
     );
     expect(
-      screen.getByRole("link", { name: /Xac minh email/ }),
-    ).toHaveAttribute("href", "/me/profile");
+      screen.getByRole("link", { name: /Xem trạng thái xác minh/ }),
+    ).toHaveAttribute("href", "/onboarding/customer/driver-license/pending");
   });
 });

@@ -25,6 +25,7 @@
 | AUTH_ACCOUNT_SUSPENDED | 403 | Account is suspended (returned only after credential check passes) |
 | AUTH_ACCOUNT_LOCKED | 423 | Account locked due to too many failed login attempts; `Retry-After` header included |
 | INVALID_TOKEN | 409 | Reset/verification token is missing, expired, or already used |
+| EMAIL_DELIVERY_FAILED | 409 | Verification email could not be sent |
 | ACCESS_DENIED | 403 | User lacks permission |
 | EMAIL_NOT_VERIFIED | 403 | Email must be verified before booking creation or payment authorization |
 | USER_EMAIL_EXISTS | 409 | Email already registered |

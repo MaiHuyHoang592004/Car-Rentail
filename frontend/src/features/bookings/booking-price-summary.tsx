@@ -10,6 +10,9 @@ type BookingPriceSummaryProps = {
   selectedExtras: Record<string, number>;
   onBook: () => void;
   isPending: boolean;
+  submitLabel: string;
+  submitDisabled?: boolean;
+  helperText: string;
 };
 
 function calcDays(pickup: string, ret: string): number | null {
@@ -27,6 +30,9 @@ export function BookingPriceSummary({
   selectedExtras,
   onBook,
   isPending,
+  submitLabel,
+  submitDisabled = false,
+  helperText,
 }: BookingPriceSummaryProps) {
   const days = calcDays(pickupDate, returnDate);
   const extrasTotal = listing.extras
@@ -85,13 +91,13 @@ export function BookingPriceSummary({
         <button
           type="button"
           onClick={onBook}
-          disabled={isPending}
+          disabled={isPending || submitDisabled}
           className="mt-2 w-full rounded-2xl bg-primary py-3.5 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
-        >{isPending ? "Đang giữ xe..." : "Giữ xe trong 15 phút"}</button>
+        >{isPending ? "Đang giữ xe..." : submitLabel}</button>
 
         <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
           <Lock className="h-3.5 w-3.5" />
-          Giữ xe trong 15 phút để hoàn tất thanh toán.
+          {helperText}
         </div>
       </div>
     </div>

@@ -253,7 +253,7 @@ class CoreBankAuthorizeIntegrationTest extends BaseIntegrationTest {
         savedBooking.setReturnDate(RETURN_DATE);
         savedBooking.setStatus(BookingStatus.HELD);
         savedBooking.setHoldToken(UUID.randomUUID());
-        savedBooking.setHoldExpiresAt(Instant.parse("2026-06-01T03:00:00Z"));
+        savedBooking.setHoldExpiresAt(Instant.now().plusSeconds(3600));
         savedBooking.setPriceSnapshot("""
                 {"totalAmount":1400000.00,"currency":"VND","extras":[]}
                 """);
@@ -271,7 +271,7 @@ class CoreBankAuthorizeIntegrationTest extends BaseIntegrationTest {
             row.setStatus(AvailabilityStatus.HOLD);
             row.setBookingId(bookingId);
             row.setHoldToken(holdToken);
-            row.setHoldExpiresAt(Instant.parse("2026-06-01T03:00:00Z"));
+            row.setHoldExpiresAt(Instant.now().plusSeconds(3600));
             availabilityRepository.save(row);
         }
     }

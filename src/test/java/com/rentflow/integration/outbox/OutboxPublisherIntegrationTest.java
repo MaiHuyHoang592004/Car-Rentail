@@ -48,33 +48,55 @@ class OutboxPublisherIntegrationTest extends BaseIntegrationTest {
         OutboxEvent maxAttemptCandidate = saveEvent("RETRY", 2, Instant.parse("2026-05-29T00:00:00Z"));
         doThrow(new RuntimeException("dispatcher down")).when(outboxEventDispatcher).dispatch(any(OutboxEvent.class));
 
-        outboxPublisherService.processBatch(10, 3, 60);
+        outboxPublisherService.processBatch(10, 3, 60, 300);
 
         OutboxEvent retried = outboxEventRepository.findById(retryCandidate.getId()).orElseThrow();
         assertThat(retried.getStatus()).isEqualTo("RETRY");
         assertThat(retried.getRetryCount()).isEqualTo(1);
         assertThat(retried.getNextAttemptAt()).isEqualTo(Instant.parse("2026-05-29T00:01:00Z"));
         assertThat(retried.getLastError()).isEqualTo("dispatcher down");
+        assertThat(retried.getProcessingStartedAt()).isNull();
+        assertThat(retried.getClaimedBy()).isNull();
 
         OutboxEvent failed = outboxEventRepository.findById(maxAttemptCandidate.getId()).orElseThrow();
         assertThat(failed.getStatus()).isEqualTo("FAILED");
         assertThat(failed.getRetryCount()).isEqualTo(3);
         assertThat(failed.getNextAttemptAt()).isNull();
         assertThat(failed.getLastError()).isEqualTo("dispatcher down");
+        assertThat(failed.getProcessingStartedAt()).isNull();
+        assertThat(failed.getClaimedBy()).isNull();
     }
 
     @Test
     void processBatch_isIdempotentForAlreadySentEvents() {
         OutboxEvent candidate = saveEvent("PENDING", 0, null);
 
-        outboxPublisherService.processBatch(10, 5, 60);
-        outboxPublisherService.processBatch(10, 5, 60);
+        outboxPublisherService.processBatch(10, 5, 60, 300);
+        outboxPublisherService.processBatch(10, 5, 60, 300);
 
         verify(outboxEventDispatcher, times(1)).dispatch(any(OutboxEvent.class));
         OutboxEvent sent = outboxEventRepository.findById(candidate.getId()).orElseThrow();
         assertThat(sent.getStatus()).isEqualTo("SENT");
         assertThat(sent.getRetryCount()).isEqualTo(0);
         assertThat(sent.getSentAt()).isEqualTo(Instant.parse("2026-05-29T00:00:00Z"));
+        assertThat(sent.getProcessingStartedAt()).isNull();
+        assertThat(sent.getClaimedBy()).isNull();
+    }
+
+    @Test
+    void processBatch_reclaimsStaleProcessingEvent() {
+        OutboxEvent stale = saveEvent("PROCESSING", 1, null);
+        stale.setProcessingStartedAt(Instant.parse("2026-05-28T23:00:00Z"));
+        stale.setClaimedBy("old-worker");
+        outboxEventRepository.save(stale);
+
+        outboxPublisherService.processBatch(10, 5, 60, 300);
+
+        verify(outboxEventDispatcher, times(1)).dispatch(any(OutboxEvent.class));
+        OutboxEvent sent = outboxEventRepository.findById(stale.getId()).orElseThrow();
+        assertThat(sent.getStatus()).isEqualTo("SENT");
+        assertThat(sent.getProcessingStartedAt()).isNull();
+        assertThat(sent.getClaimedBy()).isNull();
     }
 
     private OutboxEvent saveEvent(String status, int retryCount, Instant nextAttemptAt) {

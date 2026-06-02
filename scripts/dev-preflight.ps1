@@ -23,14 +23,14 @@ function Fail {
 
 function Test-TcpPort {
     param(
-        [string]$Host,
+        [string]$TargetHost,
         [int]$Port
     )
 
     $client = $null
     try {
         $client = [System.Net.Sockets.TcpClient]::new()
-        $async = $client.BeginConnect($Host, $Port, $null, $null)
+        $async = $client.BeginConnect($TargetHost, $Port, $null, $null)
         if (-not $async.AsyncWaitHandle.WaitOne(1000, $false)) {
             return $false
         }
@@ -108,13 +108,13 @@ function Wait-ForInfraReady {
             $null -ne $postgresState -and
             $postgresState.Status -eq "running" -and
             $postgresState.Health -eq "healthy" -and
-            (Test-TcpPort -Host "localhost" -Port 5433)
+            (Test-TcpPort -TargetHost "localhost" -Port 5433)
         )
         $redisReady = (
             $null -ne $redisState -and
             $redisState.Status -eq "running" -and
             $redisState.Health -eq "healthy" -and
-            (Test-TcpPort -Host "localhost" -Port 6379)
+            (Test-TcpPort -TargetHost "localhost" -Port 6379)
         )
 
         if ($postgresReady -and $redisReady) {
@@ -127,7 +127,7 @@ function Wait-ForInfraReady {
     $postgresStateText = if ($null -eq $postgresState) { "missing" } else { "$($postgresState.Status)/$($postgresState.Health)" }
     $redisStateText = if ($null -eq $redisState) { "missing" } else { "$($redisState.Status)/$($redisState.Health)" }
 
-    Fail "Infrastructure is not ready after $TimeoutSeconds seconds. postgres=$postgresStateText port5433=$(Test-TcpPort -Host 'localhost' -Port 5433); redis=$redisStateText port6379=$(Test-TcpPort -Host 'localhost' -Port 6379)."
+    Fail "Infrastructure is not ready after $TimeoutSeconds seconds. postgres=$postgresStateText port5433=$(Test-TcpPort -TargetHost 'localhost' -Port 5433); redis=$redisStateText port6379=$(Test-TcpPort -TargetHost 'localhost' -Port 6379)."
 }
 
 Write-Step "Checking Docker availability"

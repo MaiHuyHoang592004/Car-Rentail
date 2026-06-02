@@ -352,6 +352,18 @@ public class FileService {
         return new SignedFileUrlResponse(file.getId(), file.getVisibility().name(), signed.url(), signed.expiresAt());
     }
 
+    @Transactional(readOnly = true)
+    public SignedFileUrlResponse getSignedUrlIfExists(UUID fileId) {
+        FileMetadata file = fileMetadataRepository.findByIdAndStatus(fileId, FileStatus.ACTIVE)
+                .orElse(null);
+        if (file == null) {
+            return null;
+        }
+        assertReadable(file);
+        Signed signed = buildSignedUrl(file);
+        return new SignedFileUrlResponse(file.getId(), file.getVisibility().name(), signed.url(), signed.expiresAt());
+    }
+
     @Transactional
     public FileUploadIntentResponse createDisputeAttachmentUploadIntent(CreateDisputeAttachmentUploadRequest request) {
         validateDisputeAttachmentInput(request.contentType(), request.sizeBytes());

@@ -5,6 +5,7 @@ import com.rentflow.common.exception.DriverVerificationNotFoundException;
 import com.rentflow.common.exception.ResourceNotFoundException;
 import com.rentflow.common.exception.ValidationException;
 import com.rentflow.common.util.EncryptionUtil;
+import com.rentflow.file.dto.SignedFileUrlResponse;
 import com.rentflow.file.service.FileService;
 import com.rentflow.user.dto.DriverVerificationResponse;
 import com.rentflow.user.dto.ReviewDriverVerificationRequest;
@@ -138,11 +139,16 @@ public class DriverVerificationService {
             pendingAgeHours = ChronoUnit.HOURS.between(verification.getCreatedAt(), Instant.now(clock));
             slaBreached = pendingAgeHours >= 24;
         }
-        String previewUrl = verification.getDocumentFileId() == null
-                || fileService == null
-                ? null
-                : fileService.getSignedUrl(verification.getDocumentFileId()).signedUrl();
+        String previewUrl = resolveDocumentPreviewUrl(verification.getDocumentFileId());
         return DriverVerificationResponse.from(verification, previewUrl, pendingAgeHours, slaBreached);
+    }
+
+    private String resolveDocumentPreviewUrl(UUID documentFileId) {
+        if (documentFileId == null || fileService == null) {
+            return null;
+        }
+        SignedFileUrlResponse signedUrl = fileService.getSignedUrlIfExists(documentFileId);
+        return signedUrl == null ? null : signedUrl.signedUrl();
     }
 
     private void ensurePending(DriverVerification verification) {

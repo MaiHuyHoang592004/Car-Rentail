@@ -89,6 +89,7 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
     private AuthUser admin;
     private AuthUser otherCustomer;
     private String customerToken;
+    private String hostToken;
     private String otherCustomerToken;
     private Listing listing;
 
@@ -110,6 +111,7 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
         admin = saveUser("admin-" + UUID.randomUUID() + "@example.com", Role.ADMIN);
         otherCustomer = saveUser("other-" + UUID.randomUUID() + "@example.com", Role.CUSTOMER);
         customerToken = jwtTokenProvider.generateAccessToken(customer.getId(), customer.getEmail(), List.of(Role.CUSTOMER));
+        hostToken = jwtTokenProvider.generateAccessToken(host.getId(), host.getEmail(), List.of(Role.HOST));
         otherCustomerToken = jwtTokenProvider.generateAccessToken(
                 otherCustomer.getId(),
                 otherCustomer.getEmail(),
@@ -518,6 +520,26 @@ class BookingCancelIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"reason":"Change of plan"}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("BOOKING_NOT_FOUND"));
+    }
+
+    @Test
+    void hostCannotUseCustomerCancelEndpoint() throws Exception {
+        Booking booking = saveBooking(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.now().plusDays(2));
+        booking.setReturnDate(booking.getPickupDate().plusDays(2));
+        bookingRepository.save(booking);
+        saveBookedAvailability(booking);
+        saveAuthorizedPayment(booking.getId());
+
+        mockMvc.perform(post("/api/v1/bookings/{id}/cancel", booking.getId())
+                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Host tries customer cancel"}
                                 """))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("BOOKING_NOT_FOUND"));

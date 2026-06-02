@@ -6,6 +6,11 @@ import com.rentflow.auth.entity.AuthUser;
 import com.rentflow.auth.entity.Role;
 import com.rentflow.auth.entity.UserStatus;
 import com.rentflow.auth.repository.AuthUserRepository;
+import com.rentflow.file.entity.FileMetadata;
+import com.rentflow.file.entity.FilePurpose;
+import com.rentflow.file.entity.FileStatus;
+import com.rentflow.file.entity.FileVisibility;
+import com.rentflow.file.repository.FileMetadataRepository;
 import com.rentflow.common.security.JwtTokenProvider;
 import com.rentflow.integration.BaseIntegrationTest;
 import com.rentflow.user.entity.DriverVerification;
@@ -24,6 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -36,6 +42,7 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
     @Autowired private AuthUserRepository authUserRepository;
     @Autowired private UserProfileRepository userProfileRepository;
     @Autowired private DriverVerificationRepository driverVerificationRepository;
+    @Autowired private FileMetadataRepository fileMetadataRepository;
     @Autowired private JwtTokenProvider jwtTokenProvider;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private TransactionTemplate transactionTemplate;
@@ -54,6 +61,7 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
                     listings,
                     vehicles,
                     driver_verifications,
+                    files,
                     user_profiles,
                     auth_users
                 RESTART IDENTITY CASCADE
@@ -64,11 +72,12 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
     void submitDriverLicenseSuccessCreatesPendingAndSyncsProfile() throws Exception {
         AuthUser customer = saveUserWithProfile("customer-submit", Role.CUSTOMER);
         String token = token(customer, Role.CUSTOMER);
+        UUID documentFileId = saveDriverLicenseFile(customer.getId());
 
         var result = mockMvc.perform(post("/api/v1/users/me/driver-license")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(submitBody()))
+                        .content(submitBody(documentFileId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andReturn();
@@ -81,20 +90,42 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void duplicateSubmitReturnsAlreadySubmitted() throws Exception {
-        AuthUser customer = saveUserWithProfile("customer-duplicate", Role.CUSTOMER);
+    void submitDriverLicenseAllowsDemoUuidWithoutStoredFile() throws Exception {
+        AuthUser customer = saveUserWithProfile("customer-demo-uuid", Role.CUSTOMER);
         String token = token(customer, Role.CUSTOMER);
+        UUID documentFileId = UUID.fromString("7f9c1b2e-3a44-4d0e-9d12-6b8e5f0c1234");
 
         mockMvc.perform(post("/api/v1/users/me/driver-license")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(submitBody()))
+                        .content(submitBody(documentFileId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.documentFileId").value(documentFileId.toString()))
+                .andExpect(jsonPath("$.documentPreviewUrl").value(nullValue()));
+
+        DriverVerification verification = driverVerificationRepository.findAll().get(0);
+        assertThat(verification.getDocumentFileId()).isEqualTo(documentFileId);
+        assertThat(userProfileRepository.findByUserId(customer.getId()).orElseThrow().getDriverVerificationStatus())
+                .isEqualTo(UserProfile.DriverVerificationStatus.PENDING);
+    }
+
+    @Test
+    void duplicateSubmitReturnsAlreadySubmitted() throws Exception {
+        AuthUser customer = saveUserWithProfile("customer-duplicate", Role.CUSTOMER);
+        String token = token(customer, Role.CUSTOMER);
+        UUID documentFileId = saveDriverLicenseFile(customer.getId());
+
+        mockMvc.perform(post("/api/v1/users/me/driver-license")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(submitBody(documentFileId)))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/v1/users/me/driver-license")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(submitBody()))
+                        .content(submitBody(documentFileId)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ALREADY_SUBMITTED"));
     }
@@ -103,12 +134,13 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
     void resubmitAfterRejectedIsAllowed() throws Exception {
         AuthUser customer = saveUserWithProfile("customer-rejected", Role.CUSTOMER);
         String token = token(customer, Role.CUSTOMER);
+        UUID documentFileId = saveDriverLicenseFile(customer.getId());
         saveHistoricalVerification(customer.getId(), DriverVerificationStatus.REJECTED);
 
         mockMvc.perform(post("/api/v1/users/me/driver-license")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(submitBody()))
+                        .content(submitBody(documentFileId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
@@ -117,12 +149,13 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
     void resubmitAfterExpiredIsAllowed() throws Exception {
         AuthUser customer = saveUserWithProfile("customer-expired", Role.CUSTOMER);
         String token = token(customer, Role.CUSTOMER);
+        UUID documentFileId = saveDriverLicenseFile(customer.getId());
         saveHistoricalVerification(customer.getId(), DriverVerificationStatus.EXPIRED);
 
         mockMvc.perform(post("/api/v1/users/me/driver-license")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(submitBody()))
+                        .content(submitBody(documentFileId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
@@ -133,11 +166,12 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
         AuthUser admin = saveUserWithProfile("admin-approve", Role.ADMIN);
         String customerToken = token(customer, Role.CUSTOMER);
         String adminToken = token(admin, Role.ADMIN);
+        UUID documentFileId = saveDriverLicenseFile(customer.getId());
 
         var submitResult = mockMvc.perform(post("/api/v1/users/me/driver-license")
                         .header("Authorization", "Bearer " + customerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(submitBody()))
+                        .content(submitBody(documentFileId)))
                 .andReturn();
         UUID verificationId = UUID.fromString(
                 objectMapper.readTree(submitResult.getResponse().getContentAsString()).get("id").asText());
@@ -161,11 +195,12 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
         AuthUser admin = saveUserWithProfile("admin-reject", Role.ADMIN);
         String customerToken = token(customer, Role.CUSTOMER);
         String adminToken = token(admin, Role.ADMIN);
+        UUID documentFileId = saveDriverLicenseFile(customer.getId());
 
         var submitResult = mockMvc.perform(post("/api/v1/users/me/driver-license")
                         .header("Authorization", "Bearer " + customerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(submitBody()))
+                        .content(submitBody(documentFileId)))
                 .andReturn();
         UUID verificationId = UUID.fromString(
                 objectMapper.readTree(submitResult.getResponse().getContentAsString()).get("id").asText());
@@ -189,11 +224,12 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
         AuthUser admin = saveUserWithProfile("admin-list", Role.ADMIN);
         String customerToken = token(customer, Role.CUSTOMER);
         String adminToken = token(admin, Role.ADMIN);
+        UUID documentFileId = saveDriverLicenseFile(customer.getId());
 
         mockMvc.perform(post("/api/v1/users/me/driver-license")
                         .header("Authorization", "Bearer " + customerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(submitBody()))
+                        .content(submitBody(documentFileId)))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/v1/admin/driver-verifications")
@@ -212,11 +248,12 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
     void hostCannotSubmitDriverLicense() throws Exception {
         AuthUser host = saveUserWithProfile("host-submit", Role.HOST);
         String hostToken = token(host, Role.HOST);
+        UUID documentFileId = saveDriverLicenseFile(host.getId());
 
         mockMvc.perform(post("/api/v1/users/me/driver-license")
                         .header("Authorization", "Bearer " + hostToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(submitBody()))
+                        .content(submitBody(documentFileId)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
@@ -249,13 +286,26 @@ class DriverVerificationIntegrationTest extends BaseIntegrationTest {
         driverVerificationRepository.save(verification);
     }
 
-    private String submitBody() {
+    private UUID saveDriverLicenseFile(UUID ownerUserId) {
+        FileMetadata file = new FileMetadata();
+        file.setOwnerUserId(ownerUserId);
+        file.setPurpose(FilePurpose.DRIVER_LICENSE);
+        file.setBucket("test-bucket");
+        file.setObjectKey("driver-licenses/" + ownerUserId + ".jpg");
+        file.setContentType("image/jpeg");
+        file.setSizeBytes(1024L);
+        file.setVisibility(FileVisibility.PRIVATE);
+        file.setStatus(FileStatus.ACTIVE);
+        return fileMetadataRepository.save(file).getId();
+    }
+
+    private String submitBody(UUID documentFileId) {
         return """
                 {
                   "licenseNumber":"A123456789",
                   "licenseExpiryDate":"2028-12-31",
-                  "documentFileId":"11111111-1111-4111-8111-111111111111"
+                  "documentFileId":"%s"
                 }
-                """;
+                """.formatted(documentFileId);
     }
 }

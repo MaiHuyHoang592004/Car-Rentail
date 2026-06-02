@@ -30,6 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -95,8 +97,12 @@ public class CoreBankVoidService {
                 transactionTemplate.executeWithoutResult(status -> markFailed(prepared, "PAYMENT_PROVIDER_UNAVAILABLE", e.getMessage()));
                 throw e;
             }
-            PaymentDetailResponse response = required(transactionTemplate.execute(status ->
+            FinalizedPaymentDetail finalized = required(transactionTemplate.execute(status ->
                     finalizeVoid(prepared, voidResult)));
+            if (finalized.unsafe()) {
+                throw new BusinessRuleException("PAYMENT_FINALIZATION_UNSAFE", finalized.unsafeReason());
+            }
+            PaymentDetailResponse response = finalized.response();
             idempotencyService.complete(idempotencyKeyId, 200, serializeResponse(response));
             return response;
         } catch (PaymentProviderUnavailableException e) {
@@ -132,7 +138,7 @@ public class CoreBankVoidService {
         tx.setBookingId(booking.getId());
         tx.setType(PaymentTransactionType.VOID);
         tx.setStatus(PaymentTransactionStatus.PENDING);
-        tx.setAmount(java.math.BigDecimal.ZERO);
+        tx.setAmount(BigDecimal.ZERO);
         tx.setCurrency(payment.getCurrency());
         tx.setProvider(payment.getProvider());
         tx.setProviderRequestId(requestId);
@@ -147,10 +153,15 @@ public class CoreBankVoidService {
                 requestId,
                 payment.getId().toString(),
                 correlationId);
-        return new PreparedVoidContext(payment.getId(), booking.getId(), tx.getId(), command);
+        return new PreparedVoidContext(
+                payment.getId(),
+                booking.getId(),
+                tx.getId(),
+                payment.getProviderHoldId(),
+                command);
     }
 
-    private PaymentDetailResponse finalizeVoid(PreparedVoidContext prepared, VoidResult result) {
+    private FinalizedPaymentDetail finalizeVoid(PreparedVoidContext prepared, VoidResult result) {
         // Lock booking before payment (canonical order)
         Booking booking = bookingRepository.findByIdForUpdate(prepared.bookingId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
@@ -158,6 +169,17 @@ public class CoreBankVoidService {
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(String.valueOf(prepared.paymentId())));
+
+        String unsafeReason = voidFinalizationUnsafeReason(prepared, payment, tx);
+        if (unsafeReason != null) {
+            markUnsafe(tx, unsafeReason, result);
+            return new FinalizedPaymentDetail(paymentDetailResponseFactory.create(
+                    booking,
+                    payment,
+                    paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId())),
+                    true,
+                    unsafeReason);
+        }
 
         payment.setStatus(PaymentStatus.VOIDED);
         payment.setProviderStatus(result.providerStatus());
@@ -168,10 +190,42 @@ public class CoreBankVoidService {
 
         bookingPaymentRepository.save(payment);
         paymentTransactionRepository.save(tx);
-        return paymentDetailResponseFactory.create(
+        return new FinalizedPaymentDetail(paymentDetailResponseFactory.create(
                 booking,
                 payment,
-                paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId()));
+                paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId())),
+                false,
+                null);
+    }
+
+    private String voidFinalizationUnsafeReason(
+            PreparedVoidContext prepared,
+            BookingPayment payment,
+            PaymentTransaction tx) {
+        if (tx.getStatus() != PaymentTransactionStatus.PENDING) {
+            return "CoreBank void succeeded but local transaction is no longer pending";
+        }
+        if (payment.getProvider() != PaymentProviderType.COREBANK) {
+            return "CoreBank void succeeded but payment provider changed";
+        }
+        if (payment.getStatus() != PaymentStatus.AUTHORIZED) {
+            return "CoreBank void succeeded but payment is no longer authorized";
+        }
+        if (payment.getCapturedAmount().compareTo(BigDecimal.ZERO) > 0) {
+            return "CoreBank void succeeded but payment has captured amount";
+        }
+        if (!Objects.equals(prepared.providerHoldId(), payment.getProviderHoldId())) {
+            return "CoreBank void succeeded but provider hold changed";
+        }
+        return null;
+    }
+
+    private void markUnsafe(PaymentTransaction tx, String errorMessage, VoidResult result) {
+        tx.setStatus(PaymentTransactionStatus.FAILED);
+        tx.setProviderErrorCode("PAYMENT_FINALIZATION_UNSAFE");
+        tx.setProviderErrorMessage(errorMessage);
+        tx.setProviderResponse(result.providerMetadataJson());
+        paymentTransactionRepository.save(tx);
     }
 
     private void markFailed(PreparedVoidContext prepared, String providerErrorCode, String providerErrorMessage) {
@@ -197,7 +251,7 @@ public class CoreBankVoidService {
         if (payment.getStatus() != PaymentStatus.AUTHORIZED) {
             throw new BusinessRuleException("PAYMENT_INVALID_STATUS", "Payment is not in AUTHORIZED status");
         }
-        if (payment.getCapturedAmount().compareTo(java.math.BigDecimal.ZERO) > 0) {
+        if (payment.getCapturedAmount().compareTo(BigDecimal.ZERO) > 0) {
             throw new BusinessRuleException("PAYMENT_VOID_CAPTURED_NOT_ALLOWED", "Cannot void a payment with captured amount");
         }
         if (payment.getProviderHoldId() == null || payment.getProviderHoldId().isBlank()) {
@@ -232,7 +286,15 @@ public class CoreBankVoidService {
             UUID paymentId,
             UUID bookingId,
             UUID transactionId,
+            String providerHoldId,
             VoidCommand command
+    ) {
+    }
+
+    private record FinalizedPaymentDetail(
+            PaymentDetailResponse response,
+            boolean unsafe,
+            String unsafeReason
     ) {
     }
 

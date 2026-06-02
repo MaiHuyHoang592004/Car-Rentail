@@ -216,10 +216,10 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
                             { "throughDate": "2027-06-29" }
                             """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.updatedCount").value(30));
+                .andExpect(jsonPath("$.updatedCount").value(29));
 
         long after = availabilityRepository.countByListingId(UUID.fromString(listingId));
-        assertThat(after).isEqualTo(before + 30);
+        assertThat(after).isEqualTo(before + 29);
     }
 
     @Test

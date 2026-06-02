@@ -88,7 +88,7 @@ class BookingDriverVerificationGateIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void createBookingWithNonApprovedDriverStatusReturnsForbidden() throws Exception {
+    void createBookingWithPendingDriverStatusReturnsForbidden() throws Exception {
         AuthUser customer = saveUserWithProfile("customer-pending", UserProfile.DriverVerificationStatus.PENDING, Role.CUSTOMER);
         String token = token(customer, Role.CUSTOMER);
 
@@ -98,7 +98,23 @@ class BookingDriverVerificationGateIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody(listing.getId(), PICKUP_DATE, RETURN_DATE)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("DRIVER_LICENSE_NOT_APPROVED"));
+                .andExpect(jsonPath("$.code").value("DRIVER_VERIFICATION_PENDING"));
+
+        assertThat(bookingRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void createBookingWithMissingDriverSubmissionReturnsForbidden() throws Exception {
+        AuthUser customer = saveUserWithProfile("customer-missing", UserProfile.DriverVerificationStatus.NOT_SUBMITTED, Role.CUSTOMER);
+        String token = token(customer, Role.CUSTOMER);
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .header("Authorization", "Bearer " + token)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(listing.getId(), PICKUP_DATE, RETURN_DATE)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("DRIVER_VERIFICATION_REQUIRED"));
 
         assertThat(bookingRepository.findAll()).isEmpty();
     }
@@ -114,7 +130,7 @@ class BookingDriverVerificationGateIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody(listing.getId(), PICKUP_DATE, RETURN_DATE)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("DRIVER_LICENSE_NOT_APPROVED"));
+                .andExpect(jsonPath("$.code").value("DRIVER_VERIFICATION_REJECTED"));
 
         assertThat(bookingRepository.findAll()).isEmpty();
     }

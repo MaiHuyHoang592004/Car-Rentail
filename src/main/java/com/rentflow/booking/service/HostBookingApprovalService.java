@@ -31,6 +31,7 @@ import com.rentflow.payment.provider.VoidCommand;
 import com.rentflow.payment.provider.VoidResult;
 import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
+import com.rentflow.payment.service.SandboxTransferConfirmationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -60,6 +61,7 @@ public class HostBookingApprovalService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
+    private final SandboxTransferConfirmationService sandboxTransferConfirmationService;
 
     public HostBookingApprovalService(
             BookingRepository bookingRepository,
@@ -74,7 +76,8 @@ public class HostBookingApprovalService {
             CorrelationIdHelper correlationIdHelper,
             ObjectMapper objectMapper,
             Clock clock,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            SandboxTransferConfirmationService sandboxTransferConfirmationService) {
         this.bookingRepository = bookingRepository;
         this.bookingPaymentRepository = bookingPaymentRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
@@ -88,6 +91,7 @@ public class HostBookingApprovalService {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.sandboxTransferConfirmationService = sandboxTransferConfirmationService;
     }
 
     @Transactional(readOnly = true)
@@ -188,6 +192,15 @@ public class HostBookingApprovalService {
 
         UUID idempotencyKeyId = ((IdempotencyResolution.Proceed) resolution).idempotencyKeyId();
         try {
+            if (isSandboxManualTransferRejectCandidate(bookingId)) {
+                sandboxTransferConfirmationService.voidSandboxTransfer(bookingId, hostId, sanitizedReason);
+                Booking booking = bookingRepository.findById(bookingId)
+                        .orElseThrow(() -> new BookingNotFoundException(String.valueOf(bookingId)));
+                BookingResponse response = bookingMapper.toResponse(booking);
+                idempotencyService.complete(idempotencyKeyId, 200, serializeResponse(response));
+                return response;
+            }
+
             // Phase 1 — Prepare: validate state and create PENDING void transaction (inside TX)
             PreparedRejectContext prepared = required(transactionTemplate.execute(status ->
                     prepareReject(hostId, bookingId, idempotencyKey, idempotencyKeyId, sanitizedReason)));
@@ -203,6 +216,12 @@ public class HostBookingApprovalService {
             idempotencyFailureMarker.markFailed(idempotencyKeyId);
             throw e;
         }
+    }
+
+    private boolean isSandboxManualTransferRejectCandidate(UUID bookingId) {
+        return bookingPaymentRepository.findByBookingId(bookingId)
+                .map(sandboxTransferConfirmationService::isSandboxAuthorizedManualTransfer)
+                .orElse(false);
     }
 
     private PreparedRejectContext prepareReject(

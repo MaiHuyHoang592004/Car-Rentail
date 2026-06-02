@@ -199,6 +199,18 @@ export async function authorizeBookingPayment(
   };
 }
 
+export async function simulateTransferConfirmation(
+  bookingId: string,
+  idempotencyKey: string,
+): Promise<PaymentDetail> {
+  const raw = await api.post<RawPaymentDetailResponse>(
+    `/bookings/${bookingId}/payments/simulate-transfer-confirmation`,
+    undefined,
+    { idempotencyKey },
+  );
+  return mapPaymentDetail(raw);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Get existing payment for a booking                                */
 /* ------------------------------------------------------------------ */
@@ -212,46 +224,7 @@ export async function getBookingPayment(
       `/bookings/${bookingId}/payments`,
       { signal },
     );
-    return {
-      booking: {
-        id: raw.booking.id,
-        customerId: raw.booking.customerId,
-        hostId: raw.booking.hostId,
-        status: raw.booking.status,
-        pickupDate: raw.booking.pickupDate,
-        returnDate: raw.booking.returnDate,
-      },
-      payment: {
-        id: raw.payment.id,
-        selectedBankId: raw.payment.selectedBankId,
-        paymentMethod: raw.payment.paymentMethod as PaymentMethod | null,
-        provider: raw.payment.provider,
-        status: raw.payment.status as PaymentDetail["payment"]["status"],
-        authorizedAmount: toNumber(raw.payment.authorizedAmount),
-        capturedAmount: toNumber(raw.payment.capturedAmount),
-        refundedAmount: toNumber(raw.payment.refundedAmount),
-        currency: raw.payment.currency,
-        externalOrderRef: raw.payment.externalOrderRef,
-        providerPaymentOrderId: raw.payment.providerPaymentOrderId,
-        providerHoldId: raw.payment.providerHoldId,
-        providerStatus: raw.payment.providerStatus,
-        transferInstruction: mapTransferInstruction(raw.payment.transferInstruction),
-      },
-      transactions: raw.transactions.map((t) => ({
-        id: t.id,
-        type: t.type,
-        status: t.status,
-        amount: toNumber(t.amount),
-        currency: t.currency,
-        provider: t.provider,
-        providerRequestId: t.providerRequestId,
-        providerRef: t.providerRef,
-        providerJournalId: t.providerJournalId,
-        providerErrorCode: t.providerErrorCode,
-        providerErrorMessage: t.providerErrorMessage,
-        createdAt: t.createdAt,
-      })),
-    };
+    return mapPaymentDetail(raw);
   } catch (err) {
     // If no payment exists yet, return null instead of throwing
     if (err instanceof Error && "status" in err) {
@@ -260,4 +233,47 @@ export async function getBookingPayment(
     }
     throw err;
   }
+}
+
+function mapPaymentDetail(raw: RawPaymentDetailResponse): PaymentDetail {
+  return {
+    booking: {
+      id: raw.booking.id,
+      customerId: raw.booking.customerId,
+      hostId: raw.booking.hostId,
+      status: raw.booking.status,
+      pickupDate: raw.booking.pickupDate,
+      returnDate: raw.booking.returnDate,
+    },
+    payment: {
+      id: raw.payment.id,
+      selectedBankId: raw.payment.selectedBankId,
+      paymentMethod: raw.payment.paymentMethod as PaymentMethod | null,
+      provider: raw.payment.provider,
+      status: raw.payment.status as PaymentDetail["payment"]["status"],
+      authorizedAmount: toNumber(raw.payment.authorizedAmount),
+      capturedAmount: toNumber(raw.payment.capturedAmount),
+      refundedAmount: toNumber(raw.payment.refundedAmount),
+      currency: raw.payment.currency,
+      externalOrderRef: raw.payment.externalOrderRef,
+      providerPaymentOrderId: raw.payment.providerPaymentOrderId,
+      providerHoldId: raw.payment.providerHoldId,
+      providerStatus: raw.payment.providerStatus,
+      transferInstruction: mapTransferInstruction(raw.payment.transferInstruction),
+    },
+    transactions: raw.transactions.map((t) => ({
+      id: t.id,
+      type: t.type,
+      status: t.status,
+      amount: toNumber(t.amount),
+      currency: t.currency,
+      provider: t.provider,
+      providerRequestId: t.providerRequestId,
+      providerRef: t.providerRef,
+      providerJournalId: t.providerJournalId,
+      providerErrorCode: t.providerErrorCode,
+      providerErrorMessage: t.providerErrorMessage,
+      createdAt: t.createdAt,
+    })),
+  };
 }

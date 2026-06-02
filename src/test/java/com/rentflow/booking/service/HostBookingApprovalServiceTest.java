@@ -29,6 +29,7 @@ import com.rentflow.payment.provider.PaymentProviderRouter;
 import com.rentflow.payment.provider.VoidResult;
 import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
+import com.rentflow.payment.service.SandboxTransferConfirmationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -81,6 +82,7 @@ class HostBookingApprovalServiceTest {
     private PaymentProviderRouter paymentProviderRouter;
     private com.rentflow.common.exception.CorrelationIdHelper correlationIdHelper;
     private PaymentProvider paymentProvider;
+    private SandboxTransferConfirmationService sandboxTransferConfirmationService;
     private HostBookingApprovalService service;
     private ObjectMapper objectMapper;
 
@@ -97,6 +99,7 @@ class HostBookingApprovalServiceTest {
         paymentProviderRouter = mock(PaymentProviderRouter.class);
         correlationIdHelper = mock(com.rentflow.common.exception.CorrelationIdHelper.class);
         paymentProvider = mock(PaymentProvider.class);
+        sandboxTransferConfirmationService = mock(SandboxTransferConfirmationService.class);
         objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -142,7 +145,8 @@ class HostBookingApprovalServiceTest {
                 correlationIdHelper,
                 objectMapper,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                transactionManager);
+                transactionManager,
+                sandboxTransferConfirmationService);
     }
 
     @Test

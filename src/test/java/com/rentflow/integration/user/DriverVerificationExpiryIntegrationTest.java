@@ -142,7 +142,7 @@ class DriverVerificationExpiryIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody(listing.getId(), PICKUP_DATE, RETURN_DATE)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("DRIVER_LICENSE_NOT_APPROVED"));
+                .andExpect(jsonPath("$.code").value("DRIVER_VERIFICATION_REJECTED"));
     }
 
     private AuthUser saveUserWithProfile(String prefix, UserProfile.DriverVerificationStatus verificationStatus, Role... roles) {

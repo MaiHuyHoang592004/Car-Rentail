@@ -53,6 +53,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -62,7 +63,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Tag("integration")
 @TestPropertySource(properties = {
         "rentflow.scheduler.expire-held-bookings.enabled=false",
-        "rentflow.scheduler.expire-host-approvals.enabled=false"
+        "rentflow.scheduler.expire-host-approvals.enabled=false",
+        "rentflow.payment.sandbox-transfer-confirmation.enabled=true"
 })
 class HostBookingApprovalIntegrationTest extends BaseIntegrationTest {
 
@@ -146,7 +148,11 @@ class HostBookingApprovalIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/host/bookings/{id}/reject", booking.getId())
                         .header("Authorization", "Bearer " + hostToken)
-                        .header("Idempotency-Key", UUID.randomUUID().toString()))
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"vehicle unavailable"}
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("REJECTED"));
 
@@ -157,6 +163,51 @@ class HostBookingApprovalIntegrationTest extends BaseIntegrationTest {
         AvailabilityCalendar first = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate())).orElseThrow();
         AvailabilityCalendar second = availabilityRepository.findById(new AvailabilityId(listing.getId(), booking.getPickupDate().plusDays(1))).orElseThrow();
         assertThat(List.of(first, second)).allSatisfy(row -> assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.FREE));
+    }
+
+    @Test
+    void rejectSandboxConfirmedManualTransferDoesNotCallCoreBankVoid() throws Exception {
+        Booking booking = savePendingHostApprovalBooking(host, listing, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 3));
+        BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        payment.setPaymentMethod(PaymentMethod.BANK_TRANSFER_QR);
+        payment.setProvider(PaymentProviderType.VIETQR_MANUAL);
+        payment.setStatus(PaymentStatus.AUTHORIZED);
+        payment.setProviderStatus("SANDBOX_TRANSFER_CONFIRMED");
+        payment.setProviderHoldId(null);
+        payment.setProviderPaymentOrderId(null);
+        payment.setProviderMetadata("""
+                {"sandbox":true,"providerStatus":"SANDBOX_TRANSFER_CONFIRMED"}
+                """);
+        bookingPaymentRepository.save(payment);
+
+        mockMvc.perform(post("/api/v1/host/bookings/{id}/reject", booking.getId())
+                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"vehicle unavailable"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+
+        Booking updated = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(BookingStatus.REJECTED);
+        BookingPayment updatedPayment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        assertThat(updatedPayment.getStatus()).isEqualTo(PaymentStatus.VOIDED);
+        assertThat(updatedPayment.getProviderStatus()).isEqualTo("SANDBOX_TRANSFER_VOIDED");
+        assertThat(paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(updatedPayment.getId()))
+                .anySatisfy(tx -> {
+                    assertThat(tx.getType()).isEqualTo(PaymentTransactionType.VOID);
+                    assertThat(tx.getStatus()).isEqualTo(PaymentTransactionStatus.SUCCEEDED);
+                    assertThat(tx.getProvider()).isEqualTo(PaymentProviderType.VIETQR_MANUAL);
+                    assertThat(tx.getProviderResponse()).contains("\"sandbox\": true");
+                });
+        assertThat(availabilityRepository.findByListingIdAndAvailableDateRange(listing.getId(), booking.getPickupDate(), booking.getReturnDate()))
+                .allSatisfy(row -> {
+                    assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.FREE);
+                    assertThat(row.getBookingId()).isNull();
+                });
+        verifyNoInteractions(coreBankPaymentClient);
     }
 
     @Test

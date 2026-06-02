@@ -26,6 +26,7 @@ class EmailVerificationServiceLoggingTest {
 
     @Mock private AuthUserRepository authUserRepository;
     @Mock private EmailVerificationTokenRepository emailVerificationTokenRepository;
+    @Mock private EmailDeliveryService emailDeliveryService;
 
     private ListAppender<ILoggingEvent> appender;
     private Logger logger;
@@ -51,7 +52,8 @@ class EmailVerificationServiceLoggingTest {
 
         EmailVerificationService service = new EmailVerificationService(
                 authUserRepository,
-                emailVerificationTokenRepository);
+                emailVerificationTokenRepository,
+                emailDeliveryService);
 
         service.sendVerification(user.getId());
 

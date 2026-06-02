@@ -5,6 +5,11 @@ export type HostVehicleFilterValue = "ALL" | HostVehicleStatus;
 export interface HostVehicleSelectOption {
   id: string;
   label: string;
+  identifierIntegrity: {
+    plateNumberReadable: boolean;
+    vinReadable: boolean;
+    hasUnreadableEncryptedFields: boolean;
+  };
 }
 
 export interface VehicleResponse {

@@ -58,7 +58,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = {
         "rentflow.payment.bank-transfer.account-number=1234567890",
         "rentflow.payment.bank-transfer.account-name=RENTFLOW ESCROW",
-        "rentflow.payment.bank-transfer.transfer-content-prefix=RENTFLOW"
+        "rentflow.payment.bank-transfer.transfer-content-prefix=RENTFLOW",
+        "rentflow.payment.sandbox-transfer-confirmation.enabled=true"
 })
 class BookingPaymentAuthorizeIntegrationTest extends BaseIntegrationTest {
 
@@ -288,7 +289,7 @@ class BookingPaymentAuthorizeIntegrationTest extends BaseIntegrationTest {
         savedBooking.setReturnDate(RETURN_DATE);
         savedBooking.setStatus(BookingStatus.HELD);
         savedBooking.setHoldToken(UUID.randomUUID());
-        savedBooking.setHoldExpiresAt(Instant.parse("2026-06-01T03:00:00Z"));
+        savedBooking.setHoldExpiresAt(Instant.now().plusSeconds(3600));
         savedBooking.setPriceSnapshot("""
                 {"totalAmount":1400000.00,"currency":"VND","extras":[]}
                 """);
@@ -306,9 +307,117 @@ class BookingPaymentAuthorizeIntegrationTest extends BaseIntegrationTest {
             row.setStatus(AvailabilityStatus.HOLD);
             row.setBookingId(bookingId);
             row.setHoldToken(holdToken);
-            row.setHoldExpiresAt(Instant.parse("2026-06-01T03:00:00Z"));
+            row.setHoldExpiresAt(Instant.now().plusSeconds(3600));
             availabilityRepository.save(row);
         }
+    }
+
+    @Test
+    void simulateTransferConfirmationForManualBookingAuthorizesPaymentAndWaitsForHost() throws Exception {
+        PaymentBank bank = paymentBankRepository.findAll().stream()
+                .filter(item -> "VCB".equals(item.getCode()))
+                .findFirst()
+                .orElseThrow();
+        postAuthorize(customerToken, booking.getId(), uuidV4(), bank.getId(), PaymentMethod.BANK_TRANSFER_QR)
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.booking.status").value("PENDING_HOST_APPROVAL"))
+                .andExpect(jsonPath("$.payment.status").value("AUTHORIZED"))
+                .andExpect(jsonPath("$.payment.authorizedAmount").value(1400000.00))
+                .andExpect(jsonPath("$.payment.provider").value("VIETQR_MANUAL"))
+                .andExpect(jsonPath("$.payment.providerStatus").value("SANDBOX_TRANSFER_CONFIRMED"));
+
+        BookingPayment payment = bookingPaymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
+        assertThat(payment.getAuthorizedAmount()).isEqualByComparingTo("1400000.00");
+        assertThat(payment.getProviderStatus()).isEqualTo("SANDBOX_TRANSFER_CONFIRMED");
+        assertThat(payment.getProviderMetadata()).contains("\"sandbox\": true");
+
+        Booking reloadedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertThat(reloadedBooking.getStatus()).isEqualTo(BookingStatus.PENDING_HOST_APPROVAL);
+        assertThat(reloadedBooking.getHoldExpiresAt()).isNull();
+        assertThat(reloadedBooking.getHostApprovalExpiresAt()).isNotNull();
+        assertThat(availabilityRepository.findByListingIdAndAvailableDateRange(listing.getId(), PICKUP_DATE, RETURN_DATE))
+                .allSatisfy(row -> {
+                    assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.HOLD);
+                    assertThat(row.getBookingId()).isEqualTo(booking.getId());
+                    assertThat(row.getHoldExpiresAt()).isEqualTo(reloadedBooking.getHostApprovalExpiresAt());
+                });
+
+        assertThat(paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId()))
+                .anySatisfy(tx -> {
+                    assertThat(tx.getType()).isEqualTo(PaymentTransactionType.AUTHORIZE);
+                    assertThat(tx.getStatus()).isEqualTo(PaymentTransactionStatus.SUCCEEDED);
+                    assertThat(tx.getAmount()).isEqualByComparingTo("1400000.00");
+                    assertThat(tx.getProviderResponse()).contains("\"sandbox\": true");
+                });
+    }
+
+    @Test
+    void simulateTransferConfirmationForInstantBookingConfirmsAndBooksAvailability() throws Exception {
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"FLEXIBLE","instantBook":true,"dailyKmLimit":200}
+                """);
+        bookingRepository.save(booking);
+        PaymentBank bank = paymentBankRepository.findAll().stream()
+                .filter(item -> "VCB".equals(item.getCode()))
+                .findFirst()
+                .orElseThrow();
+        postAuthorize(customerToken, booking.getId(), uuidV4(), bank.getId(), PaymentMethod.BANK_TRANSFER_QR)
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.booking.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.payment.status").value("AUTHORIZED"));
+
+        Booking reloadedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertThat(reloadedBooking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(reloadedBooking.getHoldToken()).isNull();
+        assertThat(reloadedBooking.getHoldExpiresAt()).isNull();
+        assertThat(availabilityRepository.findByListingIdAndAvailableDateRange(listing.getId(), PICKUP_DATE, RETURN_DATE))
+                .allSatisfy(row -> {
+                    assertThat(row.getStatus()).isEqualTo(AvailabilityStatus.BOOKED);
+                    assertThat(row.getBookingId()).isEqualTo(booking.getId());
+                    assertThat(row.getHoldToken()).isNull();
+                    assertThat(row.getHoldExpiresAt()).isNull();
+                });
+    }
+
+    @Test
+    void simulateTransferConfirmationForAnotherCustomerReturnsNotFound() throws Exception {
+        PaymentBank bank = paymentBankRepository.findAll().stream()
+                .filter(item -> "VCB".equals(item.getCode()))
+                .findFirst()
+                .orElseThrow();
+        postAuthorize(customerToken, booking.getId(), uuidV4(), bank.getId(), PaymentMethod.BANK_TRANSFER_QR)
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
+                        .header("Authorization", "Bearer " + otherCustomerToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("BOOKING_NOT_FOUND"));
+    }
+
+    @Test
+    void simulateTransferConfirmationRejectsExpiredHold() throws Exception {
+        PaymentBank bank = paymentBankRepository.findAll().stream()
+                .filter(item -> "VCB".equals(item.getCode()))
+                .findFirst()
+                .orElseThrow();
+        postAuthorize(customerToken, booking.getId(), uuidV4(), bank.getId(), PaymentMethod.BANK_TRANSFER_QR)
+                .andExpect(status().isOk());
+        booking.setHoldExpiresAt(Instant.now().minusSeconds(60));
+        bookingRepository.save(booking);
+
+        mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOKING_HOLD_EXPIRED"));
     }
 
     private String uuidV4() {

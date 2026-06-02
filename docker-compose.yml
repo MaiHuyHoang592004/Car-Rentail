@@ -32,6 +32,8 @@ services:
   postgrest:
     image: postgrest/postgrest:v12.2.0
     container_name: rentflow-postgrest
+    profiles:
+      - postgrest
     ports:
       - "3000:3000"
     environment:

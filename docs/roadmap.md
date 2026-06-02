@@ -198,7 +198,7 @@ Frontend đã tồn tại trong `frontend/` với:
 
 - Verify HELD expiry job uses bounded batches and `SKIP LOCKED`.
 - Add audit/timeline in Phase 7 only for important state changes.
-- Add DB outbox before considering Kafka.
+- DB outbox publishing is at-least-once: rows are claimed as `PROCESSING`, dispatched after claim commit, then finalized as `SENT`, `RETRY`, or `FAILED`; consumers must be idempotent before Kafka is considered.
 
 ---
 

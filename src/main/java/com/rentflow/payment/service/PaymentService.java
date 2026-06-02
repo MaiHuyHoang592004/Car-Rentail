@@ -25,6 +25,7 @@ public class PaymentService {
     private final CoreBankVoidService coreBankVoidService;
     private final CoreBankRefundService coreBankRefundService;
     private final PaymentReconciliationService paymentReconciliationService;
+    private final SandboxTransferConfirmationService sandboxTransferConfirmationService;
 
     public PaymentService(
             PaymentBankRepository paymentBankRepository,
@@ -34,7 +35,8 @@ public class PaymentService {
             CoreBankCaptureService coreBankCaptureService,
             CoreBankVoidService coreBankVoidService,
             CoreBankRefundService coreBankRefundService,
-            PaymentReconciliationService paymentReconciliationService) {
+            PaymentReconciliationService paymentReconciliationService,
+            SandboxTransferConfirmationService sandboxTransferConfirmationService) {
         this.paymentBankRepository = paymentBankRepository;
         this.bankTransferAuthorizeService = bankTransferAuthorizeService;
         this.coreBankAuthorizeService = coreBankAuthorizeService;
@@ -43,6 +45,7 @@ public class PaymentService {
         this.coreBankVoidService = coreBankVoidService;
         this.coreBankRefundService = coreBankRefundService;
         this.paymentReconciliationService = paymentReconciliationService;
+        this.sandboxTransferConfirmationService = sandboxTransferConfirmationService;
     }
 
     public AuthorizePaymentResponse authorizeBookingPayment(
@@ -60,6 +63,10 @@ public class PaymentService {
 
     public PaymentDetailResponse getBookingPayment(UUID bookingId) {
         return paymentQueryService.getByBookingId(bookingId);
+    }
+
+    public PaymentDetailResponse simulateTransferConfirmation(UUID bookingId) {
+        return sandboxTransferConfirmationService.confirm(bookingId);
     }
 
     public PaymentDetailResponse capturePayment(UUID paymentId, String idempotencyKey, CapturePaymentRequest request) {

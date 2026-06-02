@@ -63,6 +63,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -70,6 +74,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -123,12 +129,14 @@ class BookingServiceTest {
 
     private BookingService bookingService;
     private ObjectMapper objectMapper;
+    private Map<UUID, PaymentTransaction> paymentTransactions;
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        paymentTransactions = new HashMap<>();
         lenient().when(vehicleRepository.findById(VEHICLE_ID))
                 .thenReturn(Optional.of(vehicle(VehicleStatus.ACTIVE)));
         Clock fixedClock = Clock.fixed(NOW, ZoneOffset.UTC);
@@ -159,11 +167,21 @@ class BookingServiceTest {
                 outboxService,
                 adminNotificationService,
                 fixedClock,
+                transactionManager(),
                 15,
                 false);
         lenient().when(correlationIdHelper.getOrGenerate()).thenReturn("corr-1");
         lenient().when(paymentProviderRouter.route(PaymentProviderType.COREBANK)).thenReturn(paymentProvider);
-        lenient().when(paymentTransactionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        lenient().when(paymentTransactionRepository.save(any())).thenAnswer(i -> {
+            PaymentTransaction tx = i.getArgument(0);
+            if (tx.getId() == null) {
+                tx.setId(UUID.randomUUID());
+            }
+            paymentTransactions.put(tx.getId(), tx);
+            return tx;
+        });
+        lenient().when(paymentTransactionRepository.findByIdForUpdate(any()))
+                .thenAnswer(i -> Optional.ofNullable(paymentTransactions.get(i.getArgument(0))));
     }
 
     @Test
@@ -336,6 +354,7 @@ class BookingServiceTest {
                 outboxService,
                 adminNotificationService,
                 fixedClock,
+                transactionManager(),
                 15,
                 true);
         mockProceed();
@@ -380,6 +399,7 @@ class BookingServiceTest {
                 outboxService,
                 adminNotificationService,
                 fixedClock,
+                transactionManager(),
                 15,
                 false);
         mockProceed();
@@ -389,7 +409,7 @@ class BookingServiceTest {
 
         assertThatThrownBy(() -> bookingService.createBooking(IDEMPOTENCY_KEY, request()))
                 .isInstanceOf(DriverLicenseNotApprovedException.class)
-                .hasFieldOrPropertyWithValue("code", "DRIVER_LICENSE_NOT_APPROVED");
+                .hasFieldOrPropertyWithValue("code", "DRIVER_VERIFICATION_PENDING");
     }
 
     @Test
@@ -884,7 +904,6 @@ class BookingServiceTest {
         mockCancelProceed();
         when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
         when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
-        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
                 .isInstanceOf(BusinessRuleException.class)
@@ -900,7 +919,6 @@ class BookingServiceTest {
         mockCancelProceed();
         when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
         when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(payment));
-        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("")))
                 .isInstanceOf(BusinessRuleException.class)
@@ -908,7 +926,7 @@ class BookingServiceTest {
     }
 
     @Test
-    void cancelBookingHostAllowed() {
+    void cancelBookingHostRejectedFromCustomerCancelEndpoint() {
         Booking booking = booking();
         booking.setStatus(BookingStatus.HELD);
         UUID hostUserId = HOST_ID;
@@ -917,11 +935,12 @@ class BookingServiceTest {
         when(idempotencyService.resolve(eq(hostUserId), eq(IdempotencyScope.CANCEL_BOOKING), eq(IDEMPOTENCY_KEY), eq(REQUEST_HASH)))
                 .thenReturn(IdempotencyResolution.proceed(IDEMPOTENCY_ID));
         when(bookingRepository.findByIdForUpdate(BOOKING_ID)).thenReturn(Optional.of(booking));
-        when(availabilityRepository.findForBookingRangeForUpdate(any(), any(), any())).thenReturn(List.of());
 
-        CancelBookingResponse response = bookingService.cancelBooking(BOOKING_ID, IDEMPOTENCY_KEY, new CancelBookingRequest("Host cancel"));
-
-        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+        assertThatThrownBy(() -> bookingService.cancelBooking(
+                BOOKING_ID,
+                IDEMPOTENCY_KEY,
+                new CancelBookingRequest("Host cancel")))
+                .isInstanceOf(BookingNotFoundException.class);
     }
 
     @Test
@@ -1279,5 +1298,26 @@ class BookingServiceTest {
         payment.setProviderPaymentOrderId("payment-order-1");
         payment.setProviderHoldId("hold-1");
         return payment;
+    }
+
+    private PlatformTransactionManager transactionManager() {
+        return new AbstractPlatformTransactionManager() {
+            @Override
+            protected Object doGetTransaction() {
+                return new Object();
+            }
+
+            @Override
+            protected void doBegin(Object transaction, TransactionDefinition definition) {
+            }
+
+            @Override
+            protected void doCommit(DefaultTransactionStatus status) {
+            }
+
+            @Override
+            protected void doRollback(DefaultTransactionStatus status) {
+            }
+        };
     }
 }

@@ -108,6 +108,36 @@ describe("middleware role-based auth", () => {
     expect(res.headers.get("x-middleware-next")).toBe("1");
   });
 
+  it("allows any authenticated user on onboarding and leaves role checks to the page", () => {
+    const res = middleware(
+      makeRequest("/onboarding/customer", {
+        [REFRESH_COOKIE_NAME]: "r",
+        [ROLE_COOKIE_NAME]: "HOST",
+      }),
+    ) as Response;
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("redirects unauthenticated onboarding route to /login", () => {
+    const res = middleware(makeRequest("/onboarding/customer")) as Response;
+    expect(locationHeader(res)).toContain("/login");
+  });
+
+  it("does not protect public verify-email route", () => {
+    const res = middleware(makeRequest("/verify-email?token=abc")) as Response;
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("does not protect verify-email api path", () => {
+    const res = middleware(makeRequest("/api/v1/auth/verify-email")) as Response;
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("does not protect driver-license api path", () => {
+    const res = middleware(makeRequest("/api/v1/users/me/driver-license")) as Response;
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+  });
+
   it("redirects HOST away from /me/bookings (CUSTOMER-only)", () => {
     const res = middleware(
       makeRequest("/me/bookings", {

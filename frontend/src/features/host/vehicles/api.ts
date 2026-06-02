@@ -159,5 +159,6 @@ export async function getHostActiveVehicles(): Promise<HostVehicleSelectOption[]
   return data.content.map((v) => ({
     id: v.id,
     label: `${v.make} ${v.model} (${v.year})`,
+    identifierIntegrity: v.identifierIntegrity,
   }));
 }

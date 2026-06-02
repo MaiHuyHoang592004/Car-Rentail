@@ -45,4 +45,10 @@ public class OutboxEvent extends BaseEntity {
 
     @Column(name = "sent_at")
     private Instant sentAt;
+
+    @Column(name = "processing_started_at")
+    private Instant processingStartedAt;
+
+    @Column(name = "claimed_by", length = 120)
+    private String claimedBy;
 }

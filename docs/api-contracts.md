@@ -180,6 +180,54 @@ Request:
 
 Response `204`.
 
+### Email Verification
+
+Email verification links are sent by backend mail delivery when enabled.
+
+Runtime configuration for real SMTP email delivery:
+
+```env
+RENTFLOW_MAIL_ENABLED=true
+RENTFLOW_MAIL_FROM=no-reply@rentflow.example
+RENTFLOW_FRONTEND_BASE_URL=http://localhost:3002
+RENTFLOW_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002
+SPRING_MAIL_HOST=smtp.example.com
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=...
+SPRING_MAIL_PASSWORD=...
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
+```
+
+Provider examples:
+
+- SendGrid SMTP: `SPRING_MAIL_HOST=smtp.sendgrid.net`, `SPRING_MAIL_PORT=587`, `SPRING_MAIL_USERNAME=apikey`, `SPRING_MAIL_PASSWORD=<sendgrid-api-key>`.
+- Mailgun SMTP: use the SMTP hostname, username, and password from the verified Mailgun domain.
+- AWS SES SMTP: use the SES SMTP endpoint for the selected region, plus SES SMTP username/password, not the AWS access key directly.
+- Local dev with Mailpit/Mailhog: point `SPRING_MAIL_HOST` and `SPRING_MAIL_PORT` at the local SMTP container and set SMTP auth to `false`.
+
+Local Mailpit flow:
+
+```powershell
+docker run --rm -p 1025:1025 -p 8025:8025 axllent/mailpit
+powershell -ExecutionPolicy Bypass -File .\scripts\start-backend-mailpit.ps1
+```
+
+Mailpit SMTP listens on `localhost:1025`; the inbox UI is `http://localhost:8025`.
+The backend script writes logs to `%TEMP%\rentflow-backend.log` and starts `http://localhost:8087`.
+If port `8087` is already in use, stop the owning process first.
+Environment variables set in one terminal do not affect a backend process launched by another terminal, agent, or script; set the mail env vars in the same process that runs `mvn spring-boot:run`.
+
+Raw verification tokens are never stored in the database and must not be logged. The backend stores only the token hash and sends the raw token inside the frontend link.
+
+`POST /api/v1/auth/verify-email` remains public and accepts:
+
+```json
+{ "token": "raw-token-from-email" }
+```
+
+Invalid, expired, or reused tokens return `409 INVALID_TOKEN`. If authenticated resend cannot deliver email, API returns `409 EMAIL_DELIVERY_FAILED`.
+
 ## User
 
 ### Current Profile

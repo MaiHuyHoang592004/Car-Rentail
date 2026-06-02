@@ -8,6 +8,7 @@ import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
 import com.rentflow.payment.entity.PaymentTransaction;
 import com.rentflow.payment.entity.PaymentTransactionStatus;
+import com.rentflow.payment.entity.PaymentTransactionType;
 import com.rentflow.payment.provider.CaptureResult;
 import com.rentflow.payment.provider.PaymentProvider;
 import com.rentflow.payment.provider.PaymentProviderRouter;
@@ -27,7 +28,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -87,8 +87,7 @@ class TripPaymentCaptureServiceTest {
     @Test
     void captureSuccessUpdatesPaymentAndTransaction() {
         BookingPayment payment = authorizedPayment(BigDecimal.ZERO);
-        PaymentTransaction tx = new PaymentTransaction();
-        tx.setId(UUID.randomUUID());
+        PaymentTransaction tx = pendingCaptureTx(payment);
 
         when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID))
                 .thenReturn(Optional.of(payment), Optional.of(payment));
@@ -127,8 +126,7 @@ class TripPaymentCaptureServiceTest {
         BookingPayment preparePayment = authorizedPayment(BigDecimal.ZERO);
         BookingPayment finalPayment = authorizedPayment(BigDecimal.ZERO);
         finalPayment.setStatus(PaymentStatus.CAPTURED);
-        PaymentTransaction tx = new PaymentTransaction();
-        tx.setId(UUID.randomUUID());
+        PaymentTransaction tx = pendingCaptureTx(preparePayment);
 
         when(bookingPaymentRepository.findByBookingIdForUpdate(BOOKING_ID))
                 .thenReturn(Optional.of(preparePayment), Optional.of(finalPayment));
@@ -143,6 +141,7 @@ class TripPaymentCaptureServiceTest {
         assertThat(finalPayment.getCapturedAmount()).isEqualByComparingTo("0.00");
         assertThat(tx.getStatus()).isEqualTo(PaymentTransactionStatus.FAILED);
         assertThat(tx.getProviderErrorCode()).isEqualTo("PAYMENT_FINALIZATION_UNSAFE");
+        assertThat(tx.getProviderJournalId()).isEqualTo("journal-1");
     }
 
     @Test
@@ -168,5 +167,19 @@ class TripPaymentCaptureServiceTest {
         payment.setCurrency("VND");
         payment.setProviderPaymentOrderId("payment-order-1");
         return payment;
+    }
+
+    private PaymentTransaction pendingCaptureTx(BookingPayment payment) {
+        PaymentTransaction tx = new PaymentTransaction();
+        tx.setId(UUID.randomUUID());
+        tx.setBookingPaymentId(payment.getId());
+        tx.setBookingId(payment.getBookingId());
+        tx.setType(PaymentTransactionType.CAPTURE);
+        tx.setStatus(PaymentTransactionStatus.PENDING);
+        tx.setAmount(payment.getAuthorizedAmount().subtract(payment.getCapturedAmount()));
+        tx.setCurrency(payment.getCurrency());
+        tx.setProvider(payment.getProvider());
+        tx.setProviderRef(payment.getProviderPaymentOrderId());
+        return tx;
     }
 }

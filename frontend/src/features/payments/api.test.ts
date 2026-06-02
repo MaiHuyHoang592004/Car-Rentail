@@ -4,6 +4,7 @@ import {
   authorizeBookingPayment,
   getBookingPayment,
   listPaymentBanks,
+  simulateTransferConfirmation,
 } from "./api";
 
 describe("payment api", () => {
@@ -265,6 +266,54 @@ describe("payment api", () => {
       );
 
       await expect(getBookingPayment("bk-err")).rejects.toThrow();
+    });
+  });
+
+  describe("simulateTransferConfirmation", () => {
+    it("posts to sandbox confirmation endpoint with Idempotency-Key and maps payment detail", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        jsonResponse({
+          booking: {
+            id: "bk-1",
+            customerId: "u-1",
+            hostId: "h-1",
+            status: "PENDING_HOST_APPROVAL",
+            pickupDate: "2026-06-01",
+            returnDate: "2026-06-03",
+          },
+          payment: {
+            id: "pay-1",
+            selectedBankId: "bank-1",
+            paymentMethod: "BANK_TRANSFER_QR",
+            provider: "VIETQR_MANUAL",
+            status: "AUTHORIZED",
+            authorizedAmount: "1400000",
+            capturedAmount: "0",
+            refundedAmount: "0",
+            currency: "VND",
+            externalOrderRef: "rentflow:booking:bk-1",
+            providerPaymentOrderId: null,
+            providerHoldId: null,
+            providerStatus: "SANDBOX_TRANSFER_CONFIRMED",
+            transferInstruction: null,
+          },
+          transactions: [],
+        }),
+      );
+
+      const detail = await simulateTransferConfirmation(
+        "bk-1",
+        "33333333-3333-4333-8333-333333333333",
+      );
+
+      expect(detail.payment.status).toBe("AUTHORIZED");
+      expect(detail.payment.providerStatus).toBe("SANDBOX_TRANSFER_CONFIRMED");
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("/api/v1/bookings/bk-1/payments/simulate-transfer-confirmation");
+      expect(init.method).toBe("POST");
+      expect(new Headers(init.headers).get("Idempotency-Key")).toBe(
+        "33333333-3333-4333-8333-333333333333",
+      );
     });
   });
 });

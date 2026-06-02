@@ -224,4 +224,33 @@ class SecurityEndpointsTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
     }
+
+    @Test
+    void verifyEmailEndpoint_isPublicAndDoesNotReturn401Or403() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "token": "no-such-token"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
+    }
+
+    @Test
+    void verifyEmailEndpoint_withStaleRentFlowCookies_isStillPublic() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .cookie(
+                                new jakarta.servlet.http.Cookie("rentflow_refresh", "stale-refresh"),
+                                new jakarta.servlet.http.Cookie("rentflow_role", "CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "token": "no-such-token"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
+    }
 }

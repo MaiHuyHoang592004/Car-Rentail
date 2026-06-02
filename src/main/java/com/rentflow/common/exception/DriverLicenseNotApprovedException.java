@@ -5,4 +5,8 @@ public class DriverLicenseNotApprovedException extends RentFlowException {
     public DriverLicenseNotApprovedException() {
         super("DRIVER_LICENSE_NOT_APPROVED", "Driver license is not approved");
     }
+
+    public DriverLicenseNotApprovedException(String code, String message) {
+        super(code, message);
+    }
 }

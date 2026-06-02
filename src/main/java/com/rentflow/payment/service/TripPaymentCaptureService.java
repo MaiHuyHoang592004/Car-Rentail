@@ -18,9 +18,11 @@ import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.repository.PaymentTransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -43,6 +45,7 @@ public class TripPaymentCaptureService {
         this.paymentProviderRouter = paymentProviderRouter;
         this.correlationIdHelper = correlationIdHelper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     public void captureRemainingForBooking(UUID bookingId) {
@@ -65,7 +68,10 @@ public class TripPaymentCaptureService {
             throw e;
         }
 
-        transactionTemplate.executeWithoutResult(status -> finalizeCapture(prepared, result));
+        FinalizedTripCapture finalized = required(transactionTemplate.execute(status -> finalizeCapture(prepared, result)));
+        if (finalized.unsafe()) {
+            throw new BusinessRuleException("PAYMENT_FINALIZATION_UNSAFE", finalized.unsafeReason());
+        }
     }
 
     private PreparedTripCaptureContext prepareCapture(UUID bookingId) {
@@ -95,6 +101,7 @@ public class TripPaymentCaptureService {
                 bookingId,
                 tx.getId(),
                 remainingAmount,
+                payment.getProviderPaymentOrderId(),
                 new CaptureCommand(
                         "rentflow:trip:checkout:capture:" + payment.getId() + ":" + requestId,
                         payment.getProviderPaymentOrderId(),
@@ -106,13 +113,17 @@ public class TripPaymentCaptureService {
                         correlationId));
     }
 
-    private void finalizeCapture(PreparedTripCaptureContext prepared, CaptureResult result) {
+    private FinalizedTripCapture finalizeCapture(PreparedTripCaptureContext prepared, CaptureResult result) {
         BookingPayment payment = bookingPaymentRepository.findByBookingIdForUpdate(prepared.bookingId())
                 .orElseThrow(() -> new PaymentNotFoundException(prepared.bookingId().toString()));
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(prepared.transactionId())
                 .orElseThrow(() -> new PaymentNotFoundException(prepared.paymentId().toString()));
 
-        validateCaptureFinalizationState(prepared, payment, tx);
+        String unsafeReason = captureFinalizationUnsafeReason(prepared, payment, tx);
+        if (unsafeReason != null) {
+            markUnsafe(tx, unsafeReason, result);
+            return new FinalizedTripCapture(true, unsafeReason);
+        }
 
         BigDecimal updatedCaptured = payment.getCapturedAmount().add(prepared.remainingAmount());
         payment.setCapturedAmount(updatedCaptured);
@@ -131,25 +142,37 @@ public class TripPaymentCaptureService {
         tx.setProviderErrorCode(null);
         tx.setProviderErrorMessage(null);
         paymentTransactionRepository.save(tx);
+        return new FinalizedTripCapture(false, null);
     }
 
-    private void validateCaptureFinalizationState(
+    private String captureFinalizationUnsafeReason(
             PreparedTripCaptureContext prepared,
             BookingPayment payment,
             PaymentTransaction tx) {
-        BigDecimal remainingAmount = payment.getAuthorizedAmount().subtract(payment.getCapturedAmount());
-        boolean invalid = payment.getProvider() != PaymentProviderType.COREBANK
-                || payment.getStatus() != PaymentStatus.AUTHORIZED
-                || payment.getProviderPaymentOrderId() == null
-                || payment.getProviderPaymentOrderId().isBlank()
-                || remainingAmount.compareTo(BigDecimal.ZERO) <= 0
-                || prepared.remainingAmount().compareTo(remainingAmount) > 0;
-        if (invalid) {
-            markUnsafe(tx, "CoreBank capture succeeded but trip payment finalization was no longer safe");
-            throw new BusinessRuleException(
-                    "PAYMENT_FINALIZATION_UNSAFE",
-                    "Payment capture succeeded but trip payment finalization was no longer safe");
+        if (tx.getStatus() != PaymentTransactionStatus.PENDING) {
+            return "CoreBank trip capture succeeded but local transaction is no longer pending";
         }
+        if (tx.getType() != PaymentTransactionType.CAPTURE
+                || tx.getProvider() != PaymentProviderType.COREBANK
+                || tx.getAmount() == null
+                || tx.getAmount().compareTo(prepared.remainingAmount()) != 0
+                || !Objects.equals(tx.getProviderRef(), prepared.providerPaymentOrderId())) {
+            return "CoreBank trip capture succeeded but local transaction state changed";
+        }
+        BigDecimal remainingAmount = payment.getAuthorizedAmount().subtract(payment.getCapturedAmount());
+        if (payment.getProvider() != PaymentProviderType.COREBANK) {
+            return "CoreBank trip capture succeeded but payment provider changed";
+        }
+        if (payment.getStatus() != PaymentStatus.AUTHORIZED) {
+            return "CoreBank trip capture succeeded but payment is no longer authorized";
+        }
+        if (!Objects.equals(prepared.providerPaymentOrderId(), payment.getProviderPaymentOrderId())) {
+            return "CoreBank trip capture succeeded but provider payment order changed";
+        }
+        if (remainingAmount.compareTo(BigDecimal.ZERO) <= 0 || prepared.remainingAmount().compareTo(remainingAmount) > 0) {
+            return "CoreBank trip capture succeeded but remaining authorized amount changed";
+        }
+        return null;
     }
 
     private boolean isCoreBankAuthorizedWithRemaining(BookingPayment payment) {
@@ -177,11 +200,20 @@ public class TripPaymentCaptureService {
         paymentTransactionRepository.save(tx);
     }
 
-    private void markUnsafe(PaymentTransaction tx, String errorMessage) {
+    private void markUnsafe(PaymentTransaction tx, String errorMessage, CaptureResult result) {
         tx.setStatus(PaymentTransactionStatus.FAILED);
         tx.setProviderErrorCode("PAYMENT_FINALIZATION_UNSAFE");
         tx.setProviderErrorMessage(errorMessage);
+        tx.setProviderJournalId(result.providerJournalId());
+        tx.setProviderResponse(result.providerMetadataJson());
         paymentTransactionRepository.save(tx);
+    }
+
+    private <T> T required(T value) {
+        if (value == null) {
+            throw new IllegalStateException("Transactional callback returned null unexpectedly");
+        }
+        return value;
     }
 
     private record PreparedTripCaptureContext(
@@ -189,7 +221,14 @@ public class TripPaymentCaptureService {
             UUID bookingId,
             UUID transactionId,
             BigDecimal remainingAmount,
+            String providerPaymentOrderId,
             CaptureCommand command
+    ) {
+    }
+
+    private record FinalizedTripCapture(
+            boolean unsafe,
+            String unsafeReason
     ) {
     }
 }

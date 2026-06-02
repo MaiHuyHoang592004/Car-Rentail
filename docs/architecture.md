@@ -121,4 +121,4 @@ policy
 | Payment stub | Supports rental final charges and cancellation penalties without real payment gateway |
 | Idempotency required | Prevents duplicate booking/payment/cancel/approval effects |
 | Vehicle/listing coupling | Automatic status propagation for data consistency |
-| Outbox pattern | Reliable event publishing without Kafka as prerequisite |
+| Outbox pattern | Reliable at-least-once event publishing without Kafka as prerequisite; consumers must be idempotent |

@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -37,6 +38,15 @@ public class GlobalExceptionHandler {
         log.warn("Validation error [{}]: {}", cid, errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ErrorResponse.of("VALIDATION_ERROR", "Request validation failed", errors, cid));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMalformedJson(
+            HttpMessageNotReadableException ex, HttpServletRequest request) {
+        String cid = correlationIdHelper.getCorrelationId();
+        log.warn("Malformed request body [{}]: {}", cid, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of("VALIDATION_ERROR", "Request body is malformed", cid));
     }
 
     @ExceptionHandler(com.rentflow.common.exception.AuthenticationException.class)

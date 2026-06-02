@@ -14,7 +14,6 @@ import com.rentflow.user.entity.UserProfile;
 import com.rentflow.user.repository.UserProfileRepository;
 import com.rentflow.vehicle.entity.VehicleStatus;
 import com.rentflow.vehicle.repository.VehicleRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -100,9 +99,22 @@ public class BookingValidator {
             return;
         }
         UserProfile profile = userProfileRepository.findByUserId(customerId)
-                .orElseThrow(DriverLicenseNotApprovedException::new);
-        if (profile.getDriverVerificationStatus() != UserProfile.DriverVerificationStatus.APPROVED) {
-            throw new DriverLicenseNotApprovedException();
+                .orElseThrow(() -> new DriverLicenseNotApprovedException(
+                        "DRIVER_VERIFICATION_REQUIRED",
+                        "Driver verification must be submitted before booking"));
+        switch (profile.getDriverVerificationStatus()) {
+            case APPROVED -> {
+                return;
+            }
+            case NOT_SUBMITTED -> throw new DriverLicenseNotApprovedException(
+                    "DRIVER_VERIFICATION_REQUIRED",
+                    "Driver verification must be submitted before booking");
+            case PENDING -> throw new DriverLicenseNotApprovedException(
+                    "DRIVER_VERIFICATION_PENDING",
+                    "Driver verification is pending approval");
+            case REJECTED, EXPIRED -> throw new DriverLicenseNotApprovedException(
+                    "DRIVER_VERIFICATION_REJECTED",
+                    "Driver verification must be resubmitted before booking");
         }
     }
 

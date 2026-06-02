@@ -3,7 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/rentflow/app-shell";
+import { EmptyState } from "@/components/rentflow/empty-state";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
+import { StatusBadge } from "@/components/rentflow/status-badge";
 import {
   adminApproveDriverVerification,
   adminListDriverVerifications,
@@ -31,30 +33,46 @@ export function AdminDriverVerificationsPageView() {
 
   return (
     <AppShell activePath="/admin/driver-verifications">
-      <div className="space-y-5">
-        <h1 className="text-2xl font-bold text-foreground">Duyet GPLX</h1>
+      <div className="space-y-6">
+        <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50 p-6 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-700">Admin RentFlow</p>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Duyệt giấy phép lái xe</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            Kiểm tra hồ sơ GPLX của khách thuê, duyệt hồ sơ hợp lệ hoặc từ chối kèm lý do rõ ràng.
+          </p>
+        </section>
+
         {query.isLoading ? <PageSkeleton message="Dang tai ho so GPLX..." /> : null}
+        {query.isError ? (
+          <section className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+            Không thể tải danh sách GPLX. Vui lòng thử lại.
+          </section>
+        ) : null}
+        {!query.isLoading && !query.isError && (query.data ?? []).length === 0 ? (
+          <EmptyState title="Không có hồ sơ GPLX cần xử lý" description="Khi khách thuê gửi GPLX, hồ sơ sẽ xuất hiện tại đây." />
+        ) : null}
         <div className="grid gap-4 lg:grid-cols-2">
           {(query.data ?? []).map((item) => (
-            <section key={item.id} className="rounded-xl border border-border bg-card p-4">
+            <section key={item.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-foreground">{item.customerId}</p>
-                  <p className="text-sm text-muted-foreground">Het han: {item.licenseExpiryDate}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Cho duyet: {item.pendingAgeHours ?? 0} gio {item.slaBreached ? "(qua SLA)" : ""}
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Khách thuê</p>
+                  <p className="mt-1 font-semibold text-slate-950">{item.customerId}</p>
+                  <p className="mt-2 text-sm text-slate-600">Hết hạn GPLX: {item.licenseExpiryDate}</p>
+                  <p className="text-sm text-slate-600">
+                    Chờ duyệt: {item.pendingAgeHours ?? 0} giờ {item.slaBreached ? "(quá SLA)" : ""}
                   </p>
                 </div>
-                <span className="rounded-full border border-border px-2 py-1 text-xs font-semibold">{item.status}</span>
+                <StatusBadge status={item.status} />
               </div>
               {item.documentPreviewUrl ? (
                 <a
                   href={item.documentPreviewUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-3 inline-flex rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
+                  className="mt-4 inline-flex rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
                 >
-                  Xem tai lieu
+                  Xem tài liệu
                 </a>
               ) : null}
               {item.status === "PENDING" ? (
@@ -63,23 +81,25 @@ export function AdminDriverVerificationsPageView() {
                     value={rejectReason}
                     onChange={(event) => setRejectReason(event.target.value)}
                     rows={2}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                    placeholder="Ly do tu choi"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-blue-200 focus:ring-4"
+                    placeholder="Lý do từ chối"
                   />
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => approveMutation.mutate(item.id)}
-                      className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                      disabled={approveMutation.isPending}
+                      className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                     >
-                      Duyet
+                      Duyệt
                     </button>
                     <button
                       type="button"
                       onClick={() => rejectMutation.mutate(item.id)}
-                      className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
+                      disabled={rejectMutation.isPending}
+                      className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                     >
-                      Tu choi
+                      Từ chối
                     </button>
                   </div>
                 </div>
