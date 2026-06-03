@@ -110,4 +110,11 @@ class JwtTokenProviderTest {
 
         assertNotEquals(accessToken, refreshToken);
     }
+
+    @Test
+    void constructorRejectsMissingSecret() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> new JwtTokenProvider("", Duration.ofMinutes(15), Duration.ofDays(7)));
+        assertTrue(ex.getMessage().contains("JWT_SECRET is not configured"));
+    }
 }

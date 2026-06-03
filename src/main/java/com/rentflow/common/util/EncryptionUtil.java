@@ -10,9 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Component
 public class EncryptionUtil {
@@ -20,26 +17,20 @@ public class EncryptionUtil {
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
-    private static final String TEST_PROFILE_FALLBACK_KEY = "Q6iaj8bzwS3UjXZTvgin7MChtBS6lhUZmj19bHF6z1o=";
 
     private final SecretKeySpec secretKey;
 
     public EncryptionUtil(
             @Value("${encryption.secret-key:#{null}}") String configKeySecretKey,
-            @Value("${encryption.secret:#{null}}") String configKeySecret,
-            @Value("${spring.profiles.active:}") String activeProfiles) {
+            @Value("${encryption.secret:#{null}}") String configKeySecret) {
         String keyEnv = configKeySecretKey != null ? configKeySecretKey : configKeySecret;
         if (keyEnv == null || keyEnv.isBlank()) {
             keyEnv = System.getenv("ENCRYPTION_SECRET_KEY");
         }
         if (keyEnv == null || keyEnv.isBlank()) {
-            if (isTestProfileActive(activeProfiles)) {
-                keyEnv = TEST_PROFILE_FALLBACK_KEY;
-            } else {
-                throw new IllegalStateException(
-                        "encryption.secret-key is not configured. Set ENCRYPTION_SECRET_KEY " +
-                                "or encryption.secret-key to a Base64-encoded 32-byte key.");
-            }
+            throw new IllegalStateException(
+                    "encryption.secret-key is not configured. Set ENCRYPTION_SECRET_KEY " +
+                            "or encryption.secret-key to a Base64-encoded 32-byte key.");
         }
         byte[] keyBytes;
         try {
@@ -123,13 +114,5 @@ public class EncryptionUtil {
             sb.append(String.format("%02x", b));
         }
         return sb.toString();
-    }
-
-    private boolean isTestProfileActive(String activeProfiles) {
-        Set<String> profiles = Arrays.stream(activeProfiles.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .collect(Collectors.toSet());
-        return profiles.contains("test");
     }
 }

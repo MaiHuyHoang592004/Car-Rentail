@@ -7,16 +7,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EncryptionUtilTest {
 
+    private static final String VALID_BASE64_KEY = "Q6iaj8bzwS3UjXZTvgin7MChtBS6lhUZmj19bHF6z1o=";
+
     @Test
     void constructorRejectsMissingKeyOutsideTestProfile() {
-        assertThatThrownBy(() -> new EncryptionUtil(null, null, "local"))
+        assertThatThrownBy(() -> new EncryptionUtil(null, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("encryption.secret-key is not configured");
     }
 
     @Test
-    void constructorAllowsTestProfileFallback() {
-        EncryptionUtil util = new EncryptionUtil(null, null, "test");
+    void constructorAcceptsExplicitValidKey() {
+        EncryptionUtil util = new EncryptionUtil(VALID_BASE64_KEY, null);
 
         String encrypted = util.encrypt("hello");
         assertThat(util.decrypt(encrypted)).isEqualTo("hello");

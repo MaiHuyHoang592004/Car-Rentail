@@ -22,10 +22,10 @@ logging:
     org.springframework.boot.context.config: DEBUG
 
 jwt:
-  secret: ${JWT_SECRET:dGVzdC1zZWNyZXQta2V5LWZvci1sb2NhbC1kZXZlbG9wbWVudC1vbmx5LW5vdC1mb3ItcHJvZHVjdGlvbi1taW5pbXVtLTYwLWJ5dGVz}
+  secret: ${JWT_SECRET:}
 
 encryption:
-  secret-key: ${ENCRYPTION_SECRET_KEY:Q6iaj8bzwS3UjXZTvgin7MChtBS6lhUZmj19bHF6z1o=}
+  secret-key: ${ENCRYPTION_SECRET_KEY:}
 
 rentflow:
   file:
