@@ -7,6 +7,7 @@ import com.rentflow.booking.service.BookingService;
 import com.rentflow.booking.service.BookingSummaryResponse;
 import com.rentflow.booking.service.CancelBookingRequest;
 import com.rentflow.booking.service.CancelBookingResponse;
+import com.rentflow.booking.service.CancellationPreviewResponse;
 import com.rentflow.booking.service.CreateBookingRequest;
 import com.rentflow.booking.service.PatchBookingLocationRequest;
 import com.rentflow.common.exception.IdempotencyKeyRequiredException;
@@ -65,6 +66,11 @@ public class BookingController {
     @GetMapping("/{id}")
     public ResponseEntity<BookingResponse> getBooking(@PathVariable UUID id) {
         return ResponseEntity.ok(bookingService.getBooking(id));
+    }
+
+    @GetMapping("/{id}/cancel-preview")
+    public ResponseEntity<CancellationPreviewResponse> getCancelPreview(@PathVariable UUID id) {
+        return ResponseEntity.ok(bookingService.getCancelPreview(id));
     }
 
     @PatchMapping("/{id}")

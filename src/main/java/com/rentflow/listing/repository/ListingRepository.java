@@ -49,6 +49,17 @@ public interface ListingRepository extends
     );
 
     @Modifying(clearAutomatically = true)
+    @Query("UPDATE Listing l SET l.status = 'SUSPENDED', " +
+            "l.suspensionReason = :reason, " +
+            "l.suspensionSource = :source, " +
+            "l.suspensionUntil = null " +
+            "WHERE l.vehicleId = :vehicleId AND l.status = 'ACTIVE'")
+    int suspendActiveListingsByVehicleId(
+            @Param("vehicleId") UUID vehicleId,
+            @Param("reason") String reason,
+            @Param("source") String source);
+
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE Listing l SET l.status = :newStatus WHERE l.vehicleId = :vehicleId AND l.status != :excludedStatus")
     int updateStatusByVehicleIdAndStatusNot(
         @Param("vehicleId") UUID vehicleId,

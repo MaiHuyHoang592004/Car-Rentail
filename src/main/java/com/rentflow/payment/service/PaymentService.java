@@ -65,8 +65,8 @@ public class PaymentService {
         return paymentQueryService.getByBookingId(bookingId);
     }
 
-    public PaymentDetailResponse simulateTransferConfirmation(UUID bookingId) {
-        return sandboxTransferConfirmationService.confirm(bookingId);
+    public PaymentDetailResponse simulateTransferConfirmation(UUID bookingId, String idempotencyKey) {
+        return sandboxTransferConfirmationService.confirm(bookingId, idempotencyKey);
     }
 
     public PaymentDetailResponse capturePayment(UUID paymentId, String idempotencyKey, CapturePaymentRequest request) {

@@ -62,8 +62,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = "rentflow.scheduler.expire-held-bookings.enabled=false")
 class BookingPhase5IntegrationTest extends BaseIntegrationTest {
 
-    private static final LocalDate PICKUP_DATE = LocalDate.of(2026, 6, 1);
-    private static final LocalDate RETURN_DATE = LocalDate.of(2026, 6, 3);
+    private static final LocalDate PICKUP_DATE = LocalDate.now().plusDays(30);
+    private static final LocalDate RETURN_DATE = PICKUP_DATE.plusDays(2);
 
     @Autowired private AuthUserRepository authUserRepository;
     @Autowired private VehicleRepository vehicleRepository;

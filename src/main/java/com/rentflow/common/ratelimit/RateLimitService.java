@@ -98,6 +98,14 @@ public class RateLimitService {
         }
     }
 
+    public void consumeRegister(String clientIp) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+        RateLimitProperties.Register register = properties.getRegister();
+        assertAllowed(registerKey(clientIp), register.getLimit(), register.getWindow(), true);
+    }
+
     public void consumeBookingCreate(UUID customerId) {
         if (!properties.isEnabled()) {
             return;
@@ -147,6 +155,11 @@ public class RateLimitService {
 
     private String bookingKey(UUID customerId) {
         return "rl:booking:create:" + customerId;
+    }
+
+    private String registerKey(String clientIp) {
+        String normalizedIp = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp.trim();
+        return "rl:register:" + normalizedIp;
     }
 
     private String publicEndpointKey(String clientIp) {

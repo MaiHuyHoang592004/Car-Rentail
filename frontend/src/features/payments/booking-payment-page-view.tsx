@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ChevronUp, Clock, Copy, CreditCard, ShieldCheck } from "lucide-react";
 
+import { ApiErrorPanel } from "@/components/rentflow/api-error-panel";
 import { AppShell } from "@/components/rentflow/app-shell";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
@@ -193,6 +194,33 @@ export function BookingPaymentPageView({ bookingId }: BookingPaymentPageViewProp
   }
 
   const booking: BookingDetailViewModel = bookingQuery.data;
+  if (paymentQuery.isError) {
+    const apiErr = paymentQuery.error instanceof ApiError ? paymentQuery.error : undefined;
+    return (
+      <AppShell activePath="/me/bookings">
+        <div className="space-y-4">
+          <PageHeader
+            title="Thanh toán đặt xe"
+            description={booking.listingTitle}
+            actions={
+              <Link
+                href={`/bookings/${bookingId}`}
+                className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
+              >
+                Quay ve
+              </Link>
+            }
+          />
+          <ApiErrorPanel
+            error={apiErr}
+            code="PAYMENT_LOOKUP_FAILED"
+            message="Không thể tải trạng thái thanh toán của booking này."
+          />
+        </div>
+      </AppShell>
+    );
+  }
+
   const payment: PaymentDetail | null | undefined = paymentQuery.data;
   const banks: PaymentBank[] = banksQuery.data ?? [];
   const isPayable = (PAYABLE_STATUSES as readonly string[]).includes(booking.status);

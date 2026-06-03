@@ -208,18 +208,20 @@ class AvailabilityIntegrationTest extends BaseIntegrationTest {
     void extend_addsMissingFutureDates() throws Exception {
         String listingId = createAndApproveListing();
         long before = availabilityRepository.countByListingId(UUID.fromString(listingId));
+        LocalDate throughDate = LocalDate.now().plusDays(393);
+        int expectedInserted = 29;
 
         mockMvc.perform(post("/api/v1/host/listings/{id}/availability/extend", listingId)
                         .header("Authorization", "Bearer " + hostToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                            { "throughDate": "2027-06-29" }
-                            """))
+                            { "throughDate": "%s" }
+                            """.formatted(throughDate)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.updatedCount").value(29));
+                .andExpect(jsonPath("$.updatedCount").value(expectedInserted));
 
         long after = availabilityRepository.countByListingId(UUID.fromString(listingId));
-        assertThat(after).isEqualTo(before + 29);
+        assertThat(after).isEqualTo(before + expectedInserted);
     }
 
     @Test

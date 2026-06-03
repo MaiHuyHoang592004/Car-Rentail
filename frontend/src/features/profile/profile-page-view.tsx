@@ -9,8 +9,14 @@ import { EmptyState } from "@/components/rentflow/empty-state";
 import { PageHeader } from "@/components/rentflow/page-header";
 import { PageSkeleton } from "@/components/rentflow/page-skeleton";
 import { StatusBadge } from "@/components/rentflow/status-badge";
-import type { ProfileFormErrors, ProfileFormState, ProfileViewModel } from "@/features/profile/types";
-import { resendVerificationEmail, updateProfile } from "@/features/profile/api";
+import type {
+  ChangePasswordFormErrors,
+  ChangePasswordFormState,
+  ProfileFormErrors,
+  ProfileFormState,
+  ProfileViewModel,
+} from "@/features/profile/types";
+import { changePassword, resendVerificationEmail, updateProfile } from "@/features/profile/api";
 import { AccountCompletionCard } from "@/features/onboarding/account-completion-card";
 import { SessionExpiredState, useAuthenticatedProfile } from "@/features/profile/use-authenticated-profile";
 import { ApiError } from "@/lib/api-error";
@@ -34,6 +40,26 @@ function validateProfileForm(form: ProfileFormState): ProfileFormErrors {
     } else if (dob > now) {
       errors.dateOfBirth = "Ngày sinh không được nằm trong tương lai.";
     }
+  }
+
+  return errors;
+}
+
+function validateChangePasswordForm(form: ChangePasswordFormState): ChangePasswordFormErrors {
+  const errors: ChangePasswordFormErrors = {};
+
+  if (!form.currentPassword) {
+    errors.currentPassword = "Vui lòng nhập mật khẩu hiện tại.";
+  }
+  if (!form.newPassword) {
+    errors.newPassword = "Vui lòng nhập mật khẩu mới.";
+  } else if (form.newPassword.length < 8) {
+    errors.newPassword = "Mật khẩu mới phải có ít nhất 8 ký tự.";
+  }
+  if (!form.confirmPassword) {
+    errors.confirmPassword = "Vui lòng xác nhận mật khẩu mới.";
+  } else if (form.confirmPassword !== form.newPassword) {
+    errors.confirmPassword = "Mật khẩu xác nhận không khớp.";
   }
 
   return errors;
@@ -79,6 +105,12 @@ function ProfileContent({ profile }: { profile: ProfileViewModel }) {
   });
   const [errors, setErrors] = useState<ProfileFormErrors>({});
   const [banner, setBanner] = useState<string>("");
+  const [passwordForm, setPasswordForm] = useState<ChangePasswordFormState>({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [passwordErrors, setPasswordErrors] = useState<ChangePasswordFormErrors>({});
 
   const { mutate: doUpdate, isPending: saving } = useMutation({
     mutationFn: updateProfile,
@@ -97,6 +129,23 @@ function ProfileContent({ profile }: { profile: ProfileViewModel }) {
     },
     onError: (error) => {
       toast.error(friendlyResendError(error));
+    },
+  });
+  const { mutate: doChangePassword, isPending: changingPassword } = useMutation({
+    mutationFn: changePassword,
+    onSuccess: () => {
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setPasswordErrors({});
+      toast.success("Đã đổi mật khẩu.");
+    },
+    onError: (error) => {
+      const message = friendlyChangePasswordError(error);
+      setPasswordErrors((prev) => ({ ...prev, form: message }));
+      toast.error(message);
     },
   });
 
@@ -121,6 +170,25 @@ function ProfileContent({ profile }: { profile: ProfileViewModel }) {
       phone: form.phone.trim(),
       dateOfBirth: form.dateOfBirth || null,
       addressLine: form.addressLine.trim(),
+    });
+  }
+
+  function updatePasswordField(field: keyof ChangePasswordFormState, value: string) {
+    setPasswordForm((prev) => ({ ...prev, [field]: value }));
+    setPasswordErrors((prev) => ({ ...prev, [field]: undefined, form: undefined }));
+  }
+
+  function handleChangePassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextErrors = validateChangePasswordForm(passwordForm);
+    setPasswordErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    doChangePassword({
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword,
     });
   }
 
@@ -249,6 +317,67 @@ function ProfileContent({ profile }: { profile: ProfileViewModel }) {
             </button>
           </form>
         </section>
+
+        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+          <h2 className="text-lg font-bold text-foreground">Đổi mật khẩu</h2>
+          <form onSubmit={handleChangePassword} noValidate className="mt-4 space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-foreground">Mật khẩu hiện tại</label>
+              <input
+                type="password"
+                aria-label="Mật khẩu hiện tại"
+                value={passwordForm.currentPassword}
+                onChange={(event) => updatePasswordField("currentPassword", event.target.value)}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+              />
+              {passwordErrors.currentPassword ? (
+                <p className="mt-1 text-xs text-rose-700">{passwordErrors.currentPassword}</p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-foreground">Mật khẩu mới</label>
+                <input
+                  type="password"
+                  aria-label="Mật khẩu mới"
+                  value={passwordForm.newPassword}
+                  onChange={(event) => updatePasswordField("newPassword", event.target.value)}
+                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+                />
+                {passwordErrors.newPassword ? (
+                  <p className="mt-1 text-xs text-rose-700">{passwordErrors.newPassword}</p>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-foreground">Xác nhận mật khẩu mới</label>
+                <input
+                  type="password"
+                  aria-label="Xác nhận mật khẩu mới"
+                  value={passwordForm.confirmPassword}
+                  onChange={(event) => updatePasswordField("confirmPassword", event.target.value)}
+                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+                />
+                {passwordErrors.confirmPassword ? (
+                  <p className="mt-1 text-xs text-rose-700">{passwordErrors.confirmPassword}</p>
+                ) : null}
+              </div>
+            </div>
+
+            {passwordErrors.form ? (
+              <p className="text-sm text-rose-700">{passwordErrors.form}</p>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={changingPassword}
+              className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {changingPassword ? "Đang đổi mật khẩu..." : "Đổi mật khẩu"}
+            </button>
+          </form>
+        </section>
       </div>
     </AppShell>
   );
@@ -265,4 +394,14 @@ function friendlyResendError(error: unknown): string {
     return "Chưa gửi được email xác minh. Vui lòng thử lại sau.";
   }
   return "Không thể gửi lại email xác minh. Vui lòng thử lại.";
+}
+
+function friendlyChangePasswordError(error: unknown): string {
+  if (error instanceof ApiError && (error.status === 401 || error.code === "AUTH_INVALID_CREDENTIALS")) {
+    return "Mật khẩu hiện tại không đúng.";
+  }
+  if (error instanceof ApiError && error.status === 403) {
+    return "Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.";
+  }
+  return "Không thể đổi mật khẩu. Vui lòng thử lại.";
 }

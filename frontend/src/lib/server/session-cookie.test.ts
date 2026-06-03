@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.stubEnv("NODE_ENV", "test");
+vi.stubEnv("COOKIE_SECURE", "");
 
 const { NextResponse } = await import("next/server");
 const {
@@ -38,6 +39,24 @@ describe("session-cookie helpers", () => {
     setRefreshCookie(res, "token");
     const sc = res.headers.get("set-cookie") ?? "";
     expect(sc.toLowerCase()).not.toContain("secure");
+  });
+
+  it("sets Secure flag when COOKIE_SECURE=true", () => {
+    vi.stubEnv("COOKIE_SECURE", "true");
+    const res = NextResponse.json({});
+    setRefreshCookie(res, "token");
+    const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc).toContain("Secure");
+    vi.stubEnv("COOKIE_SECURE", "");
+  });
+
+  it("omits Secure flag when COOKIE_SECURE=false", () => {
+    vi.stubEnv("COOKIE_SECURE", "false");
+    const res = NextResponse.json({});
+    setRefreshCookie(res, "token");
+    const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc.toLowerCase()).not.toContain("secure");
+    vi.stubEnv("COOKIE_SECURE", "");
   });
 
   it("setRoleCookie joins roles with comma and sets httpOnly 7-day cookie", () => {

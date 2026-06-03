@@ -59,7 +59,7 @@ export function CancelBookingDialog({
         aria-modal="true"
         className="w-full max-w-lg rounded-xl border border-border bg-card p-5 shadow-lg"
       >
-        <h3 className="text-lg font-bold text-foreground">Cancel Booking</h3>
+        <h3 className="text-lg font-bold text-foreground">Xác nhận hủy đơn</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           {buildCancelDescription(status)}
         </p>
@@ -83,7 +83,7 @@ export function CancelBookingDialog({
         <form onSubmit={form.handleSubmit(handleConfirm)}>
           <div className="mt-4">
             <label className="mb-1 block text-sm font-semibold text-foreground">
-              Reason (optional, max 500 chars)
+              Lý do hủy đơn (không bắt buộc, tối đa 500 ký tự)
             </label>
             <textarea
               {...form.register("reason")}
@@ -91,7 +91,7 @@ export function CancelBookingDialog({
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Character count (sanitized): {sanitizeCancellationReason(reason).length}/500
+              Số ký tự sau khi chuẩn hóa: {sanitizeCancellationReason(reason).length}/500
             </p>
           </div>
 
@@ -107,13 +107,13 @@ export function CancelBookingDialog({
               onClick={onClose}
               className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
             >
-              Keep booking
+              Giữ lại đơn
             </button>
             <button
               type="submit"
               className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
             >
-              Confirm cancel
+              Xác nhận hủy đơn
             </button>
           </div>
         </form>

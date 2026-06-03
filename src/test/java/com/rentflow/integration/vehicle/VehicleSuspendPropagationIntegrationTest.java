@@ -89,9 +89,12 @@ class VehicleSuspendPropagationIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUSPENDED"));
 
-        // The active listing must now be SUSPENDED
-        assertThat(listingRepository.findById(UUID.fromString(listing1Id)).orElseThrow().getStatus())
-                .isEqualTo(ListingStatus.SUSPENDED);
+        // The active listing must now be SUSPENDED with vehicle-driven metadata.
+        var listing = listingRepository.findById(UUID.fromString(listing1Id)).orElseThrow();
+        assertThat(listing.getStatus()).isEqualTo(ListingStatus.SUSPENDED);
+        assertThat(listing.getSuspensionReason()).isEqualTo("Vehicle moved to SUSPENDED");
+        assertThat(listing.getSuspensionSource()).isEqualTo("VEHICLE_STATUS_CHANGE");
+        assertThat(listing.getSuspensionUntil()).isNull();
     }
 
     @Test
@@ -115,8 +118,11 @@ class VehicleSuspendPropagationIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("MAINTENANCE"));
 
-        assertThat(listingRepository.findById(UUID.fromString(listingId)).orElseThrow().getStatus())
-                .isEqualTo(ListingStatus.SUSPENDED);
+        var listing = listingRepository.findById(UUID.fromString(listingId)).orElseThrow();
+        assertThat(listing.getStatus()).isEqualTo(ListingStatus.SUSPENDED);
+        assertThat(listing.getSuspensionReason()).isEqualTo("Vehicle moved to MAINTENANCE");
+        assertThat(listing.getSuspensionSource()).isEqualTo("VEHICLE_STATUS_CHANGE");
+        assertThat(listing.getSuspensionUntil()).isNull();
     }
 
     @Test

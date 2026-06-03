@@ -268,7 +268,7 @@ class ListingLifecycleIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void hostListingDetail_keepsSuspendedListingReadableWhenMetadataMissing() throws Exception {
+    void hostListingDetail_returnsVehicleSuspensionMetadataForAutoSuspendedListing() throws Exception {
         String vehicleId = createVehicle();
         String listingId = createListing(vehicleId, "My Listing");
 
@@ -292,8 +292,8 @@ class ListingLifecycleIntegrationTest extends BaseIntegrationTest {
                         .header("Authorization", "Bearer " + hostToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUSPENDED"))
-                .andExpect(jsonPath("$.suspensionReason").doesNotExist())
-                .andExpect(jsonPath("$.suspensionSource").doesNotExist())
+                .andExpect(jsonPath("$.suspensionReason").value("Vehicle moved to SUSPENDED"))
+                .andExpect(jsonPath("$.suspensionSource").value("VEHICLE_STATUS_CHANGE"))
                 .andExpect(jsonPath("$.suspensionUntil").doesNotExist());
     }
 
@@ -344,7 +344,10 @@ class ListingLifecycleIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(post("/api/v1/host/listings/" + listingId + "/resume")
                         .header("Authorization", "Bearer " + hostToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ACTIVE"));
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.suspensionReason").doesNotExist())
+                .andExpect(jsonPath("$.suspensionSource").doesNotExist())
+                .andExpect(jsonPath("$.suspensionUntil").doesNotExist());
     }
 
     @Test

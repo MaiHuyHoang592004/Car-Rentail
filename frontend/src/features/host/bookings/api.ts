@@ -31,6 +31,9 @@ type RawHostBookingResponse = {
   cancellationReason?: string | null;
   voidRetryRequired?: boolean;
   paymentRetryState?: string | null;
+  paymentStatus?: string | null;
+  voidRetryLastError?: string | null;
+  voidRetryCount?: number | null;
   createdAt: string;
 };
 
@@ -47,6 +50,9 @@ type RawHostBookingSummary = {
   currency: string;
   voidRetryRequired?: boolean;
   paymentRetryState?: string | null;
+  paymentStatus?: string | null;
+  voidRetryLastError?: string | null;
+  voidRetryCount?: number | null;
   createdAt: string;
 };
 
@@ -132,6 +138,7 @@ function mapSummary(raw: RawHostBookingSummary): BookingSummaryViewModel {
     status: raw.status,
     listingId: raw.listingId,
     listingTitle: raw.listingTitle,
+    createdAt: raw.createdAt,
     pickupDate: raw.pickupDate,
     returnDate: raw.returnDate,
     holdExpiresAt: raw.holdExpiresAt ?? undefined,
@@ -140,6 +147,9 @@ function mapSummary(raw: RawHostBookingSummary): BookingSummaryViewModel {
     currency: raw.currency,
     voidRetryRequired: raw.voidRetryRequired ?? false,
     paymentRetryState: raw.paymentRetryState ?? undefined,
+    paymentStatus: raw.paymentStatus ?? undefined,
+    voidRetryLastError: raw.voidRetryLastError ?? undefined,
+    voidRetryCount: raw.voidRetryCount ?? undefined,
   };
 }
 
@@ -149,6 +159,7 @@ function mapDetail(raw: RawHostBookingResponse): BookingDetailViewModel {
     status: raw.status,
     listingId: raw.listingId,
     listingTitle: raw.listingTitle,
+    createdAt: raw.createdAt,
     customerId: raw.customerId,
     hostId: raw.hostId,
     pickupDate: raw.pickupDate,
@@ -163,6 +174,9 @@ function mapDetail(raw: RawHostBookingResponse): BookingDetailViewModel {
     rejectionReason: raw.rejectionReason ?? undefined,
     voidRetryRequired: raw.voidRetryRequired ?? false,
     paymentRetryState: raw.paymentRetryState ?? undefined,
+    paymentStatus: raw.paymentStatus ?? undefined,
+    voidRetryLastError: raw.voidRetryLastError ?? undefined,
+    voidRetryCount: raw.voidRetryCount ?? undefined,
     priceSnapshot: parsePriceSnapshot(raw.priceSnapshot, raw.currency),
     policySnapshot: parsePolicySnapshot(raw.policySnapshot),
   };

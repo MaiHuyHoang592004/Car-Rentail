@@ -1,18 +1,28 @@
 package com.rentflow.trip.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rentflow.audit.service.AuditLogService;
 import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.booking.service.BookingTimelineService;
 import com.rentflow.common.exception.BusinessRuleException;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.entity.ListingStatus;
 import com.rentflow.listing.repository.ListingRepository;
+import com.rentflow.outbox.service.OutboxService;
+import com.rentflow.payment.entity.BookingPayment;
+import com.rentflow.payment.entity.PaymentStatus;
+import com.rentflow.payment.repository.BookingPaymentRepository;
 import com.rentflow.payment.service.TripPaymentCaptureService;
 import com.rentflow.trip.dto.CheckInRequest;
 import com.rentflow.trip.dto.CheckOutRequest;
 import com.rentflow.trip.dto.TripRecordResponse;
+import com.rentflow.trip.entity.TripCheckoutFinalizationFailure;
+import com.rentflow.trip.entity.TripCheckoutFinalizationFailureStatus;
 import com.rentflow.trip.entity.TripRecord;
+import com.rentflow.trip.repository.TripCheckoutFinalizationFailureRepository;
 import com.rentflow.trip.repository.TripRecordRepository;
 import com.rentflow.vehicle.entity.Vehicle;
 import com.rentflow.vehicle.entity.VehicleStatus;
@@ -40,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,8 +62,13 @@ class TripServiceTest {
     @Mock private ListingRepository listingRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private TripRecordRepository tripRecordRepository;
+    @Mock private TripCheckoutFinalizationFailureRepository checkoutFailureRepository;
+    @Mock private BookingPaymentRepository bookingPaymentRepository;
     @Mock private TripPaymentCaptureService tripPaymentCaptureService;
     @Mock private SecurityContext securityContext;
+    @Mock private BookingTimelineService bookingTimelineService;
+    @Mock private AuditLogService auditLogService;
+    @Mock private OutboxService outboxService;
 
     private TripService tripService;
     private Clock clock;
@@ -67,10 +83,17 @@ class TripServiceTest {
                 listingRepository,
                 vehicleRepository,
                 tripRecordRepository,
+                checkoutFailureRepository,
+                bookingPaymentRepository,
                 tripPaymentCaptureService,
                 securityContext,
+                bookingTimelineService,
+                auditLogService,
+                outboxService,
+                new ObjectMapper(),
                 clock,
                 transactionManager());
+        lenient().when(bookingPaymentRepository.findByBookingId(any())).thenReturn(Optional.empty());
     }
 
     @Test
@@ -173,8 +196,70 @@ class TripServiceTest {
         assertThat(record.getCheckOutAt()).isNull();
         assertThat(record.getCheckOutOdometer()).isNull();
         verify(tripPaymentCaptureService).captureRemainingForBooking(bookingId);
+        verify(checkoutFailureRepository).save(any(TripCheckoutFinalizationFailure.class));
+        verify(outboxService).append(
+                org.mockito.ArgumentMatchers.eq("BOOKING"),
+                org.mockito.ArgumentMatchers.eq(bookingId),
+                org.mockito.ArgumentMatchers.eq("TRIP_CHECKOUT_FINALIZATION_FAILED_AFTER_CAPTURE"),
+                any());
         verify(tripRecordRepository, never()).save(any(TripRecord.class));
         verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    @Test
+    void repairFailedCheckOutCompletesTripFromStoredSnapshot() {
+        UUID bookingId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID listingId = UUID.randomUUID();
+        UUID paymentId = UUID.randomUUID();
+        Booking booking = booking(bookingId, customerId, listingId, BookingStatus.IN_PROGRESS);
+        TripRecord record = new TripRecord();
+        record.setId(UUID.randomUUID());
+        record.setBookingId(bookingId);
+        record.setCustomerId(customerId);
+        record.setCheckInAt(Instant.parse("2026-05-28T00:00:00Z"));
+        record.setCheckInOdometer(12345);
+        record.setCheckInFuelLevel(80);
+
+        BookingPayment payment = new BookingPayment();
+        payment.setId(paymentId);
+        payment.setBookingId(bookingId);
+        payment.setStatus(PaymentStatus.CAPTURED);
+
+        TripCheckoutFinalizationFailure failure = new TripCheckoutFinalizationFailure();
+        failure.setId(UUID.randomUUID());
+        failure.setBookingId(bookingId);
+        failure.setTripRecordId(record.getId());
+        failure.setActorUserId(customerId);
+        failure.setCapturedPaymentId(paymentId);
+        failure.setCheckInOdometer(12345);
+        failure.setCheckOutOdometer(12500);
+        failure.setCheckOutFuelLevel(70);
+        failure.setCheckOutNote("end trip");
+        failure.setStatus(TripCheckoutFinalizationFailureStatus.PENDING);
+        failure.setAttempts(0);
+
+        when(checkoutFailureRepository.findFirstByBookingIdAndStatusOrderByCreatedAtDesc(
+                bookingId,
+                TripCheckoutFinalizationFailureStatus.PENDING))
+                .thenReturn(Optional.of(failure));
+        when(bookingPaymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+        when(bookingRepository.findByIdForUpdate(bookingId)).thenReturn(Optional.of(booking));
+        when(tripRecordRepository.findByBookingIdForUpdate(bookingId)).thenReturn(Optional.of(record));
+        when(tripRecordRepository.save(any(TripRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TripRecordResponse response = tripService.repairFailedCheckOut(bookingId);
+
+        assertThat(response.bookingStatus()).isEqualTo(BookingStatus.COMPLETED);
+        assertThat(record.getCheckOutOdometer()).isEqualTo(12500);
+        assertThat(failure.getStatus()).isEqualTo(TripCheckoutFinalizationFailureStatus.RESOLVED);
+        assertThat(failure.getAttempts()).isEqualTo(1);
+        verify(outboxService).append(
+                org.mockito.ArgumentMatchers.eq("BOOKING"),
+                org.mockito.ArgumentMatchers.eq(bookingId),
+                org.mockito.ArgumentMatchers.eq("TRIP_CHECKOUT_FINALIZATION_REPAIR_RESOLVED"),
+                any());
     }
 
     private Booking booking(UUID bookingId, UUID customerId, UUID listingId, BookingStatus status) {

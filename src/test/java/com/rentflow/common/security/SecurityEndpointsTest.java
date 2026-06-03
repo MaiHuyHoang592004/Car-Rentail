@@ -142,6 +142,13 @@ class SecurityEndpointsTest {
     }
 
     @Test
+    void logoutAll_withoutToken_returns401() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout-all"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    @Test
     void paymentBanksEndpoint_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/payment-banks"))
                 .andExpect(status().isUnauthorized())
@@ -226,6 +233,54 @@ class SecurityEndpointsTest {
     }
 
     @Test
+    void cancelPreviewEndpoint_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/bookings/{id}/cancel-preview",
+                        UUID.fromString("11111111-1111-4111-8111-111111111111")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void paymentMutationEndpoints_withoutToken_return401() throws Exception {
+        UUID paymentId = UUID.fromString("11111111-1111-4111-8111-111111111111");
+
+        mockMvc.perform(post("/api/v1/payments/{id}/capture", paymentId)
+                        .header("Idempotency-Key", "8b71f8d2-9e1d-4f7a-bbe6-334c3816df91")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":1000.00}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+
+        mockMvc.perform(post("/api/v1/payments/{id}/void", paymentId)
+                        .header("Idempotency-Key", "8b71f8d2-9e1d-4f7a-bbe6-334c3816df91"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+
+        mockMvc.perform(post("/api/v1/payments/{id}/refund", paymentId)
+                        .header("Idempotency-Key", "8b71f8d2-9e1d-4f7a-bbe6-334c3816df91")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":500.00,\"reason\":\"Manual refund\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void paymentMutationEndpoints_customerOrHostToken_return403() throws Exception {
+        UUID paymentId = UUID.fromString("11111111-1111-4111-8111-111111111111");
+        String customerToken = tokenProvider.generateAccessToken(
+                UUID.randomUUID(),
+                "customer-payment-mutation@example.com",
+                java.util.List.of(Role.CUSTOMER));
+        String hostToken = tokenProvider.generateAccessToken(
+                UUID.randomUUID(),
+                "host-payment-mutation@example.com",
+                java.util.List.of(Role.HOST));
+
+        assertPaymentMutationForbidden(paymentId, customerToken);
+        assertPaymentMutationForbidden(paymentId, hostToken);
+    }
+
+    @Test
     void verifyEmailEndpoint_isPublicAndDoesNotReturn401Or403() throws Exception {
         mockMvc.perform(post("/api/v1/auth/verify-email")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -252,5 +307,29 @@ class SecurityEndpointsTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
+    }
+
+    private void assertPaymentMutationForbidden(UUID paymentId, String token) throws Exception {
+        mockMvc.perform(post("/api/v1/payments/{id}/capture", paymentId)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Idempotency-Key", "8b71f8d2-9e1d-4f7a-bbe6-334c3816df91")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":1000.00}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mockMvc.perform(post("/api/v1/payments/{id}/void", paymentId)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Idempotency-Key", "8b71f8d2-9e1d-4f7a-bbe6-334c3816df91"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mockMvc.perform(post("/api/v1/payments/{id}/refund", paymentId)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Idempotency-Key", "8b71f8d2-9e1d-4f7a-bbe6-334c3816df91")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":500.00,\"reason\":\"Manual refund\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 }

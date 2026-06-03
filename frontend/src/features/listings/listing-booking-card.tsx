@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Info, MapPin } from "lucide-react";
 
+import { getDateOnlyRangeDays } from "@/features/bookings/date-utils";
 import { formatMoney } from "@/lib/formatters";
 import { getCancellationPolicyLabel } from "@/lib/display-labels";
 import type { ListingDetailViewModel } from "@/features/listings/types";
@@ -12,21 +13,13 @@ type ListingBookingCardProps = {
   listing: ListingDetailViewModel;
 };
 
-function calcDays(pickup: string, ret: string): number | null {
-  if (!pickup || !ret) return null;
-  const a = Date.parse(pickup);
-  const b = Date.parse(ret);
-  if (isNaN(a) || isNaN(b) || b <= a) return null;
-  return Math.round((b - a) / 86400000);
-}
-
 export function ListingBookingCard({ listing }: ListingBookingCardProps) {
   const router = useRouter();
   const [pickup, setPickup] = useState("");
   const [ret, setRet] = useState("");
   const [dateError, setDateError] = useState(false);
 
-  const days = calcDays(pickup, ret);
+  const days = getDateOnlyRangeDays(pickup, ret);
   const dateRangeInvalid = dateError && pickup && ret && ret <= pickup;
   const rentalTotal = days != null ? listing.basePricePerDay * days : 0;
   const serviceFee = days != null ? Math.round(rentalTotal * 0.05) : 0;

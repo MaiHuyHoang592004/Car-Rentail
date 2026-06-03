@@ -11,6 +11,7 @@ public class RateLimitProperties {
 
     private boolean enabled = true;
     private Login login = new Login();
+    private Register register = new Register();
     private Booking booking = new Booking();
     private PublicEndpoint publicEndpoint = new PublicEndpoint();
 
@@ -36,6 +37,14 @@ public class RateLimitProperties {
 
     public void setBooking(Booking booking) {
         this.booking = booking;
+    }
+
+    public Register getRegister() {
+        return register;
+    }
+
+    public void setRegister(Register register) {
+        this.register = register;
     }
 
     public PublicEndpoint getPublicEndpoint() {
@@ -85,6 +94,27 @@ public class RateLimitProperties {
 
         public void setCreateWindow(Duration createWindow) {
             this.createWindow = createWindow;
+        }
+    }
+
+    public static class Register {
+        private int limit = 5;
+        private Duration window = Duration.ofMinutes(15);
+
+        public int getLimit() {
+            return limit;
+        }
+
+        public void setLimit(int limit) {
+            this.limit = limit;
+        }
+
+        public Duration getWindow() {
+            return window;
+        }
+
+        public void setWindow(Duration window) {
+            this.window = window;
         }
     }
 

@@ -1,5 +1,6 @@
 import { api } from "@/lib/api-client";
 import type {
+  BookingCancellationPreview,
   BookingDetailViewModel,
   BookingPolicySnapshot,
   BookingPriceSnapshot,
@@ -47,13 +48,10 @@ type RawBookingResponse = {
   rejectionReason?: string | null;
   voidRetryRequired?: boolean;
   paymentRetryState?: string | null;
-  cancellationPreview?: {
-    eligible: boolean;
-    refundableAmount: number | string;
-    penaltyAmount: number | string;
-    currency: string;
-    policy: "FLEXIBLE" | "MODERATE" | "STRICT";
-  } | null;
+  paymentStatus?: string | null;
+  voidRetryLastError?: string | null;
+  voidRetryCount?: number | null;
+  cancellationPreview?: RawCancellationPreview | null;
   reviewEligible?: boolean;
   reviewSubmitted?: boolean;
   disputeEligible?: boolean;
@@ -74,7 +72,18 @@ type RawSummaryResponse = {
   currency: string;
   voidRetryRequired?: boolean;
   paymentRetryState?: string | null;
+  paymentStatus?: string | null;
+  voidRetryLastError?: string | null;
+  voidRetryCount?: number | null;
   createdAt: string;
+};
+
+type RawCancellationPreview = {
+  eligible: boolean;
+  refundableAmount: number | string;
+  penaltyAmount: number | string;
+  currency: string;
+  policy: "FLEXIBLE" | "MODERATE" | "STRICT";
 };
 
 type RawPageResponse<T> = {
@@ -97,7 +106,7 @@ export type CancelBookingResult = {
   id: string;
   status: BookingStatus;
   cancellationReason: string | null;
-  cancelled: boolean;
+  cancellationCompleted: boolean;
   voidRetryRequired: boolean;
   code: string | null;
   paymentRetryState: string | null;
@@ -163,12 +172,23 @@ function parsePolicySnapshot(raw: unknown): BookingPolicySnapshot {
   };
 }
 
+function mapCancellationPreview(raw: RawCancellationPreview): BookingCancellationPreview {
+  return {
+    eligible: Boolean(raw.eligible),
+    refundableAmount: toNumber(raw.refundableAmount),
+    penaltyAmount: toNumber(raw.penaltyAmount),
+    currency: raw.currency,
+    policy: raw.policy,
+  };
+}
+
 function mapBookingResponse(raw: RawBookingResponse): BookingDetailViewModel {
   return {
     id: raw.id,
     status: raw.status,
     listingId: raw.listingId,
     listingTitle: raw.listingTitle,
+    createdAt: raw.createdAt,
     customerId: raw.customerId,
     hostId: raw.hostId,
     pickupDate: raw.pickupDate,
@@ -183,17 +203,12 @@ function mapBookingResponse(raw: RawBookingResponse): BookingDetailViewModel {
     rejectionReason: raw.rejectionReason ?? undefined,
     voidRetryRequired: raw.voidRetryRequired ?? false,
     paymentRetryState: raw.paymentRetryState ?? undefined,
+    paymentStatus: raw.paymentStatus ?? undefined,
+    voidRetryLastError: raw.voidRetryLastError ?? undefined,
+    voidRetryCount: raw.voidRetryCount ?? undefined,
     priceSnapshot: parsePriceSnapshot(raw.priceSnapshot, raw.currency),
     policySnapshot: parsePolicySnapshot(raw.policySnapshot),
-    cancellationPreview: raw.cancellationPreview
-      ? {
-          eligible: Boolean(raw.cancellationPreview.eligible),
-          refundableAmount: toNumber(raw.cancellationPreview.refundableAmount),
-          penaltyAmount: toNumber(raw.cancellationPreview.penaltyAmount),
-          currency: raw.cancellationPreview.currency,
-          policy: raw.cancellationPreview.policy,
-        }
-      : undefined,
+    cancellationPreview: raw.cancellationPreview ? mapCancellationPreview(raw.cancellationPreview) : undefined,
     reviewEligible: raw.reviewEligible ?? false,
     reviewSubmitted: raw.reviewSubmitted ?? false,
     disputeEligible: raw.disputeEligible ?? false,
@@ -207,6 +222,7 @@ function mapSummaryResponse(raw: RawSummaryResponse): BookingSummaryViewModel {
     status: raw.status,
     listingId: raw.listingId,
     listingTitle: raw.listingTitle,
+    createdAt: raw.createdAt,
     pickupDate: raw.pickupDate,
     returnDate: raw.returnDate,
     holdExpiresAt: raw.holdExpiresAt ?? undefined,
@@ -215,6 +231,9 @@ function mapSummaryResponse(raw: RawSummaryResponse): BookingSummaryViewModel {
     currency: raw.currency,
     voidRetryRequired: raw.voidRetryRequired ?? false,
     paymentRetryState: raw.paymentRetryState ?? undefined,
+    paymentStatus: raw.paymentStatus ?? undefined,
+    voidRetryLastError: raw.voidRetryLastError ?? undefined,
+    voidRetryCount: raw.voidRetryCount ?? undefined,
   };
 }
 
@@ -244,6 +263,11 @@ export async function createBooking(
 export async function getBookingById(id: string): Promise<BookingDetailViewModel> {
   const raw = await api.get<RawBookingResponse>(`/bookings/${id}`);
   return mapBookingResponse(raw);
+}
+
+export async function getCancelPreview(id: string): Promise<BookingCancellationPreview> {
+  const raw = await api.get<RawCancellationPreview>(`/bookings/${id}/cancel-preview`);
+  return mapCancellationPreview(raw);
 }
 
 export async function listMyBookings(
@@ -291,7 +315,7 @@ export async function cancelBooking(
     id: string;
     status: BookingStatus;
     cancellationReason: string | null;
-    cancelled?: boolean;
+    cancellationCompleted?: boolean;
     voidRetryRequired?: boolean;
     code?: string | null;
     paymentRetryState?: string | null;
@@ -300,7 +324,7 @@ export async function cancelBooking(
     id: raw.id,
     status: raw.status,
     cancellationReason: raw.cancellationReason,
-    cancelled: raw.cancelled ?? raw.status === "CANCELLED",
+    cancellationCompleted: raw.cancellationCompleted ?? raw.status === "CANCELLED",
     voidRetryRequired: raw.voidRetryRequired ?? false,
     code: raw.code ?? null,
     paymentRetryState: raw.paymentRetryState ?? null,

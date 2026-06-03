@@ -21,6 +21,14 @@ function isoToUtcMs(iso: string): number {
   return Date.UTC(y, m - 1, d);
 }
 
+export function getDateOnlyRangeDays(pickupDate: string, returnDate: string): number | null {
+  if (!pickupDate || !returnDate) return null;
+  if (!isValidIsoDate(pickupDate) || !isValidIsoDate(returnDate)) return null;
+  const diff = isoToUtcMs(returnDate) - isoToUtcMs(pickupDate);
+  if (diff <= 0) return null;
+  return diff / DAY_IN_MS;
+}
+
 function isValidIsoDate(iso: string): boolean {
   if (!ISO_DATE_PATTERN.test(iso)) return false;
   const [y, m, d] = iso.split("-").map(Number);
@@ -64,8 +72,11 @@ export function validateBookingForm(
     return errors;
   }
 
-  const rentalDays =
-    (isoToUtcMs(form.returnDate) - isoToUtcMs(form.pickupDate)) / DAY_IN_MS;
+  const rentalDays = getDateOnlyRangeDays(form.pickupDate, form.returnDate);
+  if (rentalDays === null) {
+    errors.form = "Định dạng ngày không hợp lệ.";
+    return errors;
+  }
   if (rentalDays > MAX_RENTAL_DAYS) {
     errors.returnDate = `Thời gian thuê tối đa ${MAX_RENTAL_DAYS} ngày.`;
   }

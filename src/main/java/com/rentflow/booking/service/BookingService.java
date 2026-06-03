@@ -213,6 +213,33 @@ public class BookingService {
         return bookingMapper.toResponse(booking);
     }
 
+    @Transactional(readOnly = true)
+    public CancellationPreviewResponse getCancelPreview(UUID id) {
+        UUID currentUserId = securityContext.currentUserId();
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new BookingNotFoundException(String.valueOf(id)));
+
+        if (!canCancelBooking(booking, currentUserId)) {
+            throw new BookingNotFoundException(String.valueOf(id));
+        }
+
+        BigDecimal totalAmount = readTotalAmount(booking);
+        String currency = readCurrency(booking);
+        CancellationPolicy policy = readCancellationPolicy(booking);
+        if (booking.getStatus() == BookingStatus.HELD
+                || booking.getStatus() == BookingStatus.PENDING_HOST_APPROVAL) {
+            return new CancellationPreviewResponse(true, totalAmount, BigDecimal.ZERO, currency, policy);
+        }
+        if (booking.getStatus() == BookingStatus.CONFIRMED) {
+            validateBeforePickup(booking);
+            CancellationPolicyCalculator.CancellationPolicyResult calc =
+                    cancellationPolicyCalculator.calculate(policy, booking.getPickupDate(), totalAmount);
+            return new CancellationPreviewResponse(true, calc.refundAmount(), calc.penaltyAmount(), currency, policy);
+        }
+
+        throw new BusinessRuleException("BOOKING_INVALID_STATUS", "Booking cannot be cancelled in its current status");
+    }
+
     @Transactional
     public BookingResponse patchBookingLocations(UUID id, PatchBookingLocationRequest request) {
         UUID currentUserId = securityContext.currentUserId();
@@ -349,6 +376,7 @@ public class BookingService {
 
     private CancellationProviderResults executeCancellationProviderActions(PreparedCancellation prepared) {
         CaptureResult captureResult = null;
+        boolean captureFinalized = false;
         if (prepared.captureAction() != null) {
             try {
                 captureResult = paymentProviderRouter.route(PaymentProviderType.COREBANK)
@@ -366,6 +394,13 @@ public class BookingService {
                         e.getMessage());
                 throw e;
             }
+            CaptureResult completedCapture = captureResult;
+            FinalizedCancellation finalizedCapture = required(transactionTemplate.execute(status ->
+                    finalizeCancellationCapture(prepared, completedCapture)));
+            if (finalizedCapture.unsafeReason() != null) {
+                throw new BusinessRuleException("PAYMENT_FINALIZATION_UNSAFE", finalizedCapture.unsafeReason());
+            }
+            captureFinalized = true;
         }
 
         VoidResult voidResult = null;
@@ -378,7 +413,42 @@ public class BookingService {
                 voidError = e;
             }
         }
-        return new CancellationProviderResults(captureResult, voidResult, voidError);
+        return new CancellationProviderResults(captureResult, captureFinalized, voidResult, voidError);
+    }
+
+    private FinalizedCancellation finalizeCancellationCapture(
+            PreparedCancellation prepared,
+            CaptureResult captureResult) {
+        Booking booking = bookingRepository.findByIdForUpdate(prepared.bookingId())
+                .orElseThrow(() -> new BookingNotFoundException(String.valueOf(prepared.bookingId())));
+        BookingPayment payment = bookingPaymentRepository.findByBookingIdForUpdate(booking.getId())
+                .orElseThrow(() -> new BusinessRuleException("PAYMENT_NOT_FOUND", "Payment not found for booking"));
+
+        String unsafeReason = validateCancellationFinalizationState(prepared, booking, payment);
+        PaymentTransaction captureTx = paymentTransactionRepository.findByIdForUpdate(prepared.captureAction().transactionId())
+                .orElseThrow(() -> new BusinessRuleException("PAYMENT_TRANSACTION_NOT_FOUND", "Capture transaction not found"));
+        if (unsafeReason != null) {
+            markUnsafe(captureTx, unsafeReason, captureResult.providerMetadataJson(), captureResult.providerJournalId());
+            return FinalizedCancellation.unsafe(
+                    buildCancelResponse(booking, prepared.actorId(), CancelOutcome.completed()),
+                    unsafeReason);
+        }
+
+        unsafeReason = validateCaptureFinalizationState(prepared, payment, captureTx);
+        if (unsafeReason != null) {
+            markUnsafe(captureTx, unsafeReason, captureResult.providerMetadataJson(), captureResult.providerJournalId());
+            return FinalizedCancellation.unsafe(
+                    buildCancelResponse(booking, prepared.actorId(), CancelOutcome.completed()),
+                    unsafeReason);
+        }
+
+        captureTx.setStatus(PaymentTransactionStatus.SUCCEEDED);
+        captureTx.setProviderJournalId(captureResult.providerJournalId());
+        captureTx.setProviderResponse(captureResult.providerMetadataJson());
+        paymentTransactionRepository.save(captureTx);
+        applyCaptureSuccess(payment, captureResult, prepared.penaltyAmount());
+        emitPaymentCapturedSignals(booking, payment, prepared.penaltyAmount());
+        return FinalizedCancellation.completed(buildCancelResponse(booking, prepared.actorId(), CancelOutcome.completed()));
     }
 
     private FinalizedCancellation finalizeCancellation(
@@ -396,7 +466,9 @@ public class BookingService {
             return FinalizedCancellation.unsafe(buildCancelResponse(booking, prepared.actorId(), CancelOutcome.completed()), unsafeReason);
         }
 
-        if (prepared.captureAction() != null && providerResults.captureResult() != null) {
+        if (prepared.captureAction() != null
+                && providerResults.captureResult() != null
+                && !providerResults.captureFinalized()) {
             PaymentTransaction captureTx = paymentTransactionRepository.findByIdForUpdate(prepared.captureAction().transactionId())
                     .orElseThrow(() -> new BusinessRuleException("PAYMENT_TRANSACTION_NOT_FOUND", "Capture transaction not found"));
             unsafeReason = validateCaptureFinalizationState(prepared, payment, captureTx);
@@ -508,7 +580,9 @@ public class BookingService {
             PreparedCancellation prepared,
             String unsafeReason,
             CancellationProviderResults providerResults) {
-        if (prepared.captureAction() != null && providerResults.captureResult() != null) {
+        if (prepared.captureAction() != null
+                && providerResults.captureResult() != null
+                && !providerResults.captureFinalized()) {
             paymentTransactionRepository.findByIdForUpdate(prepared.captureAction().transactionId())
                     .ifPresent(tx -> markUnsafe(tx, unsafeReason,
                             providerResults.captureResult().providerMetadataJson(),
@@ -661,25 +735,6 @@ public class BookingService {
                 || securityContext.hasRole(Role.ADMIN);
     }
 
-    private CancelOutcome cancelByState(
-            Booking booking,
-            BookingPayment payment,
-            List<AvailabilityCalendar> availabilityRows,
-            String cancellationReason) {
-        BookingStatus status = booking.getStatus();
-        if (status == BookingStatus.HELD) {
-            return cancelHeld(booking, availabilityRows, cancellationReason);
-        } else if (status == BookingStatus.PENDING_HOST_APPROVAL) {
-            return cancelPendingHostApproval(booking, payment, availabilityRows, cancellationReason);
-        } else if (status == BookingStatus.CONFIRMED) {
-            return cancelConfirmed(booking, payment, availabilityRows, cancellationReason);
-        } else {
-            throw new BusinessRuleException(
-                    "BOOKING_INVALID_STATUS",
-                    "Booking cannot be cancelled in its current status");
-        }
-    }
-
     private CancelOutcome cancelHeld(Booking booking, List<AvailabilityCalendar> availabilityRows, String cancellationReason) {
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setCancellationReason(cancellationReason);
@@ -687,65 +742,6 @@ public class BookingService {
         availabilityReserver.releaseHeld(availabilityRows, booking);
         emitCancellationSignals(booking, cancellationReason);
         return CancelOutcome.completed();
-    }
-
-    private CancelOutcome cancelPendingHostApproval(
-            Booking booking,
-            BookingPayment payment,
-            List<AvailabilityCalendar> availabilityRows,
-            String cancellationReason) {
-        validateCancelablePayment(payment);
-        try {
-            VoidResult voidResult = callVoid(payment);
-            applyVoidSuccess(payment, voidResult);
-            emitPaymentVoidedSignals(booking, payment, BigDecimal.ZERO);
-            finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
-            return CancelOutcome.completed();
-        } catch (RuntimeException e) {
-            boolean firstTransitionToRetryRequired = markVoidFailed(payment, e);
-            emitVoidRetryRequiredSignals(booking, payment, firstTransitionToRetryRequired);
-            finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
-            return CancelOutcome.withRetryRequired();
-        }
-    }
-
-    private CancelOutcome cancelConfirmed(
-            Booking booking,
-            BookingPayment payment,
-            List<AvailabilityCalendar> availabilityRows,
-            String cancellationReason) {
-        validateBeforePickup(booking);
-        validateCancelablePayment(payment);
-
-        BigDecimal totalAmount = readTotalAmount(booking);
-        CancellationPolicy policy = readCancellationPolicy(booking);
-        CancellationPolicyCalculator.CancellationPolicyResult calc =
-                cancellationPolicyCalculator.calculate(policy, booking.getPickupDate(), totalAmount);
-
-        if (calc.penaltyAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            VoidResult voidResult = callVoid(payment);
-            applyVoidSuccess(payment, voidResult);
-            emitPaymentVoidedSignals(booking, payment, BigDecimal.ZERO);
-            finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
-            return CancelOutcome.completed();
-        }
-
-        CaptureResult captureResult = callCapture(payment, calc.penaltyAmount());
-        applyCaptureSuccess(payment, captureResult, calc.penaltyAmount());
-        emitPaymentCapturedSignals(booking, payment, calc.penaltyAmount());
-        try {
-            VoidResult voidResult = callVoid(payment);
-            applyVoidSuccess(payment, voidResult);
-            BigDecimal voidedAmount = totalAmount.subtract(calc.penaltyAmount());
-            emitPaymentVoidedSignals(booking, payment, voidedAmount.max(BigDecimal.ZERO));
-            finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
-            return CancelOutcome.completed();
-        } catch (RuntimeException e) {
-            boolean firstTransitionToRetryRequired = markVoidFailed(payment, e);
-            emitVoidRetryRequiredSignals(booking, payment, firstTransitionToRetryRequired);
-            finalizeBookingCancellation(booking, availabilityRows, cancellationReason);
-            return CancelOutcome.withRetryRequired();
-        }
     }
 
     private void validateCancelablePayment(BookingPayment payment) {
@@ -770,89 +766,6 @@ public class BookingService {
         LocalDate today = LocalDate.now(clock);
         if (!today.isBefore(booking.getPickupDate())) {
             throw new BusinessRuleException("BOOKING_INVALID_STATUS", "Booking cannot be cancelled after check-in date");
-        }
-    }
-
-    private CaptureResult callCapture(BookingPayment payment, BigDecimal amount) {
-        String correlationId = correlationIdHelper.getOrGenerate();
-        String requestId = UUID.randomUUID().toString();
-        PaymentTransaction tx = new PaymentTransaction();
-        tx.setBookingPaymentId(payment.getId());
-        tx.setBookingId(payment.getBookingId());
-        tx.setType(PaymentTransactionType.CAPTURE);
-        tx.setStatus(PaymentTransactionStatus.PENDING);
-        tx.setAmount(amount);
-        tx.setCurrency(payment.getCurrency());
-        tx.setProvider(payment.getProvider());
-        tx.setProviderRequestId(requestId);
-        tx.setProviderRef(payment.getProviderPaymentOrderId());
-        tx = paymentTransactionRepository.save(tx);
-
-        try {
-            CaptureResult result = paymentProviderRouter.route(PaymentProviderType.COREBANK).capture(new CaptureCommand(
-                    "rentflow:cancel:capture:" + payment.getId() + ":" + requestId,
-                    payment.getProviderPaymentOrderId(),
-                    amount,
-                    payment.getCurrency(),
-                    correlationId,
-                    requestId,
-                    payment.getId().toString(),
-                    correlationId));
-            tx.setStatus(PaymentTransactionStatus.SUCCEEDED);
-            tx.setProviderJournalId(result.providerJournalId());
-            tx.setProviderResponse(result.providerMetadataJson());
-            paymentTransactionRepository.save(tx);
-            return result;
-        } catch (PaymentProviderUnavailableException e) {
-            tx.setStatus(PaymentTransactionStatus.FAILED);
-            tx.setProviderErrorCode("PAYMENT_PROVIDER_UNAVAILABLE");
-            tx.setProviderErrorMessage(e.getMessage());
-            paymentTransactionRepository.save(tx);
-            throw new PaymentException("PAYMENT_FAILED", "Payment capture failed during cancellation", e);
-        } catch (RuntimeException e) {
-            tx.setStatus(PaymentTransactionStatus.FAILED);
-            tx.setProviderErrorCode("PAYMENT_PROVIDER_ERROR");
-            tx.setProviderErrorMessage(e.getMessage());
-            paymentTransactionRepository.save(tx);
-            throw e;
-        }
-    }
-
-    private VoidResult callVoid(BookingPayment payment) {
-        String correlationId = correlationIdHelper.getOrGenerate();
-        String requestId = UUID.randomUUID().toString();
-        PaymentTransaction tx = new PaymentTransaction();
-        tx.setBookingPaymentId(payment.getId());
-        tx.setBookingId(payment.getBookingId());
-        tx.setType(PaymentTransactionType.VOID);
-        tx.setStatus(PaymentTransactionStatus.PENDING);
-        tx.setAmount(BigDecimal.ZERO);
-        tx.setCurrency(payment.getCurrency());
-        tx.setProvider(payment.getProvider());
-        tx.setProviderRequestId(requestId);
-        tx.setProviderRef(payment.getProviderHoldId());
-        tx = paymentTransactionRepository.save(tx);
-
-        try {
-            VoidResult result = paymentProviderRouter.route(PaymentProviderType.COREBANK).voidAuthorization(new VoidCommand(
-                    "rentflow:cancel:void:" + payment.getId() + ":" + requestId,
-                    payment.getProviderHoldId(),
-                    correlationId,
-                    requestId,
-                    payment.getId().toString(),
-                    correlationId));
-            tx.setStatus(PaymentTransactionStatus.SUCCEEDED);
-            tx.setProviderResponse(result.providerMetadataJson());
-            paymentTransactionRepository.save(tx);
-            return result;
-        } catch (RuntimeException e) {
-            tx.setStatus(PaymentTransactionStatus.FAILED);
-            tx.setProviderErrorCode(e instanceof PaymentProviderUnavailableException
-                    ? "PAYMENT_PROVIDER_UNAVAILABLE"
-                    : "PAYMENT_PROVIDER_ERROR");
-            tx.setProviderErrorMessage(e.getMessage());
-            paymentTransactionRepository.save(tx);
-            throw e;
         }
     }
 
@@ -1022,6 +935,19 @@ public class BookingService {
         }
     }
 
+    private String readCurrency(Booking booking) {
+        try {
+            JsonNode root = objectMapper.readTree(booking.getPriceSnapshot());
+            JsonNode node = root.get("currency");
+            if (node == null || node.isNull() || !node.isTextual()) {
+                throw new IllegalStateException("Booking price snapshot missing currency");
+            }
+            return node.asText();
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to parse booking price snapshot", e);
+        }
+    }
+
     private CancellationPolicy readCancellationPolicy(Booking booking) {
         try {
             JsonNode root = objectMapper.readTree(booking.getPolicySnapshot());
@@ -1172,6 +1098,7 @@ public class BookingService {
 
     private record CancellationProviderResults(
             CaptureResult captureResult,
+            boolean captureFinalized,
             VoidResult voidResult,
             RuntimeException voidError
     ) {

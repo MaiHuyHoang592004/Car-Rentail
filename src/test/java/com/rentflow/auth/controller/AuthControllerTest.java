@@ -10,6 +10,7 @@ import com.rentflow.common.exception.GlobalExceptionHandler;
 import com.rentflow.common.exception.RateLimitExceededException;
 import com.rentflow.common.ratelimit.RateLimitService;
 import com.rentflow.common.security.ClientIpResolver;
+import com.rentflow.common.security.SecurityContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -36,6 +38,7 @@ class AuthControllerTest {
     private AuthService authService;
     private RateLimitService rateLimitService;
     private ClientIpResolver clientIpResolver;
+    private SecurityContext securityContext;
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -44,12 +47,15 @@ class AuthControllerTest {
         authService = mock(AuthService.class);
         rateLimitService = mock(RateLimitService.class);
         clientIpResolver = mock(ClientIpResolver.class);
+        securityContext = mock(SecurityContext.class);
         when(clientIpResolver.resolve(any())).thenReturn("203.0.113.10");
+        when(securityContext.currentUserId()).thenReturn(UUID.fromString("11111111-1111-4111-8111-111111111111"));
         objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(
                         authService,
                         rateLimitService,
                         clientIpResolver,
+                        securityContext,
                         mock(com.rentflow.auth.service.PasswordService.class),
                         mock(com.rentflow.auth.service.EmailVerificationService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(new CorrelationIdHelper()))
@@ -142,5 +148,32 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.message").value("Request body is malformed"));
+    }
+
+    @Test
+    void registerRateLimitedReturns429() throws Exception {
+        doThrow(new RateLimitExceededException(Duration.ofSeconds(30)))
+                .when(rateLimitService).consumeRegister("203.0.113.10");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "rate-limited@example.com",
+                                  "password": "Password@123",
+                                  "fullName": "Rate Limited"
+                                }
+                                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "30"))
+                .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"));
+    }
+
+    @Test
+    void logoutAllReturns204AndDelegatesToService() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout-all"))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logoutAll(UUID.fromString("11111111-1111-4111-8111-111111111111"));
     }
 }

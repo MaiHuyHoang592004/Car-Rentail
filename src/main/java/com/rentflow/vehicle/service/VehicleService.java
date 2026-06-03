@@ -33,6 +33,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VehicleService {
 
+    private static final String VEHICLE_STATUS_CHANGE_SUSPENSION_SOURCE = "VEHICLE_STATUS_CHANGE";
+
     private final VehicleRepository vehicleRepository;
     private final VehicleListingPort listingPort;
     private final VehicleBookingPort bookingPort;
@@ -180,7 +182,10 @@ public class VehicleService {
         boolean transitioningFromActive = fromStatus == VehicleStatus.ACTIVE;
 
         if (transitioningToMaintenanceOrSuspended && transitioningFromActive) {
-            int updated = listingPort.suspendListings(vehicle.getId());
+            int updated = listingPort.suspendListings(
+                    vehicle.getId(),
+                    "Vehicle moved to " + toStatus.name(),
+                    VEHICLE_STATUS_CHANGE_SUSPENSION_SOURCE);
             log.info("Auto-suspended {} listings for vehicle {} -> {}",
                     updated, vehicle.getId(), toStatus);
         }

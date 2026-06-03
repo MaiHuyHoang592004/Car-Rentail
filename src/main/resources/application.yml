@@ -108,6 +108,9 @@ rentflow:
     login:
       limit: ${RENTFLOW_LOGIN_RATE_LIMIT:5}
       window: ${RENTFLOW_LOGIN_RATE_WINDOW:PT15M}
+    register:
+      limit: ${RENTFLOW_REGISTER_RATE_LIMIT:5}
+      window: ${RENTFLOW_REGISTER_RATE_WINDOW:PT15M}
     booking:
       create-limit: ${RENTFLOW_BOOKING_CREATE_RATE_LIMIT:10}
       create-window: ${RENTFLOW_BOOKING_CREATE_RATE_WINDOW:PT1H}

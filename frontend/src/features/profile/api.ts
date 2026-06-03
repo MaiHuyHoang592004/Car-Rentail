@@ -20,6 +20,11 @@ interface UpdateProfileInput {
   addressLine?: string;
 }
 
+interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
 function mapProfile(raw: UserProfileResponse): ProfileViewModel {
   return {
     id: raw.id,
@@ -44,4 +49,8 @@ export async function updateProfile(body: UpdateProfileInput): Promise<ProfileVi
 
 export async function resendVerificationEmail(): Promise<void> {
   await api.post("/users/me/resend-verification");
+}
+
+export async function changePassword(body: ChangePasswordInput): Promise<void> {
+  await api.patch("/users/me/password", body);
 }

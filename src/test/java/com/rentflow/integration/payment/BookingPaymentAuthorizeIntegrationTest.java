@@ -12,6 +12,7 @@ import com.rentflow.availability.repository.AvailabilityCalendarRepository;
 import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.repository.BookingRepository;
+import com.rentflow.common.idempotency.repository.IdempotencyKeyRepository;
 import com.rentflow.common.security.JwtTokenProvider;
 import com.rentflow.integration.BaseIntegrationTest;
 import com.rentflow.listing.entity.CancellationPolicy;
@@ -74,6 +75,7 @@ class BookingPaymentAuthorizeIntegrationTest extends BaseIntegrationTest {
     @Autowired private PaymentBankRepository paymentBankRepository;
     @Autowired private BookingPaymentRepository bookingPaymentRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
+    @Autowired private IdempotencyKeyRepository idempotencyKeyRepository;
     @Autowired private JwtTokenProvider jwtTokenProvider;
     @Autowired private ObjectMapper objectMapper;
 
@@ -89,6 +91,7 @@ class BookingPaymentAuthorizeIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         paymentTransactionRepository.deleteAll();
         bookingPaymentRepository.deleteAll();
+        idempotencyKeyRepository.deleteAll();
         availabilityRepository.deleteAll();
         bookingRepository.deleteAll();
         listingRepository.deleteAll();
@@ -322,7 +325,8 @@ class BookingPaymentAuthorizeIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
-                        .header("Authorization", "Bearer " + customerToken))
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", uuidV4()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.booking.status").value("PENDING_HOST_APPROVAL"))
                 .andExpect(jsonPath("$.payment.status").value("AUTHORIZED"))
@@ -370,7 +374,8 @@ class BookingPaymentAuthorizeIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
-                        .header("Authorization", "Bearer " + customerToken))
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", uuidV4()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.booking.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.payment.status").value("AUTHORIZED"));
@@ -398,7 +403,8 @@ class BookingPaymentAuthorizeIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
-                        .header("Authorization", "Bearer " + otherCustomerToken))
+                        .header("Authorization", "Bearer " + otherCustomerToken)
+                        .header("Idempotency-Key", uuidV4()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("BOOKING_NOT_FOUND"));
     }
@@ -415,9 +421,40 @@ class BookingPaymentAuthorizeIntegrationTest extends BaseIntegrationTest {
         bookingRepository.save(booking);
 
         mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
-                        .header("Authorization", "Bearer " + customerToken))
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", uuidV4()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("BOOKING_HOLD_EXPIRED"));
+    }
+
+    @Test
+    void sameIdempotencyKeyOnSimulateTransferConfirmationReplaysSameResponse() throws Exception {
+        PaymentBank bank = paymentBankRepository.findAll().stream()
+                .filter(item -> "VCB".equals(item.getCode()))
+                .findFirst()
+                .orElseThrow();
+        postAuthorize(customerToken, booking.getId(), uuidV4(), bank.getId(), PaymentMethod.BANK_TRANSFER_QR)
+                .andExpect(status().isOk());
+
+        String key = uuidV4();
+        MvcResult first = mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", key))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.booking.status").value("PENDING_HOST_APPROVAL"))
+                .andReturn();
+
+        MvcResult second = mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", booking.getId())
+                        .header("Authorization", "Bearer " + customerToken)
+                        .header("Idempotency-Key", key))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(json(second).get("payment").get("id").asText())
+                .isEqualTo(json(first).get("payment").get("id").asText());
+        assertThat(paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(
+                UUID.fromString(json(first).get("payment").get("id").asText())))
+                .hasSize(2);
     }
 
     private String uuidV4() {

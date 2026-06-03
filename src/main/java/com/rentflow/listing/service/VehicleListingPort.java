@@ -6,5 +6,5 @@ public interface VehicleListingPort {
 
     int archiveListings(UUID vehicleId);
 
-    int suspendListings(UUID vehicleId);
+    int suspendListings(UUID vehicleId, String reason, String source);
 }

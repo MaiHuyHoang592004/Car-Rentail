@@ -4,6 +4,7 @@ export type PaymentProviderType = "VIETQR_MANUAL" | "COREBANK" | "STUB" | string
 
 export type PaymentStatus =
   | "UNPAID"
+  | "PENDING_TRANSFER"
   | "AUTHORIZED"
   | "CAPTURED"
   | "PARTIALLY_REFUNDED"

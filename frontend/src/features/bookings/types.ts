@@ -16,6 +16,14 @@ export type BookingListFilterState = {
   status: BookingListFilterValue;
 };
 
+export type BookingCancellationPreview = {
+  eligible: boolean;
+  refundableAmount: number;
+  penaltyAmount: number;
+  currency: string;
+  policy: BookingPolicySnapshot["cancellationPolicy"];
+};
+
 export type BookingCreateFormErrors = Partial<
   Record<"pickupDate" | "returnDate" | "pickupLocation" | "returnLocation" | "form", string>
 >;
@@ -25,6 +33,7 @@ export type BookingSummaryViewModel = {
   status: BookingStatus;
   listingId: string;
   listingTitle: string;
+  createdAt: string;
   pickupDate: string;
   returnDate: string;
   totalAmount: number;
@@ -33,6 +42,9 @@ export type BookingSummaryViewModel = {
   hostApprovalExpiresAt?: string;
   voidRetryRequired: boolean;
   paymentRetryState?: string;
+  paymentStatus?: string;
+  voidRetryLastError?: string;
+  voidRetryCount?: number;
 };
 
 export type BookingPriceExtraViewModel = {
@@ -72,13 +84,7 @@ export type BookingDetailViewModel = BookingSummaryViewModel & {
   paymentRetryState?: string;
   priceSnapshot: BookingPriceSnapshot;
   policySnapshot: BookingPolicySnapshot;
-  cancellationPreview?: {
-    eligible: boolean;
-    refundableAmount: number;
-    penaltyAmount: number;
-    currency: string;
-    policy: BookingPolicySnapshot["cancellationPolicy"];
-  };
+  cancellationPreview?: BookingCancellationPreview;
   reviewEligible?: boolean;
   reviewSubmitted?: boolean;
   disputeEligible?: boolean;

@@ -14,6 +14,7 @@ import {
   createBookingDispute,
   createBookingReview,
   getBookingById,
+  getCancelPreview,
   patchBookingLocations,
   uploadDisputeAttachment,
   type PatchBookingLocationsInput,
@@ -26,7 +27,11 @@ import { HoldCountdown } from "@/features/bookings/hold-countdown";
 import { LocationSummary } from "@/features/bookings/location-summary";
 import { PolicySnapshotPanel } from "@/features/bookings/policy-snapshot-panel";
 import { PriceSnapshotPanel } from "@/features/bookings/price-snapshot-panel";
-import type { BookingStatus } from "@/features/bookings/types";
+import type {
+  BookingCancellationPreview,
+  BookingDetailViewModel,
+  BookingStatus,
+} from "@/features/bookings/types";
 import { ApiError } from "@/lib/api-error";
 import { getBookingStatusLabel } from "@/lib/display-labels";
 import { formatDateRange, formatMoney } from "@/lib/formatters";
@@ -57,6 +62,9 @@ function formatPaymentRetryState(state?: string | null) {
   if (state === "VOID_RETRY_REQUIRED") {
     return "He thong dang retry thao tac void thanh toan trong nen.";
   }
+  if (state === "VOID_RETRY_EXHAUSTED") {
+    return "Hệ thống đã hết lượt retry void thanh toán.";
+  }
   return `Trang thai xu ly hien tai: ${state}.`;
 }
 
@@ -69,6 +77,18 @@ const STEPS = [
 ];
 
 const FINAL_STATUSES = ["CANCELLED", "REJECTED", "EXPIRED"];
+
+function isVoidRetryExhausted(booking: BookingDetailViewModel) {
+  return (
+    booking.status === "CANCELLED"
+    && !booking.voidRetryRequired
+    && (booking.paymentStatus === "AUTHORIZED" || booking.paymentStatus === "CAPTURED")
+    && (
+      booking.paymentRetryState === "VOID_RETRY_EXHAUSTED"
+      || ((booking.voidRetryCount ?? 0) > 0 && Boolean(booking.voidRetryLastError))
+    )
+  );
+}
 
 function getStepState(
   stepKey: string,
@@ -97,6 +117,8 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
   const [disputeReason, setDisputeReason] = useState("");
   const [disputeContext, setDisputeContext] = useState("");
   const [disputeFiles, setDisputeFiles] = useState<File[]>([]);
+  const [freshCancelPreview, setFreshCancelPreview] =
+    useState<BookingCancellationPreview | undefined>();
   const cancelKeyRef = useRef<string | null>(null);
   const expireRetryRef = useRef<number>(0);
 
@@ -131,6 +153,8 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
       queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
       queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
       cancelKeyRef.current = null;
+      setFreshCancelPreview(undefined);
+      setCancelOpen(false);
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError && error.code === "BOOKING_INVALID_STATUS") {
@@ -139,6 +163,35 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
       const message =
         error instanceof ApiError ? error.message : "Huy don that bai";
       toast.error(message);
+    },
+  });
+
+  const cancelPreviewMutation = useMutation({
+    mutationFn: () => getCancelPreview(bookingId),
+    onSuccess: (preview) => {
+      setFreshCancelPreview(preview);
+      if (!cancelKeyRef.current) {
+        cancelKeyRef.current = newIdempotencyKey();
+      }
+      setCancelOpen(true);
+    },
+    onError: (error: unknown) => {
+      setCancelOpen(false);
+      setFreshCancelPreview(undefined);
+      cancelKeyRef.current = null;
+      if (
+        error instanceof ApiError
+        && (error.code === "BOOKING_INVALID_STATUS" || error.code === "BOOKING_NOT_FOUND")
+      ) {
+        queryClient.invalidateQueries({ queryKey: ["bookings", bookingId] });
+      }
+      if (error instanceof ApiError && error.code === "BOOKING_INVALID_STATUS") {
+        toast.error("Booking không còn ở trạng thái có thể hủy. Đang tải lại chi tiết.");
+      } else if (error instanceof ApiError && error.code === "BOOKING_NOT_FOUND") {
+        toast.error("Không tìm thấy booking hoặc bạn không có quyền truy cập. Đang tải lại chi tiết.");
+      } else {
+        toast.error(error instanceof ApiError ? error.message : "Không thể tải phí hủy mới.");
+      }
     },
   });
 
@@ -258,14 +311,13 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
       : null;
 
   function openCancelDialog() {
-    if (!cancelKeyRef.current) {
-      cancelKeyRef.current = newIdempotencyKey();
-    }
-    setCancelOpen(true);
+    cancelPreviewMutation.mutate();
   }
 
   function handleCancelClose() {
     setCancelOpen(false);
+    setFreshCancelPreview(undefined);
+    cancelKeyRef.current = null;
   }
 
   function handleCancelConfirm(next: CancelBookingFormState) {
@@ -390,6 +442,20 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
             </div>
           ) : null}
 
+          {isVoidRetryExhausted(booking) ? (
+            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-950">
+              <p className="font-semibold">Thanh toán cần hỗ trợ xử lý thủ công</p>
+              <p className="mt-1">
+                Hệ thống đã hết lượt retry thao tác thanh toán; support/admin đang xử lý thủ công.
+              </p>
+              {booking.voidRetryLastError ? (
+                <p className="mt-1 text-xs text-rose-800">
+                  Lỗi cuối: {booking.voidRetryLastError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           {booking.status === "REJECTED" && booking.rejectionReason ? (
             <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
               <p className="font-semibold">Ly do chu xe tu choi</p>
@@ -417,11 +483,11 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
             {canCancel ? (
               <button
                 type="button"
-                disabled={cancelMutation.isPending}
+                disabled={cancelMutation.isPending || cancelPreviewMutation.isPending}
                 onClick={openCancelDialog}
                 className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:opacity-90"
               >
-                Huy don
+                {cancelPreviewMutation.isPending ? "Đang tải phí hủy..." : "Huy don"}
               </button>
             ) : null}
             {booking.reviewEligible ? (
@@ -534,7 +600,7 @@ export function BookingDetailPageView({ bookingId }: BookingDetailPageViewProps)
         key={`${booking.id}:${booking.status}:${cancelOpen ? "open" : "closed"}`}
         open={cancelOpen}
         status={cancelDialogStatus}
-        preview={booking.cancellationPreview}
+        preview={freshCancelPreview}
         onClose={handleCancelClose}
         onConfirm={handleCancelConfirm}
       />

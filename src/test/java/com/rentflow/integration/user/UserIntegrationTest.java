@@ -168,6 +168,75 @@ class UserIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.driverVerificationStatus").value("NOT_SUBMITTED"));
     }
 
+    @Test
+    void changePassword_withCorrectCurrentPasswordRevokesOldRefreshTokenAndAllowsNewLogin() throws Exception {
+        registerUser("password-change@example.com", "Password@123");
+        JsonNode login = loginUser("password-change@example.com", "Password@123");
+        String accessToken = login.get("accessToken").asText();
+        String oldRefreshToken = login.get("refreshToken").asText();
+
+        mockMvc.perform(patch("/api/v1/users/me/password")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "Password@123",
+                                  "newPassword": "NewPassword@123"
+                                }
+                                """))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "password-change@example.com",
+                                  "password": "Password@123"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "password-change@example.com",
+                                  "password": "NewPassword@123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").exists());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "%s"
+                                }
+                                """.formatted(oldRefreshToken)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void changePassword_withWrongCurrentPasswordReturns401() throws Exception {
+        registerUser("password-wrong-current@example.com", "Password@123");
+        JsonNode login = loginUser("password-wrong-current@example.com", "Password@123");
+        String accessToken = login.get("accessToken").asText();
+
+        mockMvc.perform(patch("/api/v1/users/me/password")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "WrongPassword@123",
+                                  "newPassword": "NewPassword@123"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+    }
+
     // ─── Admin: GET /admin/users ───────────────────────────────────────────────
 
     @Test
@@ -252,6 +321,34 @@ class UserIntegrationTest extends BaseIntegrationTest {
 
     private AuthUser createUser(String email, String password, Role role) {
         return createUser(email, password, role, UserStatus.ACTIVE);
+    }
+
+    private void registerUser(String email, String password) throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s",
+                                  "password": "%s",
+                                  "fullName": "Registered User"
+                                }
+                                """.formatted(email, password)))
+                .andExpect(status().isCreated());
+    }
+
+    private JsonNode loginUser(String email, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(email, password)))
+                .andExpect(status().isOk())
+                .andReturn();
+        return new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(result.getResponse().getContentAsString());
     }
 
     private AuthUser createUser(String email, String password, Role role, UserStatus status) {

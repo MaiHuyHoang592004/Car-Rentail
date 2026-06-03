@@ -243,6 +243,7 @@ public class ListingService {
         }
 
         listing.setStatus(ListingStatus.DRAFT);
+        clearSuspensionMetadata(listing);
         listing = listingRepository.save(listing);
 
         log.info("Listing reactivated: {} by host {}", listingId, hostId);
@@ -280,9 +281,16 @@ public class ListingService {
         }
 
         listing.setStatus(ListingStatus.ACTIVE);
+        clearSuspensionMetadata(listing);
         listing = listingRepository.save(listing);
 
         log.info("Listing resumed: {} by host {}", listingId, hostId);
         return mapper.toResponse(listing, vehicle, List.of());
+    }
+
+    private void clearSuspensionMetadata(Listing listing) {
+        listing.setSuspensionReason(null);
+        listing.setSuspensionSource(null);
+        listing.setSuspensionUntil(null);
     }
 }

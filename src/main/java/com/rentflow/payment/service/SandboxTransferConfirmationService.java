@@ -11,6 +11,10 @@ import com.rentflow.booking.repository.BookingRepository;
 import com.rentflow.booking.service.AvailabilityReserver;
 import com.rentflow.common.exception.BookingNotFoundException;
 import com.rentflow.common.exception.BusinessRuleException;
+import com.rentflow.common.idempotency.service.IdempotencyFailureMarker;
+import com.rentflow.common.idempotency.service.IdempotencyResolution;
+import com.rentflow.common.idempotency.service.IdempotencyScope;
+import com.rentflow.common.idempotency.service.IdempotencyService;
 import com.rentflow.common.security.SecurityContext;
 import com.rentflow.payment.dto.PaymentDetailResponse;
 import com.rentflow.payment.entity.BookingPayment;
@@ -49,6 +53,8 @@ public class SandboxTransferConfirmationService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final boolean enabled;
+    private final IdempotencyService idempotencyService;
+    private final IdempotencyFailureMarker idempotencyFailureMarker;
 
     public SandboxTransferConfirmationService(
             BookingRepository bookingRepository,
@@ -60,6 +66,8 @@ public class SandboxTransferConfirmationService {
             PaymentDetailResponseFactory paymentDetailResponseFactory,
             ObjectMapper objectMapper,
             Clock clock,
+            IdempotencyService idempotencyService,
+            IdempotencyFailureMarker idempotencyFailureMarker,
             @Value("${rentflow.payment.sandbox-transfer-confirmation.enabled:false}") boolean enabled) {
         this.bookingRepository = bookingRepository;
         this.bookingPaymentRepository = bookingPaymentRepository;
@@ -70,13 +78,36 @@ public class SandboxTransferConfirmationService {
         this.paymentDetailResponseFactory = paymentDetailResponseFactory;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.idempotencyService = idempotencyService;
+        this.idempotencyFailureMarker = idempotencyFailureMarker;
         this.enabled = enabled;
     }
 
     @Transactional
-    public PaymentDetailResponse confirm(UUID bookingId) {
+    public PaymentDetailResponse confirm(UUID bookingId, String idempotencyKey) {
         ensureEnabled();
         UUID actorId = securityContext.currentUserId();
+        String requestHash = idempotencyService.computeHash(new ConfirmHashInput(bookingId));
+        IdempotencyResolution resolution = idempotencyService.resolve(
+                actorId,
+                IdempotencyScope.SIMULATE_TRANSFER_CONFIRMATION,
+                idempotencyKey,
+                requestHash);
+        if (resolution instanceof IdempotencyResolution.Replay replay) {
+            return deserializeResponse(replay.responseBodyJson());
+        }
+        UUID idempotencyKeyId = ((IdempotencyResolution.Proceed) resolution).idempotencyKeyId();
+        try {
+            PaymentDetailResponse response = doConfirm(actorId, bookingId);
+            idempotencyService.complete(idempotencyKeyId, 200, serializeResponse(response));
+            return response;
+        } catch (RuntimeException e) {
+            idempotencyFailureMarker.markFailed(idempotencyKeyId);
+            throw e;
+        }
+    }
+
+    private PaymentDetailResponse doConfirm(UUID actorId, UUID bookingId) {
         Booking booking = bookingRepository.findByIdForUpdate(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException(bookingId.toString()));
         requireCustomerOwnerOrAdmin(booking, actorId);
@@ -136,6 +167,22 @@ public class SandboxTransferConfirmationService {
                 booking,
                 payment,
                 paymentTransactionRepository.findByBookingPaymentIdOrderByCreatedAtAsc(payment.getId()));
+    }
+
+    private String serializeResponse(PaymentDetailResponse response) {
+        try {
+            return objectMapper.writeValueAsString(response);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize sandbox payment detail response", e);
+        }
+    }
+
+    private PaymentDetailResponse deserializeResponse(String responseBodyJson) {
+        try {
+            return objectMapper.readValue(responseBodyJson, PaymentDetailResponse.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to deserialize sandbox payment detail response", e);
+        }
     }
 
     @Transactional
@@ -309,5 +356,8 @@ public class SandboxTransferConfirmationService {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize sandbox payment metadata", e);
         }
+    }
+
+    private record ConfirmHashInput(UUID bookingId) {
     }
 }

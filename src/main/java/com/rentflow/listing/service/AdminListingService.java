@@ -318,6 +318,7 @@ public class AdminListingService {
         }
 
         listing.setStatus(ListingStatus.ACTIVE);
+        clearSuspensionMetadata(listing);
         listingRepository.save(listing);
 
         log.info("Listing reactivated: {}", listingId);
@@ -331,5 +332,11 @@ public class AdminListingService {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Failed to serialize listing outbox payload", ex);
         }
+    }
+
+    private void clearSuspensionMetadata(Listing listing) {
+        listing.setSuspensionReason(null);
+        listing.setSuspensionSource(null);
+        listing.setSuspensionUntil(null);
     }
 }

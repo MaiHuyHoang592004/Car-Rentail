@@ -39,7 +39,10 @@ public class BookingPaymentController {
     }
 
     @PostMapping("/simulate-transfer-confirmation")
-    public ResponseEntity<PaymentDetailResponse> simulateTransferConfirmation(@PathVariable UUID bookingId) {
-        return ResponseEntity.ok(paymentService.simulateTransferConfirmation(bookingId));
+    public ResponseEntity<PaymentDetailResponse> simulateTransferConfirmation(
+            @PathVariable UUID bookingId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        IdempotencyKeyValidator.validate(idempotencyKey);
+        return ResponseEntity.ok(paymentService.simulateTransferConfirmation(bookingId, idempotencyKey));
     }
 }

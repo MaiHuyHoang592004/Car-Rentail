@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -43,6 +44,9 @@ public abstract class BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired(required = false)
+    private StringRedisTemplate redisTemplate;
+
     @BeforeEach
     void resetDatabaseState() {
         // Keep Flyway history and seeded payment bank catalog, reset all runtime data.
@@ -65,5 +69,9 @@ public abstract class BaseIntegrationTest {
                     END IF;
                 END $$;
                 """);
+
+        if (redisTemplate != null) {
+            redisTemplate.getConnectionFactory().getConnection().serverCommands().flushAll();
+        }
     }
 }

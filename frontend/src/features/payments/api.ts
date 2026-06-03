@@ -5,6 +5,7 @@ import type {
   PaymentDetail,
   PaymentMethod,
 } from "@/features/payments/types";
+import { ApiError } from "@/lib/api-error";
 
 /* ------------------------------------------------------------------ */
 /*  Raw backend response types (kept internal)                        */
@@ -226,10 +227,12 @@ export async function getBookingPayment(
     );
     return mapPaymentDetail(raw);
   } catch (err) {
-    // If no payment exists yet, return null instead of throwing
-    if (err instanceof Error && "status" in err) {
-      const status = (err as unknown as { status?: number }).status;
-      if (status === 404) return null;
+    if (
+      err instanceof ApiError
+      && err.status === 404
+      && err.code === "PAYMENT_NOT_FOUND"
+    ) {
+      return null;
     }
     throw err;
   }

@@ -9,6 +9,7 @@ import com.rentflow.booking.service.BookingService;
 import com.rentflow.booking.service.BookingSummaryResponse;
 import com.rentflow.booking.service.CancelBookingRequest;
 import com.rentflow.booking.service.CancelBookingResponse;
+import com.rentflow.booking.service.CancellationPreviewResponse;
 import com.rentflow.booking.service.CreateBookingRequest;
 import com.rentflow.booking.service.PatchBookingLocationRequest;
 import com.rentflow.booking.service.RequestedExtra;
@@ -16,6 +17,7 @@ import com.rentflow.common.exception.CorrelationIdHelper;
 import com.rentflow.common.exception.GlobalExceptionHandler;
 import com.rentflow.common.exception.RateLimitExceededException;
 import com.rentflow.common.web.PageResponse;
+import com.rentflow.listing.entity.CancellationPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Pageable;
@@ -186,6 +188,27 @@ class BookingControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(BOOKING_ID.toString()))
                 .andExpect(jsonPath("$.listingTitle").value("Toyota Vios 2022"));
+    }
+
+    @Test
+    void getCancelPreviewDelegatesAndReturnsPreview() throws Exception {
+        when(bookingService.getCancelPreview(BOOKING_ID))
+                .thenReturn(new CancellationPreviewResponse(
+                        true,
+                        new BigDecimal("1400000.00"),
+                        new BigDecimal("100000.00"),
+                        "VND",
+                        CancellationPolicy.FLEXIBLE));
+
+        mockMvc.perform(get("/api/v1/bookings/{id}/cancel-preview", BOOKING_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eligible").value(true))
+                .andExpect(jsonPath("$.refundableAmount").value(1400000.00))
+                .andExpect(jsonPath("$.penaltyAmount").value(100000.00))
+                .andExpect(jsonPath("$.currency").value("VND"))
+                .andExpect(jsonPath("$.policy").value("FLEXIBLE"));
+
+        verify(bookingService).getCancelPreview(BOOKING_ID);
     }
 
     @Test

@@ -135,6 +135,43 @@ describe("AuthProvider", () => {
     expect(routerReplace).toHaveBeenCalledWith("/");
   });
 
+  it("logoutAll() revokes server sessions then clears local session", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: wrapperWithInitial({
+        accessToken: "ACCESS",
+        accessTokenExpiresAt: "2099-01-01T00:00:00Z",
+        user: sessionUser,
+      }),
+    });
+
+    await act(async () => {
+      await result.current.logoutAll();
+    });
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/auth/logout-all",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer ACCESS",
+          Accept: "application/json",
+        }),
+      }),
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      "/api/auth/logout",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(result.current.status).toBe("guest");
+    expect(routerReplace).toHaveBeenCalledWith("/");
+  });
+
   it("useAuth throws when used outside AuthProvider", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => render(<TestConsumer />)).toThrow(/AuthProvider/);

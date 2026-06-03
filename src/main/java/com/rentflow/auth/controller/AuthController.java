@@ -7,6 +7,7 @@ import com.rentflow.auth.service.PasswordService;
 import com.rentflow.common.exception.AuthenticationException;
 import com.rentflow.common.ratelimit.RateLimitService;
 import com.rentflow.common.security.ClientIpResolver;
+import com.rentflow.common.security.SecurityContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,11 +25,16 @@ public class AuthController {
     private final AuthService authService;
     private final RateLimitService rateLimitService;
     private final ClientIpResolver clientIpResolver;
+    private final SecurityContext securityContext;
     private final PasswordService passwordService;
     private final EmailVerificationService emailVerificationService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest servletRequest) {
+        String clientIp = clientIpResolver.resolve(servletRequest);
+        rateLimitService.consumeRegister(clientIp);
         var response = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -58,6 +64,12 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/logout-all")
+    public ResponseEntity<Void> logoutAll() {
+        authService.logoutAll(securityContext.currentUserId());
         return ResponseEntity.noContent().build();
     }
 

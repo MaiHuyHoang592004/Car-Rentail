@@ -62,6 +62,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/forgot-password").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/reset-password").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/verify-email").permitAll()
@@ -90,6 +91,7 @@ public class SecurityConfig {
                     // Booking endpoints require authentication; service layer enforces roles and ownership
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/cancel").authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{id}/cancel-preview").authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/bookings/me").authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{id}").authenticated()
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/bookings/{id}").authenticated()

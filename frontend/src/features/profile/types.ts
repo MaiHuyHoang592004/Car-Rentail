@@ -18,3 +18,11 @@ export type ProfileFormState = {
 };
 
 export type ProfileFormErrors = Partial<Record<keyof ProfileFormState | "form", string>>;
+
+export type ChangePasswordFormState = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
+export type ChangePasswordFormErrors = Partial<Record<keyof ChangePasswordFormState | "form", string>>;

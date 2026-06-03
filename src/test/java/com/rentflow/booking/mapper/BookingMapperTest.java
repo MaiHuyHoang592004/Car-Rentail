@@ -9,14 +9,17 @@ import com.rentflow.booking.entity.Booking;
 import com.rentflow.booking.entity.BookingStatus;
 import com.rentflow.booking.service.BookingResponse;
 import com.rentflow.booking.service.BookingSummaryResponse;
+import com.rentflow.booking.service.CancellationPolicyCalculator;
 import com.rentflow.common.web.PageResponse;
 import com.rentflow.listing.entity.Listing;
 import com.rentflow.listing.repository.ListingRepository;
 import com.rentflow.payment.entity.BookingPayment;
 import com.rentflow.payment.repository.BookingPaymentRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,7 +40,15 @@ class BookingMapperTest {
 
     @BeforeEach
     void setUp() {
-        mapper = new BookingMapper(listingRepository, bookingPaymentRepository, new ObjectMapper());
+        Clock clock = Clock.fixed(Instant.parse("2026-05-23T00:00:00Z"), ZoneOffset.UTC);
+        mapper = new BookingMapper(
+                listingRepository,
+                bookingPaymentRepository,
+                null,
+                null,
+                new CancellationPolicyCalculator(clock),
+                clock,
+                new ObjectMapper());
     }
 
     @Test

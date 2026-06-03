@@ -120,11 +120,11 @@ class PaymentServiceTest {
     @Test
     void delegatesSimulateTransferConfirmation() {
         PaymentDetailResponse response = mock(PaymentDetailResponse.class);
-        when(sandboxTransferConfirmationService.confirm(BOOKING_ID)).thenReturn(response);
+        when(sandboxTransferConfirmationService.confirm(BOOKING_ID, "key")).thenReturn(response);
 
-        paymentService.simulateTransferConfirmation(BOOKING_ID);
+        paymentService.simulateTransferConfirmation(BOOKING_ID, "key");
 
-        verify(sandboxTransferConfirmationService).confirm(BOOKING_ID);
+        verify(sandboxTransferConfirmationService).confirm(BOOKING_ID, "key");
     }
 
     @Test

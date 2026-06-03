@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
 
 import { AuthProvider } from "@/features/auth/auth-context";
 import { BookingsListPageView } from "./bookings-list-page-view";
+import { formatDateTime } from "@/lib/formatters";
 
 const authedSession = {
   accessToken: "ACCESS",
@@ -82,6 +83,9 @@ describe("BookingsListPageView", () => {
     fetchSpy.mockResolvedValue(jsonResponse(samplePage));
     wrap(<BookingsListPageView />);
     await waitFor(() => expect(screen.getByText("Toyota Vios 2022")).toBeInTheDocument());
+    expect(
+      screen.getByText(`Tạo lúc ${formatDateTime(samplePage.content[0].createdAt)}`),
+    ).toBeInTheDocument();
     const bookingCalls = fetchSpy.mock.calls.filter(
       ([url]) => typeof url === "string" && url.startsWith("/api/v1/bookings/me"),
     );
@@ -159,5 +163,29 @@ describe("BookingsListPageView", () => {
     wrap(<BookingsListPageView />);
     await screen.findByText("Toyota Vios 2022");
     expect(screen.queryByText("Dang xu ly hoan tien hoac void trong nen")).not.toBeInTheDocument();
+  });
+
+  it("shows manual-support marker when cancelled payment retry is exhausted", async () => {
+    fetchSpy.mockResolvedValue(
+      jsonResponse({
+        ...samplePage,
+        content: [
+          {
+            ...samplePage.content[0],
+            status: "CANCELLED",
+            voidRetryRequired: false,
+            paymentRetryState: "VOID_RETRY_EXHAUSTED",
+            paymentStatus: "AUTHORIZED",
+            voidRetryLastError: "provider down",
+            voidRetryCount: 3,
+          },
+        ],
+      }),
+    );
+    wrap(<BookingsListPageView />);
+
+    expect(
+      await screen.findByText("Thanh toán cần hỗ trợ xử lý thủ công"),
+    ).toBeInTheDocument();
   });
 });

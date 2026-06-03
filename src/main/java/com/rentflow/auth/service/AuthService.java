@@ -157,6 +157,12 @@ public class AuthService {
         log.info("User logged out");
     }
 
+    @Transactional
+    public void logoutAll(UUID userId) {
+        int revoked = refreshTokenService.revokeAllByUserId(userId);
+        log.info("User {} logged out from all sessions; revoked {} refresh tokens", userId, revoked);
+    }
+
     private List<Role> resolveRoles(List<String> requestedRoles) {
         if (requestedRoles == null || requestedRoles.isEmpty()) {
             return List.of(Role.CUSTOMER);

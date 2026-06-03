@@ -1,5 +1,6 @@
 ﻿import { Lock } from "lucide-react";
 
+import { getDateOnlyRangeDays } from "@/features/bookings/date-utils";
 import { formatMoney } from "@/lib/formatters";
 import type { ListingDetailViewModel } from "@/features/listings/types";
 
@@ -15,14 +16,6 @@ type BookingPriceSummaryProps = {
   helperText: string;
 };
 
-function calcDays(pickup: string, ret: string): number | null {
-  if (!pickup || !ret) return null;
-  const a = Date.parse(pickup);
-  const b = Date.parse(ret);
-  if (isNaN(a) || isNaN(b) || b <= a) return null;
-  return Math.round((b - a) / 86400000);
-}
-
 export function BookingPriceSummary({
   listing,
   pickupDate,
@@ -34,7 +27,7 @@ export function BookingPriceSummary({
   submitDisabled = false,
   helperText,
 }: BookingPriceSummaryProps) {
-  const days = calcDays(pickupDate, returnDate);
+  const days = getDateOnlyRangeDays(pickupDate, returnDate);
   const extrasTotal = listing.extras
     .reduce((sum, e) => sum + e.price * (selectedExtras[e.id] ?? 0), 0);
   const baseTotal = days != null ? listing.basePricePerDay * days : null;

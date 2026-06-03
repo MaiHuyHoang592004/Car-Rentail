@@ -245,9 +245,9 @@ describe("payment api", () => {
       expect(detail!.transactions[0].type).toBe("AUTHORIZE");
     });
 
-    it("returns null on 404 (no payment yet)", async () => {
+    it("returns null only on 404 PAYMENT_NOT_FOUND", async () => {
       fetchSpy.mockResolvedValueOnce(
-        new Response(JSON.stringify({ code: "NOT_FOUND", message: "No payment" }), {
+        new Response(JSON.stringify({ code: "PAYMENT_NOT_FOUND", message: "No payment" }), {
           status: 404,
           headers: { "Content-Type": "application/json" },
         }),
@@ -255,6 +255,17 @@ describe("payment api", () => {
 
       const detail = await getBookingPayment("bk-new");
       expect(detail).toBeNull();
+    });
+
+    it("re-throws 404 BOOKING_NOT_FOUND instead of treating it as empty payment", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: "BOOKING_NOT_FOUND", message: "No booking" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      await expect(getBookingPayment("bk-missing")).rejects.toThrow("No booking");
     });
 
     it("re-throws non-404 errors", async () => {

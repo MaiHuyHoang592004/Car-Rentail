@@ -5,6 +5,7 @@ import com.rentflow.common.exception.CorrelationIdHelper;
 import com.rentflow.common.exception.GlobalExceptionHandler;
 import com.rentflow.payment.dto.AuthorizePaymentRequest;
 import com.rentflow.payment.dto.AuthorizePaymentResponse;
+import com.rentflow.payment.dto.PaymentDetailResponse;
 import com.rentflow.payment.entity.PaymentMethod;
 import com.rentflow.payment.entity.PaymentProviderType;
 import com.rentflow.payment.entity.PaymentStatus;
@@ -121,5 +122,52 @@ class BookingPaymentControllerTest {
                 .andExpect(jsonPath("$.payment.transferInstruction.bankCode").value("VCB"));
 
         verify(paymentService).authorizeBookingPayment(eq(BOOKING_ID), eq(VALID_IDEMPOTENCY_KEY), any(AuthorizePaymentRequest.class));
+    }
+
+    @Test
+    void simulateTransferConfirmationMissingIdempotencyKeyReturnsRequiredError() throws Exception {
+        mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", BOOKING_ID))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
+    }
+
+    @Test
+    void simulateTransferConfirmationDelegatesAndReturnsContractShape() throws Exception {
+        UUID paymentId = UUID.fromString("33333333-3333-4333-8333-333333333333");
+        PaymentDetailResponse response = new PaymentDetailResponse(
+                new PaymentDetailResponse.BookingSummary(
+                        BOOKING_ID,
+                        UUID.fromString("44444444-4444-4444-8444-444444444444"),
+                        UUID.fromString("55555555-5555-4555-8555-555555555555"),
+                        BookingStatus.PENDING_HOST_APPROVAL,
+                        java.time.LocalDate.of(2026, 6, 1),
+                        java.time.LocalDate.of(2026, 6, 3)),
+                new PaymentDetailResponse.PaymentSummary(
+                        paymentId,
+                        null,
+                        PaymentMethod.BANK_TRANSFER_QR,
+                        PaymentProviderType.VIETQR_MANUAL,
+                        PaymentStatus.AUTHORIZED,
+                        new BigDecimal("1400000.00"),
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        "VND",
+                        "rentflow:booking:" + BOOKING_ID,
+                        null,
+                        null,
+                        "SANDBOX_TRANSFER_CONFIRMED",
+                        null),
+                java.util.List.of());
+        when(paymentService.simulateTransferConfirmation(BOOKING_ID, VALID_IDEMPOTENCY_KEY))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/bookings/{bookingId}/payments/simulate-transfer-confirmation", BOOKING_ID)
+                        .header("Idempotency-Key", VALID_IDEMPOTENCY_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.booking.id").value(BOOKING_ID.toString()))
+                .andExpect(jsonPath("$.payment.id").value(paymentId.toString()))
+                .andExpect(jsonPath("$.payment.status").value("AUTHORIZED"));
+
+        verify(paymentService).simulateTransferConfirmation(BOOKING_ID, VALID_IDEMPOTENCY_KEY);
     }
 }

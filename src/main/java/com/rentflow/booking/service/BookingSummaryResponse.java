@@ -20,7 +20,10 @@ public record BookingSummaryResponse(
         String currency,
         Instant createdAt,
         boolean voidRetryRequired,
-        String paymentRetryState) {
+        String paymentRetryState,
+        String paymentStatus,
+        String voidRetryLastError,
+        Integer voidRetryCount) {
 
     public BookingSummaryResponse(
             UUID id,
@@ -47,6 +50,9 @@ public record BookingSummaryResponse(
                 currency,
                 createdAt,
                 false,
-                null);
+                null,
+                null,
+                null,
+                0);
     }
 }

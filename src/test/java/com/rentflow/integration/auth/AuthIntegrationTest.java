@@ -406,6 +406,53 @@ class AuthIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isNoContent());
     }
 
+    @Test
+    void logoutAll_revokesAllRefreshTokensForCurrentUserOnly() throws Exception {
+        registerUser("logout-all@example.com", "Password@123");
+        registerUser("other-user@example.com", "Password@123");
+
+        MvcResult firstLogin = login("logout-all@example.com", "Password@123");
+        MvcResult secondLogin = login("logout-all@example.com", "Password@123");
+        MvcResult otherLogin = login("other-user@example.com", "Password@123");
+
+        String accessToken = parseJson(firstLogin).get("accessToken").asText();
+        String firstRefreshToken = parseJson(firstLogin).get("refreshToken").asText();
+        String secondRefreshToken = parseJson(secondLogin).get("refreshToken").asText();
+        String otherRefreshToken = parseJson(otherLogin).get("refreshToken").asText();
+
+        mockMvc.perform(post("/api/v1/auth/logout-all")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "%s"
+                                }
+                                """.formatted(firstRefreshToken)))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "%s"
+                                }
+                                """.formatted(secondRefreshToken)))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "%s"
+                                }
+                                """.formatted(otherRefreshToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refreshToken").exists());
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private void registerUser(String email, String password) throws Exception {
@@ -419,6 +466,19 @@ class AuthIntegrationTest extends BaseIntegrationTest {
                                 }
                                 """.formatted(email, password)))
                 .andExpect(status().isCreated());
+    }
+
+    private MvcResult login(String email, String password) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(email, password)))
+                .andExpect(status().isOk())
+                .andReturn();
     }
 
     private JsonNode parseJson(MvcResult result) throws Exception {

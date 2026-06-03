@@ -46,7 +46,7 @@ function redirectToForbidden(request: NextRequest) {
   return NextResponse.redirect(forbiddenUrl);
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const requirement = matchRequirement(request.nextUrl.pathname);
   if (!requirement) {
     return NextResponse.next();

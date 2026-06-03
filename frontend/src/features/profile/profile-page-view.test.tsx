@@ -143,6 +143,80 @@ describe("ProfilePageView", () => {
     );
   });
 
+  it("submits change password to the canonical endpoint", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: "u-1",
+          email: "u@e.com",
+          emailVerified: false,
+          roles: ["CUSTOMER"],
+          fullName: "User",
+          phone: "",
+          dateOfBirth: null,
+          addressLine: "",
+          driverVerificationStatus: "NOT_SUBMITTED",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    wrap(<ProfilePageView />);
+
+    await screen.findByRole("heading", { name: "Đổi mật khẩu" });
+    await userEvent.type(screen.getByLabelText("Mật khẩu hiện tại"), "Password@123");
+    await userEvent.type(screen.getByLabelText("Mật khẩu mới"), "NewPassword@123");
+    await userEvent.type(screen.getByLabelText("Xác nhận mật khẩu mới"), "NewPassword@123");
+    await userEvent.click(screen.getByRole("button", { name: "Đổi mật khẩu" }));
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Đã đổi mật khẩu."));
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe("/api/v1/users/me/password");
+    expect(fetchSpy.mock.calls[1]?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({
+        currentPassword: "Password@123",
+        newPassword: "NewPassword@123",
+      }),
+    });
+  });
+
+  it("maps wrong current password to friendly change-password error", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: "u-1",
+          email: "u@e.com",
+          emailVerified: false,
+          roles: ["CUSTOMER"],
+          fullName: "User",
+          phone: "",
+          dateOfBirth: null,
+          addressLine: "",
+          driverVerificationStatus: "NOT_SUBMITTED",
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            code: "AUTH_INVALID_CREDENTIALS",
+            message: "Invalid email or password",
+          },
+          401,
+        ),
+      );
+
+    wrap(<ProfilePageView />);
+
+    await screen.findByRole("heading", { name: "Đổi mật khẩu" });
+    await userEvent.type(screen.getByLabelText("Mật khẩu hiện tại"), "WrongPassword@123");
+    await userEvent.type(screen.getByLabelText("Mật khẩu mới"), "NewPassword@123");
+    await userEvent.type(screen.getByLabelText("Xác nhận mật khẩu mới"), "NewPassword@123");
+    await userEvent.click(screen.getByRole("button", { name: "Đổi mật khẩu" }));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Mật khẩu hiện tại không đúng."),
+    );
+  });
+
   it("defers profile endpoint while auth session is loading", () => {
     fetchSpy.mockImplementation(() => new Promise(() => undefined));
 

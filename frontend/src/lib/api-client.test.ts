@@ -8,6 +8,8 @@ import {
 } from "./api-client";
 import { ApiError } from "./api-error";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function mockResponse(
   status: number,
   body: unknown = null,
@@ -74,6 +76,22 @@ describe("api-client", () => {
     expect((init.headers as Headers).get("Idempotency-Key")).toBe("abc-123");
   });
 
+  it("attaches a generated X-Correlation-Id when missing", async () => {
+    fetchSpy.mockResolvedValue(mockResponse(200, { ok: true }));
+    await api.get("/users/me");
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Headers).get("X-Correlation-Id")).toMatch(UUID_REGEX);
+  });
+
+  it("preserves caller-provided X-Correlation-Id", async () => {
+    fetchSpy.mockResolvedValue(mockResponse(200, { ok: true }));
+    await api.get("/users/me", {
+      headers: { "X-Correlation-Id": "cid-from-caller" },
+    });
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Headers).get("X-Correlation-Id")).toBe("cid-from-caller");
+  });
+
   it("serializes JSON body and sets Content-Type", async () => {
     fetchSpy.mockResolvedValue(mockResponse(200, { ok: true }));
     await api.post("/x", { a: 1 });
@@ -97,6 +115,11 @@ describe("api-client", () => {
     expect(result).toEqual({ ok: true });
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const firstInit = fetchSpy.mock.calls[0][1] as RequestInit;
+    const retryInit = fetchSpy.mock.calls[1][1] as RequestInit;
+    expect((firstInit.headers as Headers).get("X-Correlation-Id")).toBe(
+      (retryInit.headers as Headers).get("X-Correlation-Id"),
+    );
   });
 
   it("calls authFailed handler when refresh fails on 401", async () => {

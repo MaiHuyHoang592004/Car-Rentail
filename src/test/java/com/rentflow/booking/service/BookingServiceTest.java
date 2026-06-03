@@ -156,7 +156,7 @@ class BookingServiceTest {
                 securityContext,
                 emailVerificationPolicy,
                 objectMapper,
-                new com.rentflow.booking.mapper.BookingMapper(listingRepository, bookingPaymentRepository, objectMapper),
+                bookingMapper(fixedClock),
                 bookingPaymentRepository,
                 paymentTransactionRepository,
                 paymentProviderRouter,
@@ -343,7 +343,7 @@ class BookingServiceTest {
                 securityContext,
                 emailVerificationPolicy,
                 objectMapper,
-                new com.rentflow.booking.mapper.BookingMapper(listingRepository, bookingPaymentRepository, objectMapper),
+                bookingMapper(fixedClock),
                 bookingPaymentRepository,
                 paymentTransactionRepository,
                 paymentProviderRouter,
@@ -388,7 +388,7 @@ class BookingServiceTest {
                 securityContext,
                 emailVerificationPolicy,
                 objectMapper,
-                new com.rentflow.booking.mapper.BookingMapper(listingRepository, bookingPaymentRepository, objectMapper),
+                bookingMapper(fixedClock),
                 bookingPaymentRepository,
                 paymentTransactionRepository,
                 paymentProviderRouter,
@@ -673,6 +673,66 @@ class BookingServiceTest {
         assertThatThrownBy(() -> bookingService.getBooking(BOOKING_ID))
                 .isInstanceOf(com.rentflow.common.exception.BookingNotFoundException.class)
                 .hasFieldOrPropertyWithValue("code", "BOOKING_NOT_FOUND");
+    }
+
+    @Test
+    void getCancelPreviewAllowsCustomerOwnerAndUsesInjectedClockPolicy() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPickupDate(LocalDate.of(2026, 5, 13));
+        booking.setReturnDate(LocalDate.of(2026, 5, 15));
+        booking.setPolicySnapshot("""
+                {"cancellationPolicy":"MODERATE","instantBook":true,"dailyKmLimit":200}
+                """);
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        CancellationPreviewResponse result = bookingService.getCancelPreview(BOOKING_ID);
+
+        assertThat(result.eligible()).isTrue();
+        assertThat(result.policy()).isEqualTo(CancellationPolicy.MODERATE);
+        assertThat(result.refundableAmount()).isEqualByComparingTo("750000.000");
+        assertThat(result.penaltyAmount()).isEqualByComparingTo("750000.000");
+    }
+
+    @Test
+    void getCancelPreviewAllowsAdmin() {
+        Booking booking = booking();
+        UUID adminId = UUID.fromString("88888888-8888-8888-8888-888888888888");
+        when(securityContext.currentUserId()).thenReturn(adminId);
+        when(securityContext.hasRole(Role.ADMIN)).thenReturn(true);
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        CancellationPreviewResponse result = bookingService.getCancelPreview(BOOKING_ID);
+
+        assertThat(result.eligible()).isTrue();
+        assertThat(result.refundableAmount()).isEqualByComparingTo("1500000.00");
+        assertThat(result.penaltyAmount()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void getCancelPreviewRejectsNonOwnerAsNotFound() {
+        Booking booking = booking();
+        UUID otherUserId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        when(securityContext.currentUserId()).thenReturn(otherUserId);
+        when(securityContext.hasRole(Role.ADMIN)).thenReturn(false);
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.getCancelPreview(BOOKING_ID))
+                .isInstanceOf(BookingNotFoundException.class)
+                .hasFieldOrPropertyWithValue("code", "BOOKING_NOT_FOUND");
+    }
+
+    @Test
+    void getCancelPreviewRejectsInvalidStatus() {
+        Booking booking = booking();
+        booking.setStatus(BookingStatus.IN_PROGRESS);
+        when(securityContext.currentUserId()).thenReturn(CUSTOMER_ID);
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.getCancelPreview(BOOKING_ID))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("code", "BOOKING_INVALID_STATUS");
     }
 
     @Test
@@ -1298,6 +1358,17 @@ class BookingServiceTest {
         payment.setProviderPaymentOrderId("payment-order-1");
         payment.setProviderHoldId("hold-1");
         return payment;
+    }
+
+    private com.rentflow.booking.mapper.BookingMapper bookingMapper(Clock clock) {
+        return new com.rentflow.booking.mapper.BookingMapper(
+                listingRepository,
+                bookingPaymentRepository,
+                null,
+                null,
+                new CancellationPolicyCalculator(clock),
+                clock,
+                objectMapper);
     }
 
     private PlatformTransactionManager transactionManager() {

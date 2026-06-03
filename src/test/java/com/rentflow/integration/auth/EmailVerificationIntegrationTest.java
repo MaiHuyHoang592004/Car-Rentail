@@ -58,6 +58,33 @@ class EmailVerificationIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("resend-verification keeps an older usable token valid")
+    void resendVerification_doesNotInvalidateOlderUsableToken() throws Exception {
+        String accessToken = registerAndLogin("verify-old@example.com", "Password@123");
+        AuthUser user = authUserRepository.findByEmail("verify-old@example.com").orElseThrow();
+
+        String oldRawToken = "older-usable-token";
+        emailVerificationTokenRepository.save(new EmailVerificationToken(
+                user.getId(),
+                PasswordService.sha256(oldRawToken),
+                Instant.now().plusSeconds(3600)));
+
+        mockMvc.perform(post("/api/v1/users/me/resend-verification")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "token": "%s" }
+                                """.formatted(oldRawToken)))
+                .andExpect(status().isNoContent());
+
+        AuthUser refreshed = authUserRepository.findByEmail("verify-old@example.com").orElseThrow();
+        assertThat(refreshed.getEmailVerified()).isTrue();
+    }
+
+    @Test
     @DisplayName("verify-email with valid token marks user as verified")
     void verifyEmail_validToken_setsEmailVerified() throws Exception {
         registerAndLogin("verify-ok@example.com", "Password@123");

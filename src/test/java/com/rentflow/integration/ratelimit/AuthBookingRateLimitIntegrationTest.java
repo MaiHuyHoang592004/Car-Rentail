@@ -50,6 +50,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "rentflow.rate-limit.enabled=true",
         "rentflow.rate-limit.login.limit=1",
         "rentflow.rate-limit.login.window=PT15M",
+        "rentflow.rate-limit.register.limit=1",
+        "rentflow.rate-limit.register.window=PT15M",
         "rentflow.rate-limit.booking.create-limit=1",
         "rentflow.rate-limit.booking.create-window=PT1H",
         "rentflow.scheduler.expire-held-bookings.enabled=false"
@@ -118,6 +120,42 @@ class AuthBookingRateLimitIntegrationTest extends BaseIntegrationTest {
                                   "password": "wrong-password"
                                 }
                                 """.formatted(email)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"))
+                .andExpect(jsonPath("$.correlationId").exists());
+    }
+
+    @Test
+    void registerBeyondLimitReturns429Contract() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .with(req -> {
+                            req.setRemoteAddr("203.0.113.10");
+                            return req;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "first-register@example.com",
+                                  "password": "Password@123",
+                                  "fullName": "First Register"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .with(req -> {
+                            req.setRemoteAddr("203.0.113.10");
+                            return req;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "second-register@example.com",
+                                  "password": "Password@123",
+                                  "fullName": "Second Register"
+                                }
+                                """))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"))

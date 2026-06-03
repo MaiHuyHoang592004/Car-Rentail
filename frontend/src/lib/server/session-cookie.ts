@@ -8,12 +8,23 @@ export { REFRESH_COOKIE_NAME, ROLE_COOKIE_NAME };
 
 const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
 
+function resolveSecureCookie(): boolean {
+  const configured = process.env.COOKIE_SECURE;
+  if (configured === "true") {
+    return true;
+  }
+  if (configured === "false") {
+    return false;
+  }
+  return process.env.NODE_ENV === "production";
+}
+
 export function setRefreshCookie(response: NextResponse, refreshToken: string) {
   response.cookies.set({
     name: REFRESH_COOKIE_NAME,
     value: refreshToken,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: resolveSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: SEVEN_DAYS_SECONDS,
@@ -25,7 +36,7 @@ export function clearRefreshCookie(response: NextResponse) {
     name: REFRESH_COOKIE_NAME,
     value: "",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: resolveSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: 0,
@@ -37,7 +48,7 @@ export function setRoleCookie(response: NextResponse, roles: string[]) {
     name: ROLE_COOKIE_NAME,
     value: roles.join(","),
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: resolveSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: SEVEN_DAYS_SECONDS,
@@ -49,7 +60,7 @@ export function clearRoleCookie(response: NextResponse) {
     name: ROLE_COOKIE_NAME,
     value: "",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: resolveSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: 0,

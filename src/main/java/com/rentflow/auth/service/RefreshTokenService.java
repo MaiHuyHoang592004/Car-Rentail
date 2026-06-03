@@ -101,6 +101,11 @@ public class RefreshTokenService {
                 });
     }
 
+    @Transactional
+    public int revokeAllByUserId(java.util.UUID userId) {
+        return refreshTokenRepository.revokeAllByUserId(userId, Instant.now());
+    }
+
     public String sha256(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

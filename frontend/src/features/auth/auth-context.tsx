@@ -60,6 +60,7 @@ type AuthContextValue = {
   login: (input: LoginInput) => Promise<AuthUser>;
   register: (input: RegisterInput) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  logoutAll: () => Promise<void>;
   refresh: () => Promise<boolean>;
 };
 
@@ -77,10 +78,16 @@ async function readJsonOrError(response: Response): Promise<unknown> {
 }
 
 async function postBff<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(path, {
+  return fetchJson<T>(path, {
     method: "POST",
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
   });
   const payload = await readJsonOrError(response);
   if (!response.ok) {
@@ -176,6 +183,33 @@ export function AuthProvider({
     router.refresh();
   }, [clearSession, router]);
 
+  const logoutAll = useCallback(async (): Promise<void> => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) {
+      clearSession();
+      router.replace("/");
+      router.refresh();
+      return;
+    }
+
+    await fetchJson<void>("/api/v1/auth/logout-all", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+    });
+
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore, clear local state regardless after backend revoke succeeds
+    }
+    clearSession();
+    router.replace("/");
+    router.refresh();
+  }, [clearSession, router]);
+
   const hasRole = useCallback(
     (role: AuthRole | string) => (user?.roles ?? []).includes(role),
     [user],
@@ -229,9 +263,10 @@ export function AuthProvider({
       login,
       register,
       logout,
+      logoutAll,
       refresh,
     }),
-    [status, user, hasRole, login, register, logout, refresh],
+    [status, user, hasRole, login, register, logout, logoutAll, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -55,20 +55,6 @@ public class BookingMapper {
         this.objectMapper = objectMapper;
     }
 
-    public BookingMapper(
-            ListingRepository listingRepository,
-            BookingPaymentRepository bookingPaymentRepository,
-            ObjectMapper objectMapper) {
-        this(
-                listingRepository,
-                bookingPaymentRepository,
-                null,
-                null,
-                new CancellationPolicyCalculator(Clock.systemUTC()),
-                Clock.systemUTC(),
-                objectMapper);
-    }
-
     public BookingSummaryResponse toSummaryResponse(Booking booking) {
         JsonNode priceSnapshot = readTree(booking.getPriceSnapshot());
         Optional<BookingPayment> payment = bookingPaymentRepository.findByBookingId(booking.getId());
@@ -87,7 +73,10 @@ public class BookingMapper {
                 payment.map(BookingPayment::isVoidRetryRequired).orElse(false),
                 payment.filter(BookingPayment::isVoidRetryRequired)
                         .map(BookingPayment::getProviderStatus)
-                        .orElse(null));
+                        .orElseGet(() -> retryExhausted(payment) ? "VOID_RETRY_EXHAUSTED" : null),
+                payment.map(item -> item.getStatus().name()).orElse(null),
+                payment.map(BookingPayment::getVoidRetryLastError).orElse(null),
+                payment.map(BookingPayment::getVoidRetryCount).orElse(0));
     }
 
     public BookingResponse toResponse(Booking booking) {
@@ -120,7 +109,10 @@ public class BookingMapper {
                 payment.map(BookingPayment::isVoidRetryRequired).orElse(false),
                 payment.filter(BookingPayment::isVoidRetryRequired)
                         .map(BookingPayment::getProviderStatus)
-                        .orElse(null),
+                        .orElseGet(() -> retryExhausted(payment) ? "VOID_RETRY_EXHAUSTED" : null),
+                payment.map(item -> item.getStatus().name()).orElse(null),
+                payment.map(BookingPayment::getVoidRetryLastError).orElse(null),
+                payment.map(BookingPayment::getVoidRetryCount).orElse(0),
                 cancellationPreview(booking, priceSnapshot, policySnapshot),
                 booking.getStatus() == BookingStatus.COMPLETED && !reviewSubmitted,
                 reviewSubmitted,
@@ -130,6 +122,16 @@ public class BookingMapper {
 
     public PageResponse<BookingSummaryResponse> toSummaryPage(Page<Booking> page) {
         return PageResponse.from(page, this::toSummaryResponse);
+    }
+
+    private boolean retryExhausted(Optional<BookingPayment> payment) {
+        return payment
+                .filter(item -> !item.isVoidRetryRequired())
+                .filter(item -> item.getVoidRetryCount() != null && item.getVoidRetryCount() > 0)
+                .filter(item -> item.getVoidRetryLastError() != null && !item.getVoidRetryLastError().isBlank())
+                .filter(item -> item.getStatus() == com.rentflow.payment.entity.PaymentStatus.AUTHORIZED
+                        || item.getStatus() == com.rentflow.payment.entity.PaymentStatus.CAPTURED)
+                .isPresent();
     }
 
     private String findListingTitle(UUID listingId) {
