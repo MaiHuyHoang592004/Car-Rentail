@@ -7,6 +7,7 @@ import { REFRESH_COOKIE_NAME, ROLE_COOKIE_NAME } from "@/lib/session-cookie-shar
 export { REFRESH_COOKIE_NAME, ROLE_COOKIE_NAME };
 
 const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
+type CookieSameSite = "lax" | "strict" | "none";
 
 function resolveSecureCookie(): boolean {
   const configured = process.env.COOKIE_SECURE;
@@ -16,18 +17,41 @@ function resolveSecureCookie(): boolean {
   if (configured === "false") {
     return false;
   }
-  return process.env.NODE_ENV === "production";
+  return process.env.NODE_ENV !== "development";
+}
+
+function resolveSameSite(): CookieSameSite {
+  const configured = process.env.COOKIE_SAME_SITE?.trim().toLowerCase();
+  if (configured === "strict" || configured === "none") {
+    return configured;
+  }
+  return "lax";
+}
+
+function assertCookiePolicy(sameSite: CookieSameSite, secure: boolean) {
+  if (sameSite === "none" && !secure) {
+    throw new Error("COOKIE_SAME_SITE=none requires a secure cookie configuration");
+  }
+}
+
+function sharedCookieOptions(maxAge: number) {
+  const secure = resolveSecureCookie();
+  const sameSite = resolveSameSite();
+  assertCookiePolicy(sameSite, secure);
+  return {
+    httpOnly: true,
+    secure,
+    sameSite,
+    path: "/",
+    maxAge,
+  } as const;
 }
 
 export function setRefreshCookie(response: NextResponse, refreshToken: string) {
   response.cookies.set({
     name: REFRESH_COOKIE_NAME,
     value: refreshToken,
-    httpOnly: true,
-    secure: resolveSecureCookie(),
-    sameSite: "lax",
-    path: "/",
-    maxAge: SEVEN_DAYS_SECONDS,
+    ...sharedCookieOptions(SEVEN_DAYS_SECONDS),
   });
 }
 
@@ -35,11 +59,7 @@ export function clearRefreshCookie(response: NextResponse) {
   response.cookies.set({
     name: REFRESH_COOKIE_NAME,
     value: "",
-    httpOnly: true,
-    secure: resolveSecureCookie(),
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
+    ...sharedCookieOptions(0),
   });
 }
 
@@ -47,11 +67,7 @@ export function setRoleCookie(response: NextResponse, roles: string[]) {
   response.cookies.set({
     name: ROLE_COOKIE_NAME,
     value: roles.join(","),
-    httpOnly: true,
-    secure: resolveSecureCookie(),
-    sameSite: "lax",
-    path: "/",
-    maxAge: SEVEN_DAYS_SECONDS,
+    ...sharedCookieOptions(SEVEN_DAYS_SECONDS),
   });
 }
 
@@ -59,11 +75,7 @@ export function clearRoleCookie(response: NextResponse) {
   response.cookies.set({
     name: ROLE_COOKIE_NAME,
     value: "",
-    httpOnly: true,
-    secure: resolveSecureCookie(),
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
+    ...sharedCookieOptions(0),
   });
 }
 

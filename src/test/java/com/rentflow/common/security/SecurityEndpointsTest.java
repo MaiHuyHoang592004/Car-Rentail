@@ -297,7 +297,7 @@ class SecurityEndpointsTest {
     void verifyEmailEndpoint_withStaleRentFlowCookies_isStillPublic() throws Exception {
         mockMvc.perform(post("/api/v1/auth/verify-email")
                         .cookie(
-                                new jakarta.servlet.http.Cookie("rentflow_refresh", "stale-refresh"),
+                                new jakarta.servlet.http.Cookie("__Host-rentflow_refresh", "stale-refresh"),
                                 new jakarta.servlet.http.Cookie("rentflow_role", "CUSTOMER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

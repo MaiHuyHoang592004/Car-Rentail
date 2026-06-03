@@ -1,4 +1,4 @@
-export const REFRESH_COOKIE_NAME = "rentflow_refresh";
+export const REFRESH_COOKIE_NAME = "__Host-rentflow_refresh";
 export const ROLE_COOKIE_NAME = "rentflow_role";
 
 export function parseRoles(value: string | undefined | null): string[] {

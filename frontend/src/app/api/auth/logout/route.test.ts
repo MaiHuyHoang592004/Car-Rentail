@@ -4,7 +4,7 @@ let cookieValue: string | undefined = "REFRESH";
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
-      name === "rentflow_refresh" && cookieValue !== undefined
+      name === "__Host-rentflow_refresh" && cookieValue !== undefined
         ? { name, value: cookieValue }
         : undefined,
   }),
@@ -32,7 +32,7 @@ describe("POST /api/auth/logout", () => {
     const res = await POST();
     expect(res.status).toBe(204);
     const sc = res.headers.get("set-cookie") ?? "";
-    expect(sc).toContain("rentflow_refresh=;");
+    expect(sc).toContain("__Host-rentflow_refresh=;");
     expect(sc).toContain("Max-Age=0");
   });
 

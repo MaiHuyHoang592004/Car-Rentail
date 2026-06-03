@@ -4,7 +4,7 @@ let cookieValue: string | undefined = "REFRESH";
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
-      name === "rentflow_refresh" && cookieValue !== undefined
+      name === "__Host-rentflow_refresh" && cookieValue !== undefined
         ? { name, value: cookieValue }
         : undefined,
   }),
@@ -76,7 +76,7 @@ describe("POST /api/v1/users/me/resend-verification", () => {
       headers: { Authorization: "Bearer NEW_ACCESS" },
     });
     const cookies = res.headers.get("set-cookie") ?? "";
-    expect(cookies).toContain("rentflow_refresh=NEW_REFRESH");
+    expect(cookies).toContain("__Host-rentflow_refresh=NEW_REFRESH");
     expect(cookies).toContain("rentflow_role=CUSTOMER");
   });
 

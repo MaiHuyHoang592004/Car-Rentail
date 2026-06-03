@@ -4,7 +4,7 @@ let cookieValue: string | undefined = "REFRESH";
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
-      name === "rentflow_refresh" && cookieValue !== undefined
+      name === "__Host-rentflow_refresh" && cookieValue !== undefined
         ? { name, value: cookieValue }
         : undefined,
   }),
@@ -84,7 +84,7 @@ describe("POST /api/auth/refresh", () => {
       },
     });
     const cookies = res.headers.get("set-cookie") ?? "";
-    expect(cookies).toContain("rentflow_refresh=NEW_REFRESH");
+    expect(cookies).toContain("__Host-rentflow_refresh=NEW_REFRESH");
     expect(cookies).toContain("rentflow_role=HOST");
   });
 
@@ -119,7 +119,7 @@ describe("POST /api/auth/refresh", () => {
     const res = await POST();
     expect(res.status).toBe(204);
     const cookies = res.headers.get("set-cookie") ?? "";
-    expect(cookies).toContain("rentflow_refresh=");
+    expect(cookies).toContain("__Host-rentflow_refresh=");
     expect(cookies).toContain("rentflow_role=");
     expect(cookies).toContain("Max-Age=0");
   });

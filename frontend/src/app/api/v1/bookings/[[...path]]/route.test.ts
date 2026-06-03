@@ -5,7 +5,7 @@ let cookieValue: string | undefined = "REFRESH";
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
-      name === "rentflow_refresh" && cookieValue !== undefined
+      name === "__Host-rentflow_refresh" && cookieValue !== undefined
         ? { name, value: cookieValue }
         : undefined,
   }),
@@ -69,7 +69,7 @@ describe("booking BFF route", () => {
     expect(response.status).toBe(401);
     expect(response.headers.get("retry-after")).toBe("60");
     const cookies = response.headers.get("set-cookie") ?? "";
-    expect(cookies).toContain("rentflow_refresh=");
+    expect(cookies).toContain("__Host-rentflow_refresh=");
     expect(cookies).toContain("rentflow_role=");
     expect(cookies).toContain("Max-Age=0");
   });
@@ -141,7 +141,7 @@ describe("booking BFF route", () => {
     expect(thirdCall.headers.get("X-Correlation-Id")).toBe("corr-123");
 
     const cookies = response.headers.get("set-cookie") ?? "";
-    expect(cookies).toContain("rentflow_refresh=NEW_REFRESH");
+    expect(cookies).toContain("__Host-rentflow_refresh=NEW_REFRESH");
     expect(cookies).toContain("rentflow_role=CUSTOMER");
     await expect(response.json()).resolves.toMatchObject({
       id: "bk-1",

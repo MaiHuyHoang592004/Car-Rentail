@@ -82,7 +82,7 @@ describe("POST /api/auth/login", () => {
     expect(body.refreshToken).toBeUndefined();
 
     const sc = res.headers.get("set-cookie") ?? "";
-    expect(sc).toContain("rentflow_refresh=REFRESH");
+    expect(sc).toContain("__Host-rentflow_refresh=REFRESH");
     expect(sc).toContain("rentflow_role=CUSTOMER");
     expect(sc).toContain("HttpOnly");
     expect(sc.toLowerCase()).toContain("samesite=lax");

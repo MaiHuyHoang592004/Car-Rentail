@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.stubEnv("NODE_ENV", "test");
 vi.stubEnv("COOKIE_SECURE", "");
+vi.stubEnv("COOKIE_SAME_SITE", "");
 
 const { NextResponse } = await import("next/server");
 const {
@@ -14,6 +15,16 @@ const {
 } = await import("./session-cookie");
 
 describe("session-cookie helpers", () => {
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("COOKIE_SECURE", "");
+    vi.stubEnv("COOKIE_SAME_SITE", "");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("setRefreshCookie sets httpOnly cookie with 7-day maxAge and sameSite=lax", () => {
     const res = NextResponse.json({});
     setRefreshCookie(res, "refresh-token-xyz");
@@ -34,11 +45,11 @@ describe("session-cookie helpers", () => {
     expect(sc).toContain("HttpOnly");
   });
 
-  it("does not set Secure flag in non-production env", () => {
+  it("sets Secure flag by default outside development", () => {
     const res = NextResponse.json({});
     setRefreshCookie(res, "token");
     const sc = res.headers.get("set-cookie") ?? "";
-    expect(sc.toLowerCase()).not.toContain("secure");
+    expect(sc).toContain("Secure");
   });
 
   it("sets Secure flag when COOKIE_SECURE=true", () => {
@@ -56,7 +67,39 @@ describe("session-cookie helpers", () => {
     setRefreshCookie(res, "token");
     const sc = res.headers.get("set-cookie") ?? "";
     expect(sc.toLowerCase()).not.toContain("secure");
-    vi.stubEnv("COOKIE_SECURE", "");
+  });
+
+  it("omits Secure flag in development when COOKIE_SECURE is unset", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const res = NextResponse.json({});
+    setRefreshCookie(res, "token");
+    const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc.toLowerCase()).not.toContain("secure");
+  });
+
+  it("uses configured SameSite policy when valid", () => {
+    vi.stubEnv("COOKIE_SAME_SITE", "strict");
+    const res = NextResponse.json({});
+    setRefreshCookie(res, "token");
+    const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc.toLowerCase()).toContain("samesite=strict");
+  });
+
+  it("falls back to SameSite=lax for invalid values", () => {
+    vi.stubEnv("COOKIE_SAME_SITE", "weird");
+    const res = NextResponse.json({});
+    setRefreshCookie(res, "token");
+    const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc.toLowerCase()).toContain("samesite=lax");
+  });
+
+  it("rejects SameSite=None when secure cookies are disabled", () => {
+    vi.stubEnv("COOKIE_SAME_SITE", "none");
+    vi.stubEnv("COOKIE_SECURE", "false");
+    const res = NextResponse.json({});
+    expect(() => setRefreshCookie(res, "token")).toThrow(
+      "COOKIE_SAME_SITE=none requires a secure cookie configuration",
+    );
   });
 
   it("setRoleCookie joins roles with comma and sets httpOnly 7-day cookie", () => {
