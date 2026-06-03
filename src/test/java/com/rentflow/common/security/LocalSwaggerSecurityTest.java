@@ -13,10 +13,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
-@ActiveProfiles("prod")
+@ActiveProfiles("local")
 @TestPropertySource(properties = {
         "spring.flyway.enabled=false",
-        "spring.datasource.url=jdbc:h2:mem:prod-swagger-test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
+        "spring.datasource.url=jdbc:h2:mem:local-swagger-test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
@@ -27,22 +27,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "rentflow.scheduler.outbox-publisher.enabled=false",
         "rentflow.scheduler.idempotency-cleanup.enabled=false",
         "rentflow.file.signed-url.secret=test-signed-url-secret-1234567890-abcdef",
-        "encryption.secret-key=Q6iaj8bzwS3UjXZTvgin7MChtBS6lhUZmj19bHF6z1o="
+        "encryption.secret-key=Q6iaj8bzwS3UjXZTvgin7MChtBS6lhUZmj19bHF6z1o=",
+        "springdoc.api-docs.enabled=true",
+        "springdoc.swagger-ui.enabled=true"
 })
-class ProdSwaggerSecurityTest {
+class LocalSwaggerSecurityTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
-    void apiDocs_areDisabledInProd() throws Exception {
+    void apiDocs_arePublicInLocal() throws Exception {
         mockMvc.perform(get("/api-docs"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void swaggerUi_isDisabledInProd() throws Exception {
+    void swaggerUi_isPublicInLocal() throws Exception {
         mockMvc.perform(get("/swagger-ui.html"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isFound());
     }
 }

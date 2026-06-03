@@ -1,6 +1,7 @@
 package com.rentflow.common.config;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.cors.CorsConfiguration;
 
@@ -9,12 +10,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SecurityConfigCorsTest {
 
+    private SecurityConfig configWithOrigins(String origins) {
+        return new SecurityConfig(
+                null,
+                null,
+                null,
+                origins,
+                true,
+                true,
+                new MockEnvironment().withProperty("spring.profiles.active", "test"));
+    }
+
     @Test
     void corsConfiguration_acceptsExplicitOriginsWithCredentials() {
-        SecurityConfig config = new SecurityConfig(
-                null,
-                null,
-                null,
+        SecurityConfig config = configWithOrigins(
                 "http://localhost:3000,http://localhost:3001,http://localhost:3002, https://rentflow.example");
 
         CorsConfiguration cors = config.corsConfigurationSource()
@@ -32,10 +41,7 @@ class SecurityConfigCorsTest {
 
     @Test
     void corsConfiguration_allowsLocalFrontendDevPorts() {
-        SecurityConfig config = new SecurityConfig(
-                null,
-                null,
-                null,
+        SecurityConfig config = configWithOrigins(
                 "http://localhost:3000,http://localhost:3001,http://localhost:3002");
         CorsConfiguration cors = config.corsConfigurationSource()
                 .getCorsConfiguration(new MockHttpServletRequest("POST", "/api/v1/auth/verify-email"));
@@ -47,10 +53,7 @@ class SecurityConfigCorsTest {
 
     @Test
     void corsConfiguration_rejectsUnlistedOrigin() {
-        SecurityConfig config = new SecurityConfig(
-                null,
-                null,
-                null,
+        SecurityConfig config = configWithOrigins(
                 "http://localhost:3000,http://localhost:3001,http://localhost:3002");
         CorsConfiguration cors = config.corsConfigurationSource()
                 .getCorsConfiguration(new MockHttpServletRequest("POST", "/api/v1/auth/verify-email"));
@@ -61,7 +64,7 @@ class SecurityConfigCorsTest {
 
     @Test
     void corsConfiguration_rejectsWildcardOriginsWithCredentials() {
-        SecurityConfig config = new SecurityConfig(null, null, null, "*");
+        SecurityConfig config = configWithOrigins("*");
 
         assertThatThrownBy(config::corsConfigurationSource)
                 .isInstanceOf(IllegalStateException.class)
@@ -70,7 +73,7 @@ class SecurityConfigCorsTest {
 
     @Test
     void corsConfiguration_rejectsBlankOriginConfiguration() {
-        SecurityConfig config = new SecurityConfig(null, null, null, " , ");
+        SecurityConfig config = configWithOrigins(" , ");
 
         assertThatThrownBy(config::corsConfigurationSource)
                 .isInstanceOf(IllegalStateException.class)
