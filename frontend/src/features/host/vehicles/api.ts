@@ -22,6 +22,14 @@ export type {
   UpdateVehicleInput,
 } from "@/features/host/vehicles/types";
 
+export type HostVehiclePage = {
+  content: HostVehicleViewModel[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
 export const HOST_VEHICLE_STATUS_FILTERS: HostVehicleFilterValue[] = [
   "ALL",
   "DRAFT",
@@ -67,13 +75,24 @@ function isNotFoundError(error: unknown): boolean {
 
 export async function getHostVehiclesByStatus(
   status?: HostVehicleFilterValue,
-): Promise<HostVehicleViewModel[]> {
-  const params = new URLSearchParams();
+  page = 0,
+  size = 20,
+): Promise<HostVehiclePage> {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  });
   if (status && status !== "ALL") params.set("status", status);
   const data = await api.get<VehiclePageResponse<VehicleResponse>>(
     `/host/vehicles?${params}`,
   );
-  return data.content.map(mapVehicleResponseToViewModel);
+  return {
+    content: data.content.map(mapVehicleResponseToViewModel),
+    page: data.page ?? data.pageNumber ?? 0,
+    size: data.size,
+    totalElements: data.totalElements,
+    totalPages: data.totalPages,
+  };
 }
 
 export async function getHostVehicleById(

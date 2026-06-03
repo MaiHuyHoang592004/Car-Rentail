@@ -27,7 +27,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -72,7 +74,8 @@ public class ListingService {
         } else {
             listings = listingRepository.findByHostId(hostId, pageable);
         }
-        return mapper.toSummaryPage(listings);
+        Map<UUID, Vehicle> vehiclesById = loadVehiclesById(listings.getContent());
+        return mapper.toSummaryPage(listings, vehiclesById);
     }
 
     @Transactional(readOnly = true)
@@ -292,5 +295,19 @@ public class ListingService {
         listing.setSuspensionReason(null);
         listing.setSuspensionSource(null);
         listing.setSuspensionUntil(null);
+    }
+
+    private Map<UUID, Vehicle> loadVehiclesById(List<Listing> listings) {
+        List<UUID> vehicleIds = listings.stream()
+                .map(Listing::getVehicleId)
+                .distinct()
+                .toList();
+        if (vehicleIds.isEmpty()) {
+            return Map.of();
+        }
+        return vehicleRepository.findAllById(vehicleIds).stream()
+                .collect(LinkedHashMap::new,
+                        (map, vehicle) -> map.put(vehicle.getId(), vehicle),
+                        Map::putAll);
     }
 }

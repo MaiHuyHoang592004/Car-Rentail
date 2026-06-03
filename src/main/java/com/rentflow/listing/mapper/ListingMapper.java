@@ -12,6 +12,7 @@ import com.rentflow.listing.entity.CancellationPolicy;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 
@@ -52,8 +53,8 @@ public class ListingMapper {
         if (request.cancellationPolicy() != null) listing.setCancellationPolicy(request.cancellationPolicy());
     }
 
-    public ListingSummaryResponse toSummaryResponse(Listing listing) {
-        return ListingSummaryResponse.from(listing);
+    public ListingSummaryResponse toSummaryResponse(Listing listing, Vehicle vehicle) {
+        return ListingSummaryResponse.from(listing, buildVehicleLabel(vehicle));
     }
 
     public ListingResponse toResponse(Listing listing, Vehicle vehicle, List<ExtraResponse> extras) {
@@ -73,7 +74,17 @@ public class ListingMapper {
         return ListingResponse.from(listing, vehicleSummary, extras);
     }
 
-    public Page<ListingSummaryResponse> toSummaryPage(Page<Listing> listings) {
-        return listings.map(ListingSummaryResponse::from);
+    public Page<ListingSummaryResponse> toSummaryPage(Page<Listing> listings, Map<UUID, Vehicle> vehiclesById) {
+        return listings.map(listing -> toSummaryResponse(listing, vehiclesById.get(listing.getVehicleId())));
+    }
+
+    private String buildVehicleLabel(Vehicle vehicle) {
+        if (vehicle == null) {
+            return "Unknown vehicle";
+        }
+        return "%s %s (%d)".formatted(
+                vehicle.getMake(),
+                vehicle.getModel(),
+                vehicle.getManufactureYear());
     }
 }

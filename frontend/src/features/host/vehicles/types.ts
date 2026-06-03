@@ -70,7 +70,8 @@ export interface VehiclePageResponse<T> {
   totalElements: number;
   totalPages: number;
   size: number;
-  number: number;
+  page: number;
+  pageNumber?: number;
 }
 
 export interface UpdateVehicleInput {

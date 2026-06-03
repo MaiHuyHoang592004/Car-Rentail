@@ -32,25 +32,30 @@ export type HostVehicleViewModel = {
   }[];
 };
 
-export type HostListingViewModel = {
+export type HostListingSummaryViewModel = {
   id: string;
   vehicleId: string;
   vehicleLabel: string;
   title: string;
-  description: string;
   city: string;
-  address: string;
   basePricePerDay: number;
-  currency: "VND";
+  currency: string;
+  status: HostListingStatus;
+};
+
+export type HostListingDetailViewModel = HostListingSummaryViewModel & {
+  description: string;
+  address: string;
   dailyKmLimit: number;
   instantBook: boolean;
   cancellationPolicy: "FLEXIBLE" | "MODERATE" | "STRICT";
-  status: HostListingStatus;
   suspensionReason?: string | null;
   suspensionSource?: string | null;
   suspensionUntil?: string | null;
   extras: HostListingExtraViewModel[];
 };
+
+export type HostListingViewModel = HostListingDetailViewModel;
 
 export type HostListingExtraViewModel = {
   id: string;

@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public record ListingSummaryResponse(
     UUID id,
+    UUID vehicleId,
+    String vehicleLabel,
     String title,
     String city,
     ListingStatus status,
@@ -16,9 +18,11 @@ public record ListingSummaryResponse(
     String currency,
     Instant createdAt
 ) {
-    public static ListingSummaryResponse from(Listing listing) {
+    public static ListingSummaryResponse from(Listing listing, String vehicleLabel) {
         return new ListingSummaryResponse(
             listing.getId(),
+            listing.getVehicleId(),
+            vehicleLabel,
             listing.getTitle(),
             listing.getCity(),
             listing.getStatus(),

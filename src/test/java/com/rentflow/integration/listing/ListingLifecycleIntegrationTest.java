@@ -230,6 +230,19 @@ class ListingLifecycleIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void hostListings_summaryIncludesVehicleIdentityFields() throws Exception {
+        String vehicleId = createVehicle();
+        createListing(vehicleId, "My Listing");
+
+        mockMvc.perform(get("/api/v1/host/listings")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].vehicleId").value(vehicleId))
+                .andExpect(jsonPath("$.content[0].vehicleLabel").value("Toyota Camry (2020)"))
+                .andExpect(jsonPath("$.content[0].currency").value("VND"));
+    }
+
+    @Test
     void hostListingDetail_returnsSuspensionMetadataForAdminSuspendedListing() throws Exception {
         String vehicleId = createVehicle();
         String listingId = createListing(vehicleId, "My Listing");

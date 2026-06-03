@@ -6,10 +6,10 @@ import { ListChecks } from "lucide-react";
 import { StatusBadge } from "@/components/rentflow/status-badge";
 import { getListingStatusLabel } from "@/lib/display-labels";
 import { formatMoney } from "@/lib/formatters";
-import type { HostListingViewModel } from "@/features/host/types";
+import type { HostListingSummaryViewModel } from "@/features/host/types";
 
 type HostListingRowProps = {
-  listing: HostListingViewModel;
+  listing: HostListingSummaryViewModel;
   onResume?: (listingId: string) => void;
   resumePending?: boolean;
 };

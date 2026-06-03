@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { AlertCircle, Car, ClipboardList, ListChecks } from "lucide-react";
+
+import { FormError } from "@/components/rentflow/form-error";
 import { WorkspaceSidebar } from "@/components/rentflow/workspace-sidebar";
 import { HostWorkspaceNav } from "@/features/host/components/host-workspace-nav";
 import { HostMetricStrip } from "@/features/host/components/host-metric-strip";
@@ -16,6 +18,10 @@ import {
   getListingStatusLabel,
 } from "@/lib/display-labels";
 
+const DASHBOARD_LIST_SIZE = 5;
+const DASHBOARD_LISTING_SIZE = 100;
+const DASHBOARD_VEHICLE_SIZE = 100;
+
 export function HostDashboardPageView() {
   const today = new Date();
   const fromDate = new Date();
@@ -23,48 +29,51 @@ export function HostDashboardPageView() {
   const from = fromDate.toISOString().split("T")[0];
   const to = today.toISOString().split("T")[0];
 
-  const { data: vehicles = [], isLoading: loadingVehicles } = useQuery({
-    queryKey: ["host", "vehicles"],
-    queryFn: () => getHostVehiclesByStatus(),
+  const vehiclesQuery = useQuery({
+    queryKey: ["host", "vehicles", "dashboard"],
+    queryFn: () => getHostVehiclesByStatus("ALL", 0, DASHBOARD_VEHICLE_SIZE),
   });
 
-  const { data: listingsResult, isLoading: loadingListings } = useQuery({
-    queryKey: ["host", "listings"],
-    queryFn: () => getHostListings(undefined, 0, 100),
+  const listingsQuery = useQuery({
+    queryKey: ["host", "listings", "dashboard"],
+    queryFn: () => getHostListings(undefined, 0, DASHBOARD_LISTING_SIZE),
   });
 
-  const { data: pendingBookings, isLoading: loadingBookings } = useQuery({
+  const pendingBookingsQuery = useQuery({
     queryKey: ["host", "bookings", "pending-dashboard"],
     queryFn: () =>
       getHostBookings({
         status: "PENDING_HOST_APPROVAL",
         page: 0,
-        size: 5,
+        size: DASHBOARD_LIST_SIZE,
       }),
   });
 
-  const { data: overview } = useQuery({
+  const overviewQuery = useQuery({
     queryKey: ["host", "reports", "overview", from, to],
     queryFn: () => getHostOverviewReport(from, to),
   });
 
-  const vehicleAttention = vehicles.filter((v) =>
-    ["MAINTENANCE", "SUSPENDED"].includes(v.status),
+  const vehicles = vehiclesQuery.data?.content ?? [];
+  const listings = listingsQuery.data?.listings ?? [];
+  const pendingBookings = pendingBookingsQuery.data?.content ?? [];
+
+  const vehicleAttention = vehicles.filter((vehicle) =>
+    ["MAINTENANCE", "SUSPENDED"].includes(vehicle.status),
   );
-  const listingAttention = (listingsResult?.listings ?? []).filter((l) =>
-    ["PENDING_APPROVAL", "SUSPENDED"].includes(l.status),
+  const listingAttention = listings.filter((listing) =>
+    ["PENDING_APPROVAL", "SUSPENDED"].includes(listing.status),
   );
 
-  const totalVehicles = vehicles.length;
-  const totalListings = listingsResult?.listings.length ?? 0;
-
+  const canUseListingsFallback = !listingsQuery.isError;
+  const canUseVehiclesFallback = !vehiclesQuery.isError;
   const metrics = {
-    totalVehicles,
-    activeListings: overview?.activeListings ?? totalListings,
-    pendingApprovals: overview?.pendingApprovalListings ?? (listingsResult?.listings ?? []).filter(
-      (l) => l.status === "PENDING_APPROVAL",
-    ).length,
-    blockedDates: overview?.blockedDays ?? 0,
+    totalVehicles: canUseVehiclesFallback ? vehiclesQuery.data?.totalElements ?? vehicles.length : 0,
+    activeListings: overviewQuery.data?.activeListings ?? 0,
+    pendingApprovals:
+      overviewQuery.data?.pendingApprovalListings
+      ?? (canUseListingsFallback ? listings.filter((listing) => listing.status === "PENDING_APPROVAL").length : 0),
+    blockedDates: overviewQuery.data?.blockedDays ?? 0,
   };
 
   return (
@@ -73,7 +82,6 @@ export function HostDashboardPageView() {
       activePath="/host/dashboard"
     >
       <div className="space-y-6">
-        {/* Page title */}
         <div>
           <h1 className="text-2xl font-bold text-foreground">Bang dieu khien Chu xe</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -83,7 +91,6 @@ export function HostDashboardPageView() {
 
         <HostMetricStrip metrics={metrics} />
 
-        {/* Quick Actions */}
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-lg font-bold text-foreground">Thao tac nhanh</h2>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -120,9 +127,7 @@ export function HostDashboardPageView() {
           </div>
         </section>
 
-        {/* Two-column: attention items */}
         <div className="grid gap-4 lg:grid-cols-2">
-          {/* Vehicles needing attention */}
           <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <Car className="h-4 w-4 text-muted-foreground" />
@@ -133,8 +138,10 @@ export function HostDashboardPageView() {
                 </span>
               )}
             </div>
-            {loadingVehicles ? (
+            {vehiclesQuery.isLoading ? (
               <p className="mt-3 text-sm text-muted-foreground">Dang tai...</p>
+            ) : vehiclesQuery.isError ? (
+              <FormError>Khong tai duoc du lieu xe can xu ly.</FormError>
             ) : vehicleAttention.length === 0 ? (
               <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                 <AlertCircle className="h-4 w-4 text-emerald-600" />
@@ -163,7 +170,6 @@ export function HostDashboardPageView() {
             )}
           </section>
 
-          {/* Listings needing attention */}
           <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <ListChecks className="h-4 w-4 text-muted-foreground" />
@@ -174,8 +180,10 @@ export function HostDashboardPageView() {
                 </span>
               )}
             </div>
-            {loadingListings ? (
+            {listingsQuery.isLoading ? (
               <p className="mt-3 text-sm text-muted-foreground">Dang tai...</p>
+            ) : listingsQuery.isError ? (
+              <FormError>Khong tai duoc du lieu tin dang can xu ly.</FormError>
             ) : listingAttention.length === 0 ? (
               <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                 <AlertCircle className="h-4 w-4 text-emerald-600" />
@@ -206,22 +214,24 @@ export function HostDashboardPageView() {
             <div className="flex items-center gap-2">
               <ClipboardList className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-base font-bold text-foreground">Booking cho duyet</h2>
-              {(pendingBookings?.content.length ?? 0) > 0 && (
+              {pendingBookings.length > 0 && (
                 <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-800">
-                  {pendingBookings?.content.length}
+                  {pendingBookings.length}
                 </span>
               )}
             </div>
-            {loadingBookings ? (
+            {pendingBookingsQuery.isLoading ? (
               <p className="mt-3 text-sm text-muted-foreground">Dang tai...</p>
-            ) : (pendingBookings?.content.length ?? 0) === 0 ? (
+            ) : pendingBookingsQuery.isError ? (
+              <FormError>Khong tai duoc danh sach booking cho duyet.</FormError>
+            ) : pendingBookings.length === 0 ? (
               <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                 <AlertCircle className="h-4 w-4 text-emerald-600" />
                 Khong co booking nao dang cho duyet.
               </div>
             ) : (
               <div className="mt-3 space-y-2">
-                {pendingBookings?.content.map((booking) => (
+                {pendingBookings.map((booking) => (
                   <Link
                     key={booking.id}
                     href={`/host/bookings/${booking.id}`}
@@ -240,6 +250,10 @@ export function HostDashboardPageView() {
             )}
           </section>
         </div>
+
+        {overviewQuery.isError ? (
+          <FormError>Khong tai duoc bao cao tong quan. So lieu tong hop dang dung fallback an toan.</FormError>
+        ) : null}
       </div>
     </WorkspaceSidebar>
   );

@@ -1,7 +1,8 @@
 import { api } from "@/lib/api-client";
 import type {
   HostListingExtraViewModel,
-  HostListingViewModel,
+  HostListingDetailViewModel,
+  HostListingSummaryViewModel,
   HostListingStatus,
 } from "@/features/host/types";
 import { ApiError } from "@/lib/api-error";
@@ -37,11 +38,13 @@ type RawVehicleSummary = {
 
 type RawListingSummary = {
   id: string;
+  vehicleId: string;
+  vehicleLabel: string;
   title: string;
   city: string;
   status: RawListingStatus;
   basePricePerDay: number | string;
-  currency: string;
+  currency?: string | null;
   createdAt: string;
 };
 
@@ -54,7 +57,7 @@ type RawListingDetail = {
   city: string;
   address: string;
   basePricePerDay: number | string;
-  currency: string;
+  currency?: string | null;
   dailyKmLimit: number;
   instantBook: boolean;
   cancellationPolicy: "FLEXIBLE" | "MODERATE" | "STRICT";
@@ -106,29 +109,24 @@ function mapExtra(raw: RawExtra): HostListingExtraViewModel {
   };
 }
 
-export function mapListingSummary(raw: RawListingSummary): HostListingViewModel {
+function normalizeCurrency(currency?: string | null): string {
+  return currency && currency.trim().length > 0 ? currency : "VND";
+}
+
+export function mapListingSummary(raw: RawListingSummary): HostListingSummaryViewModel {
   return {
     id: raw.id,
-    vehicleId: "", // not in summary response
-    vehicleLabel: "", // not in summary response
+    vehicleId: raw.vehicleId,
+    vehicleLabel: raw.vehicleLabel,
     title: raw.title,
-    description: "",
     city: raw.city,
-    address: "",
     basePricePerDay: toNumber(raw.basePricePerDay),
-    currency: "VND" as const,
-    dailyKmLimit: 0,
-    instantBook: false,
-    cancellationPolicy: "FLEXIBLE" as const,
+    currency: normalizeCurrency(raw.currency),
     status: raw.status,
-    suspensionReason: null,
-    suspensionSource: null,
-    suspensionUntil: null,
-    extras: [],
   };
 }
 
-export function mapListingDetail(raw: RawListingDetail): HostListingViewModel {
+export function mapListingDetail(raw: RawListingDetail): HostListingDetailViewModel {
   return {
     id: raw.id,
     vehicleId: raw.vehicleId,
@@ -138,7 +136,7 @@ export function mapListingDetail(raw: RawListingDetail): HostListingViewModel {
     city: raw.city,
     address: raw.address,
     basePricePerDay: toNumber(raw.basePricePerDay),
-    currency: "VND" as const,
+    currency: normalizeCurrency(raw.currency),
     dailyKmLimit: raw.dailyKmLimit,
     instantBook: raw.instantBook,
     cancellationPolicy: raw.cancellationPolicy,
@@ -154,7 +152,7 @@ export async function getHostListings(
   status?: HostListingFilterValue,
   page = 0,
   size = 50,
-): Promise<{ listings: HostListingViewModel[]; totalElements: number }> {
+): Promise<{ listings: HostListingSummaryViewModel[]; totalElements: number }> {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   if (status && status !== "ALL") {
     params.set("status", status);
@@ -171,26 +169,26 @@ export async function getHostListings(
 
 export async function getHostListingById(
   id: string,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   const raw = await api.get<RawListingDetail>(`/host/listings/${id}`);
   return mapListingDetail(raw);
 }
 
-export async function submitListing(id: string): Promise<HostListingViewModel> {
+export async function submitListing(id: string): Promise<HostListingDetailViewModel> {
   const raw = await api.post<RawListingDetail>(`/host/listings/${id}/submit`);
   return mapListingDetail(raw);
 }
 
 export async function archiveListing(
   id: string,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   const raw = await api.post<RawListingDetail>(`/host/listings/${id}/archive`);
   return mapListingDetail(raw);
 }
 
 export async function reactivateListing(
   id: string,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   const raw = await api.post<RawListingDetail>(
     `/host/listings/${id}/reactivate`,
   );
@@ -199,7 +197,7 @@ export async function reactivateListing(
 
 export async function resumeListing(
   id: string,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   const raw = await api.post<RawListingDetail>(`/host/listings/${id}/resume`);
   return mapListingDetail(raw);
 }
@@ -207,7 +205,7 @@ export async function resumeListing(
 export async function updateListing(
   id: string,
   body: Omit<CreateListingInput, "vehicleId">,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   const raw = await api.patch<RawListingDetail>(`/host/listings/${id}`, body);
   return mapListingDetail(raw);
 }
@@ -265,7 +263,7 @@ export interface CreateListingInput {
 
 export async function createListing(
   body: CreateListingInput,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   const raw = await api.post<RawListingDetail>("/host/listings", body);
   return mapListingDetail(raw);
 }
@@ -293,7 +291,7 @@ function handleListingError(err: unknown): never {
 
 export async function submitListingSafe(
   id: string,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   try {
     return await submitListing(id);
   } catch (err) {
@@ -303,7 +301,7 @@ export async function submitListingSafe(
 
 export async function archiveListingSafe(
   id: string,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   try {
     return await archiveListing(id);
   } catch (err) {
@@ -313,7 +311,7 @@ export async function archiveListingSafe(
 
 export async function reactivateListingSafe(
   id: string,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   try {
     return await reactivateListing(id);
   } catch (err) {
@@ -323,7 +321,7 @@ export async function reactivateListingSafe(
 
 export async function resumeListingSafe(
   id: string,
-): Promise<HostListingViewModel> {
+): Promise<HostListingDetailViewModel> {
   try {
     return await resumeListing(id);
   } catch (err) {
