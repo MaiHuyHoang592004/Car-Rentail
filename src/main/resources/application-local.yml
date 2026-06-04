@@ -13,6 +13,17 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:false}
 
 logging:
   level:
@@ -28,6 +39,9 @@ encryption:
   secret-key: ${ENCRYPTION_SECRET_KEY:}
 
 rentflow:
+  mail:
+    enabled: ${RENTFLOW_MAIL_ENABLED:true}
+    frontend-base-url: ${RENTFLOW_FRONTEND_BASE_URL:http://localhost:3000}
   file:
     signed-url:
       secret: ${RENTFLOW_FILE_SIGNED_URL_SECRET:rentflow-local-file-signed-url-secret-1234567890}

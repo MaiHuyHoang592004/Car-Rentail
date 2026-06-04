@@ -32,7 +32,7 @@ class SmtpEmailDeliveryServiceTest {
                 mailSenderProvider,
                 false,
                 "no-reply@rentflow.local",
-                "http://localhost:3002",
+                "http://localhost:3000",
                 "",
                 1025);
 
@@ -50,7 +50,7 @@ class SmtpEmailDeliveryServiceTest {
                 mailSenderProvider,
                 true,
                 "no-reply@rentflow.local",
-                "http://localhost:3002",
+                "http://localhost:3000",
                 "",
                 1025);
 
@@ -69,7 +69,7 @@ class SmtpEmailDeliveryServiceTest {
                 mailSenderProvider,
                 true,
                 "no-reply@rentflow.local",
-                "http://localhost:3002",
+                "http://localhost:3000",
                 "smtp.example.com",
                 587);
 
@@ -88,7 +88,7 @@ class SmtpEmailDeliveryServiceTest {
                 mailSenderProvider,
                 true,
                 "no-reply@rentflow.local",
-                "http://localhost:3002",
+                "http://localhost:3000",
                 "smtp.example.com",
                 587);
 
@@ -106,7 +106,7 @@ class SmtpEmailDeliveryServiceTest {
         assertThat(message.getSubject()).isEqualTo("Xác minh email RentFlow");
         assertThat(message.getText())
                 .contains("Vui lòng xác minh email RentFlow")
-                .contains("http://localhost:3002/verify-email?token=raw-token")
+                .contains("http://localhost:3000/verify-email?token=raw-token")
                 .contains("2026-06-02T10:00:00Z");
     }
 
@@ -120,7 +120,7 @@ class SmtpEmailDeliveryServiceTest {
                 mailSenderProvider,
                 true,
                 "no-reply@rentflow.local",
-                "http://localhost:3002",
+                "http://localhost:3000",
                 "smtp.example.com",
                 587);
 

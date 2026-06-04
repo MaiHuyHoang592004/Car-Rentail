@@ -29,6 +29,13 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit
+    container_name: rentflow-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   postgrest:
     image: postgrest/postgrest:v12.2.0
     container_name: rentflow-postgrest

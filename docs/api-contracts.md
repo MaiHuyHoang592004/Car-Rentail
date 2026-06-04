@@ -191,7 +191,7 @@ Runtime configuration for real SMTP email delivery:
 ```env
 RENTFLOW_MAIL_ENABLED=true
 RENTFLOW_MAIL_FROM=no-reply@rentflow.example
-RENTFLOW_FRONTEND_BASE_URL=http://localhost:3002
+RENTFLOW_FRONTEND_BASE_URL=http://localhost:3000
 RENTFLOW_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002
 SPRING_MAIL_HOST=smtp.example.com
 SPRING_MAIL_PORT=587
@@ -211,7 +211,13 @@ Provider examples:
 Local Mailpit flow:
 
 ```powershell
+# Option A: use the repo compose service
+docker compose up -d mailpit
+
+# Option B: run Mailpit ad hoc
 docker run --rm -p 1025:1025 -p 8025:8025 axllent/mailpit
+
+# Start backend in the same terminal so mail env applies to that process
 powershell -ExecutionPolicy Bypass -File .\scripts\start-backend-mailpit.ps1
 ```
 
@@ -219,6 +225,7 @@ Mailpit SMTP listens on `localhost:1025`; the inbox UI is `http://localhost:8025
 The backend script writes logs to `%TEMP%\rentflow-backend.log` and starts `http://localhost:8087`.
 If port `8087` is already in use, stop the owning process first.
 Environment variables set in one terminal do not affect a backend process launched by another terminal, agent, or script; set the mail env vars in the same process that runs `mvn spring-boot:run`.
+The `local` profile now defaults to Mailpit (`localhost:1025`) with `rentflow.mail.enabled=true`; production must still opt in explicitly through environment variables.
 
 Raw verification tokens are never stored in the database and must not be logged. The backend stores only the token hash and sends the raw token inside the frontend link.
 

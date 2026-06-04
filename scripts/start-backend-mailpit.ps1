@@ -27,6 +27,7 @@ if (Test-Path $logFile) {
 
 $env:RENTFLOW_MAIL_ENABLED = "true"
 $env:RENTFLOW_MAIL_FROM = "no-reply@rentflow.local"
+$env:RENTFLOW_FRONTEND_BASE_URL = "http://localhost:3000"
 $env:SPRING_MAIL_HOST = "localhost"
 $env:SPRING_MAIL_PORT = "1025"
 $env:SPRING_MAIL_USERNAME = ""
