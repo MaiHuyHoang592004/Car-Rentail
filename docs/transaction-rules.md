@@ -117,15 +117,19 @@ FOR UPDATE SKIP LOCKED;
 5. Lock booking_payment if exists.
 6. Lock availability rows.
 7. Apply cancellation policy.
-8. Void/refund/capture penalty as needed.
-9. booking -> CANCELLED.
-10. Release availability if before check-in.
-11. Write audit/timeline/outbox.
-12. Commit.
+8. Create pending CAPTURE/VOID payment transaction rows as needed.
+9. Commit prepare transaction.
+10. Call provider outside the DB transaction.
+11. Re-lock booking/payment/availability and revalidate prepared state.
+12. Mark payment transaction success/failure.
+13. booking -> CANCELLED.
+14. Release availability if before check-in.
+15. Write audit/timeline/outbox.
+16. Commit finalize transaction.
 ```
 
-**⚠ VIOLATION: Provider calls (callCapture, callVoid) are made INSIDE the transaction while holding all locks.**
-Target for Slice 4 refactor.
+Provider calls now run outside the DB transaction using `prepare -> provider call -> finalize`.
+Partial-penalty cancellation finalizes CAPTURE before attempting VOID, so local drift after capture stops the flow before another provider call. ✅
 
 ---
 
@@ -146,13 +150,15 @@ cancelBookingWithPenalty()
 6. Validate payment.status = AUTHORIZED.
 7. Calculate refundPercent and penaltyAmount.
 8. If penaltyAmount > 0:
-   - CAPTURE penaltyAmount.
-9. VOID remaining authorization.
-10. Update booking_payments aggregate.
-11. booking -> CANCELLED.
-12. availability -> FREE.
-13. Write audit/timeline/outbox.
-14. Commit.
+   - prepare CAPTURE/PENDING.
+9. Prepare VOID/PENDING for remaining authorization.
+10. Commit prepare transaction.
+11. CAPTURE penaltyAmount outside DB TX.
+12. Re-lock and finalize CAPTURE before attempting VOID.
+13. VOID remaining authorization outside DB TX.
+14. Re-lock and finalize booking/payment/availability cancellation.
+15. Write audit/timeline/outbox.
+16. Commit finalize transaction.
 
 **Failure handling:**
 
@@ -171,8 +177,7 @@ VOID fails after CAPTURE succeeds:
 
 **Critical: CAPTURE before VOID (BR-47)**
 
-**⚠ VIOLATION: Provider calls are made INSIDE the transaction while holding all locks.**
-Target for Slice 4 refactor.
+Provider calls now run outside the DB transaction. Finalization drift returns `PAYMENT_FINALIZATION_UNSAFE` and does not overwrite local state. ✅
 
 ---
 
@@ -368,7 +373,7 @@ FAILED:
 | **Capture** | `CoreBankCaptureService.capture()` | ✅ booking → payment (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW |
 | **Void** | `CoreBankVoidService.voidAuthorization()` | ✅ booking → payment (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW |
 | **Refund** | `CoreBankRefundService.refund()` | ✅ booking → payment (prepare + finalize) | ✅ Yes (between prepare/finalize) | LOW |
-| **Cancel booking** | `BookingService.cancelBooking()` | ✅ booking → payment → availability | ❌ No — callCapture/callVoid INSIDE TX | **HIGH** |
+| **Cancel booking** | `BookingService.cancelBooking()` | ✅ booking → payment → availability | ✅ Yes (split TX pattern) | LOW |
 | **Host approve** | `HostBookingApprovalService.approveBooking()` | ✅ booking → payment → availability | ✅ No provider call | OK |
 | **Host reject** | `HostBookingApprovalService.rejectBooking()` | ✅ booking → payment → availability | ✅ Yes (split TX pattern) | LOW |
 | **Void retry** | `DefaultPaymentVoidRetryService.retrySingle()` | ✅ payment lock only; prepare/finalize relock before mutation | ✅ Yes (between prepare/finalize) | LOW |
@@ -379,10 +384,9 @@ FAILED:
 
 ### Violation Summary
 
-**Remaining provider-call-while-holding-locks violations:**
-- `BookingService.cancelBooking` → `callCapture` + `callVoid`
+No known provider-call-while-holding-locks violation remains in the listed payment, booking, or host-approval mutation paths.
 
-All other payment/host-approval mutation paths listed in this matrix now follow:
+All payment/host-approval mutation paths listed in this matrix now follow:
 
 ```text
 prepare (lock + validate + create PENDING payment_transaction)

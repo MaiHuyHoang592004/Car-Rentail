@@ -19,7 +19,7 @@ Slice 5 and Slice 6 are one committed delivery scope: do not pause, defer, or en
 | GAP-002 | P3 | frontend | done | Done | Listing create UI filters to ACTIVE vehicles. |
 | GAP-003 | P2 | frontend | done | Slice 4 | Vehicle archive confirmation lists affected listings via archive preview API. |
 | GAP-004 | P3 | backend | todo | Slice 7 | Plate/VIN decrypt failure has no explicit user-facing state. |
-| GAP-005 | P1 | fullstack | todo | Slice 4 | Suspended listing lacks persisted source/reason/status guidance. |
+| GAP-005 | P1 | fullstack | done | Slice 4 | Suspended listing now persists source/reason metadata for admin and vehicle-driven suspensions. |
 | GAP-006 | P2 | fullstack | done | Slice 4 | Listing edit is draft-only; UI guides archive -> reactivate -> edit -> resubmit. |
 | GAP-007 | P1 | fullstack | done | Slice 4 | Host can manage listing extras via API/UI (soft delete). |
 | GAP-008 | P3 | fullstack | deferred | Slice 7 | Currency is effectively VND-only. |

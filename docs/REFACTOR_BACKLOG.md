@@ -296,9 +296,9 @@ if (userOpt.isEmpty()) {
 
 This file is now primarily a historical record of completed refactors and deferred nice-to-have items.
 For active release-hardening work, treat [`docs/roadmap.md`](docs/roadmap.md) and `docs/transaction-rules.md`
-as the source of truth. Current active gap: `BookingService.cancelBooking()` still needs the same
-provider-call-outside-transaction hardening already applied to host reject, void retry, trip checkout,
-and host-approval expiry.
+as the source of truth. The previous active gap in `BookingService.cancelBooking()` is closed: cancellation
+now follows the same provider-call-outside-transaction hardening already applied to host reject, void retry,
+trip checkout, and host-approval expiry.
 
 | Category | Count | Effort |
 |---|---|---|

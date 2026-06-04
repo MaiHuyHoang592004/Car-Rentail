@@ -49,11 +49,12 @@ Frontend đã tồn tại trong `frontend/` với:
 - Outbox publisher `9.6`: scheduler + retry/backoff/max-attempt persistence has been implemented with unit coverage and integration evidence for retry progression/idempotent send behavior.
 - CI/observability baseline `9.7`: GitHub Actions CI (`unit/package` + `integration profile`) and actuator metrics/prometheus exposure with secured access are now wired.
 - Release stabilization `9.8`: CoreBank external-order query param assertion is now semantic (decoded key/value), and `mvn clean verify` gate is green.
-- Frontend auth hardening `FE-AUTH-2`: `api-client` runtime ownership is now instance-first via `AuthProvider`, BFF refresh re-syncs `rentflow_role` via `/users/me`, and middleware treats missing/empty role cookie as an invalid session.
+- Frontend auth hardening `FE-AUTH-2`: `api-client` runtime ownership is now instance-first via `AuthProvider`, BFF refresh re-syncs `rentflow_role` via `/users/me`, and the Next.js proxy treats missing/empty role cookie as an invalid session.
 - Email verification enforcement `AUTH-VERIFY-3`: booking creation and payment authorization now reject unverified accounts with `403 EMAIL_NOT_VERIFIED`, and frontend maps that state to profile/resend-verification UX.
 - Frontend UX/integration hardening: mobile nav drawer, Vietnamese-first copy, real listing/profile API wiring, and local startup preflight/one-command backend scripts are now in place.
-- Transaction correctness hardening `TX-HARDEN-1`: host reject, trip checkout capture, void retry, and host-approval expiry now use `prepare -> provider call outside TX -> finalize` with finalize-time revalidation and `PAYMENT_FINALIZATION_UNSAFE` evidence on drift.
-- Remaining transaction gap for this track: `BookingService.cancelBooking()` still performs provider capture/void work while holding DB locks and remains the primary release-correctness follow-up.
+- Listing suspension metadata hardening: admin and vehicle-driven listing suspensions now expose persisted reason/source guidance for host/admin review.
+- Transaction correctness hardening `TX-HARDEN-1`: host reject, trip checkout capture, void retry, host-approval expiry, and booking cancellation now use `prepare -> provider call outside TX -> finalize` with finalize-time revalidation and `PAYMENT_FINALIZATION_UNSAFE` evidence on drift.
+- Cancellation release-correctness gap is closed for `BookingService.cancelBooking()`: CoreBank capture/void work is outside DB transactions, partial-penalty capture finalizes before void, and drift/void-retry behavior is covered by integration tests.
 - Integration gate recovery `TX-HARDEN-1A`: `BookingMapper` bean wiring was normalized to a single runtime constructor, restoring Spring app-context boot for booking/trip integration tests and unblocking full `mvn test` gate.
 
 ### Docs/code drift
@@ -219,8 +220,8 @@ This migration is complete for the current MVP surface:
 ### Route protection
 
 - Short term: backend remains authoritative.
-- Medium: central route policy table shared by server layouts and `middleware.ts`.
-- Middleware now treats refresh-cookie-without-role-cookie as an invalid session, not authenticated state.
+- Medium: central route policy table shared by server layouts and `proxy.ts`.
+- The Next.js proxy now treats refresh-cookie-without-role-cookie as an invalid session, not authenticated state.
 - Avoid fetching sensitive SSR data before role validation.
 
 ### Form validation

@@ -211,7 +211,8 @@ Base config remains strict outside `local`: non-local startup still requires exp
 - [x] Booking core: HELD booking creation, idempotency, overlap prevention, availability locking, customer cancellation for HELD/pending/confirmed pre-pickup paths, hold expiry scheduler.
 - [x] Frontend shell: Next.js app, auth BFF, auth provider, API client, public listings, host pages, booking detail, payment authorization, and admin pages.
 
-Current priority: transaction hardening around booking cancellation/payment mutations, API/doc consistency, and release evidence.
+Current priority: release-gate evidence, API/doc consistency, and incremental UX polish. The booking
+cancellation/payment transaction-hardening track is closed in code and covered by backend regression tests.
 
 ## Troubleshooting
 
