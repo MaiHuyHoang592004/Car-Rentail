@@ -24,11 +24,7 @@ export function VerifyEmailPageView() {
   const [verifyError, setVerifyError] = useState<unknown>(null);
 
   useEffect(() => {
-    if (!token) {
-      setVerifyStatus("error");
-      setVerifyError(null);
-      return;
-    }
+    if (!token) return;
 
     if (submittedTokenRef.current === token) {
       return;
