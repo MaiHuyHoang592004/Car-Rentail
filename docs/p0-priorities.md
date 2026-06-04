@@ -1,5 +1,10 @@
 # P0 Priorities — RentFlow
 
+> Historical planning note. The current codebase has already passed the original P0 scope and now tracks
+> active work in [`docs/roadmap.md`](roadmap.md) and release evidence in
+> [`docs/release-gate-evidence.md`](release-gate-evidence.md). Keep this file as portfolio context, not as
+> an active implementation checklist.
+
 These are the features that must be completed before any P1 or P2 work begins.
 
 ---
