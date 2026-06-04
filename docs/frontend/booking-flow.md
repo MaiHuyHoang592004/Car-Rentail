@@ -121,7 +121,7 @@ stateDiagram-v2
 - `frontend/src/lib/idempotency.ts` cung cấp `useIdempotencyKey()` (UUID v4, hold trong ref per form) và `newIdempotencyKey()` (sinh ad-hoc).
 - Browser fetch → `/api/v1/bookings/...` → `next.config.ts` rewrite → Spring `BookingController`.
 
-**Gap đã biết**: `api-client.ts` chưa sinh/gắn `X-Correlation-Id` outgoing. Backend `CorrelationIdFilter` tự sinh nếu thiếu và echo trong error JSON body. Issue riêng (xem Out of scope spec doc), không thuộc Sprint 2-wire.
+**Resolved utility note**: `api-client.ts` now generates `X-Correlation-Id` for outgoing `/api/v1` calls when callers do not provide one. Backend `CorrelationIdFilter` still generates and echoes a correlation id for external clients that omit it.
 
 ### Endpoint map
 
@@ -283,7 +283,7 @@ Confirm OK. Tách thành plan riêng:
 - **Sprint 4+ — Admin booking view** — plan riêng.
 - Payment UI (Phase 6).
 - Driver verification UI (Phase 8A).
-- **X-Correlation-Id outgoing** trong `api-client.ts` (utility gap, không phải BFF) — issue riêng.
+- **X-Correlation-Id outgoing** trong `api-client.ts` — resolved by the shared API client generating the header when missing.
 
 ## Backlog (track riêng, kế thừa từ mục 1.6)
 

@@ -27,6 +27,8 @@ Authorization: Bearer <accessToken>
 X-Correlation-Id: <client-generated-or-empty>
 ```
 
+The shared frontend API client generates `X-Correlation-Id` for `/api/v1` calls when callers do not provide one, and preserves caller-provided values. Backend still generates and echoes a correlation id if an external client omits the header.
+
 `Idempotency-Key` is required by current code for:
 
 ```http
