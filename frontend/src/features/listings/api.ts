@@ -18,13 +18,15 @@ export const DEFAULT_LISTING_FILTERS: ListingFilterState = {
   sort: "NEWEST",
 };
 
+type ListingSearchParamsInput = Record<string, string | string[] | undefined>;
+
 type RawListingSearchResponse = {
   id: string;
   title: string;
   city: string;
   category: string | null;
   basePricePerDay: number | string;
-  currency: string;
+  currency: string | null;
   seats: number | null;
   transmission: "AUTO" | "MANUAL" | null;
   fuelType: string | null;
@@ -52,6 +54,40 @@ function addIfPresent(params: URLSearchParams, key: string, value: string) {
   if (trimmed) {
     params.set(key, trimmed);
   }
+}
+
+function firstParamValue(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
+function normalizeFilterValue(value: string | string[] | undefined): string {
+  return firstParamValue(value).trim();
+}
+
+export function parseListingFiltersFromSearchParams(
+  searchParams: ListingSearchParamsInput,
+): ListingFilterState {
+  const sort = normalizeFilterValue(searchParams.sort);
+  return {
+    query: normalizeFilterValue(searchParams.query),
+    city: normalizeFilterValue(searchParams.city),
+    pickupDate: normalizeFilterValue(searchParams.pickupDate),
+    returnDate: normalizeFilterValue(searchParams.returnDate),
+    category:
+      normalizeFilterValue(searchParams.categories) ||
+      normalizeFilterValue(searchParams.category) ||
+      DEFAULT_LISTING_FILTERS.category,
+    transmission:
+      normalizeFilterValue(searchParams.transmission) || DEFAULT_LISTING_FILTERS.transmission,
+    fuelType: normalizeFilterValue(searchParams.fuelType) || DEFAULT_LISTING_FILTERS.fuelType,
+    seats: normalizeFilterValue(searchParams.seats),
+    minPrice: normalizeFilterValue(searchParams.minPrice),
+    maxPrice: normalizeFilterValue(searchParams.maxPrice),
+    sort:
+      sort === "PRICE_ASC" || sort === "PRICE_DESC" || sort === "NEWEST"
+        ? sort
+        : DEFAULT_LISTING_FILTERS.sort,
+  };
 }
 
 export function buildListingSearchQuery(
@@ -90,7 +126,7 @@ type RawListingSummaryResponse = {
   city: string;
   status: string;
   basePricePerDay: number | string;
-  currency: string;
+  currency: string | null;
   createdAt: string;
 };
 
@@ -101,7 +137,7 @@ type RawListingDetailResponse = {
   city: string;
   address: string;
   basePricePerDay: number | string;
-  currency: string;
+  currency: string | null;
   dailyKmLimit: number;
   instantBook: boolean;
   cancellationPolicy: "FLEXIBLE" | "MODERATE" | "STRICT";
@@ -116,8 +152,13 @@ type RawListingDetailResponse = {
     seats: number;
     status: string;
   } | null;
-  extras: { id: string; name: string; price: number; currency: string }[];
+  extras: { id: string; name: string; price: number; currency: string | null }[];
 };
+
+function resolveCurrency(value: string | null | undefined): "VND" {
+  void value;
+  return "VND";
+}
 
 export function mapListingSearchResponse(raw: RawListingSearchResponse): ListingCardViewModel {
   const rating = raw.ratingAverage == null ? null : toNumber(raw.ratingAverage);
@@ -127,7 +168,7 @@ export function mapListingSearchResponse(raw: RawListingSearchResponse): Listing
     city: raw.city,
     category: raw.category ?? "UNKNOWN",
     basePricePerDay: toNumber(raw.basePricePerDay),
-    currency: "VND",
+    currency: resolveCurrency(raw.currency),
     seats: raw.seats ?? 0,
     transmission: raw.transmission ?? "AUTO",
     fuelType: raw.fuelType ?? "UNKNOWN",
@@ -168,7 +209,7 @@ function toListingCard(raw: RawListingSearchResponse | RawListingSummaryResponse
     city: raw.city,
     category: "category" in raw ? (raw.category ?? "UNKNOWN") : "UNKNOWN",
     basePricePerDay: toNumber(raw.basePricePerDay),
-    currency: "VND",
+    currency: resolveCurrency(raw.currency),
     seats: "seats" in raw ? (raw.seats ?? 0) : 0,
     transmission: ("transmission" in raw && raw.transmission) ? raw.transmission : "AUTO",
     fuelType: "fuelType" in raw ? (raw.fuelType ?? "UNKNOWN") : "UNKNOWN",
@@ -186,7 +227,7 @@ function mapListingDetail(raw: RawListingDetailResponse): ListingDetailViewModel
     city: raw.city,
     address: raw.address,
     basePricePerDay: toNumber(raw.basePricePerDay),
-    currency: "VND",
+    currency: resolveCurrency(raw.currency),
     dailyKmLimit: raw.dailyKmLimit,
     instantBook: raw.instantBook,
     cancellationPolicy: raw.cancellationPolicy,
@@ -206,7 +247,12 @@ function mapListingDetail(raw: RawListingDetailResponse): ListingDetailViewModel
       : {
           make: "", model: "", year: 0, category: "", seats: 0, transmission: "AUTO" as const, fuelType: "",
         },
-    extras: raw.extras.map((e) => ({ id: e.id, name: e.name, price: e.price, currency: "VND" as const })),
+    extras: raw.extras.map((e) => ({
+      id: e.id,
+      name: e.name,
+      price: e.price,
+      currency: resolveCurrency(e.currency),
+    })),
     availability: { from: "", to: "", days: [] },
   };
 }

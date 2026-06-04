@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_LISTING_FILTERS,
   buildListingSearchQuery,
+  getListingDetailById,
   mapListingSearchResponse,
+  parseListingFiltersFromSearchParams,
   searchListings,
 } from "./api";
 
@@ -69,6 +71,36 @@ describe("listing search api", () => {
     expect(params.get("size")).toBe("20");
   });
 
+  it("hydrates listing filters from URL search params", () => {
+    expect(
+      parseListingFiltersFromSearchParams({
+        city: [" Hanoi "],
+        query: "Toyota",
+        categories: "SUV",
+        transmission: "AUTO",
+        fuelType: "EV",
+        seats: "7",
+        minPrice: "800000",
+        maxPrice: "2000000",
+        pickupDate: "2026-07-01",
+        returnDate: "2026-07-03",
+        sort: "PRICE_ASC",
+      }),
+    ).toEqual({
+      query: "Toyota",
+      city: "Hanoi",
+      pickupDate: "2026-07-01",
+      returnDate: "2026-07-03",
+      category: "SUV",
+      transmission: "AUTO",
+      fuelType: "EV",
+      seats: "7",
+      minPrice: "800000",
+      maxPrice: "2000000",
+      sort: "PRICE_ASC",
+    });
+  });
+
   it("maps backend search result to listing card view model", () => {
     const card = mapListingSearchResponse({
       id: "lst-1",
@@ -76,7 +108,7 @@ describe("listing search api", () => {
       city: "Hanoi",
       category: "SEDAN",
       basePricePerDay: "700000.00",
-      currency: "VND",
+      currency: "USD",
       seats: 5,
       transmission: "AUTO",
       fuelType: "GASOLINE",
@@ -97,6 +129,24 @@ describe("listing search api", () => {
       ratingLabel: "4.8 rating",
     });
     expect(card.coverImageUrl).toContain("images.unsplash.com");
+  });
+
+  it("falls back to VND when backend search currency is missing", () => {
+    const card = mapListingSearchResponse({
+      id: "lst-2",
+      title: "Honda City",
+      city: "Da Nang",
+      category: "SEDAN",
+      basePricePerDay: 500000,
+      currency: null,
+      seats: 5,
+      transmission: "AUTO",
+      fuelType: "GASOLINE",
+      coverPhotoUrl: null,
+      ratingAverage: null,
+    });
+
+    expect(card.currency).toBe("VND");
   });
 
   it("calls GET /listings with search params and maps page", async () => {
@@ -128,5 +178,65 @@ describe("listing search api", () => {
 
     expect(page.content[0].title).toBe("Toyota Vios");
     expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/listings?city=Hanoi&sort=NEWEST&page=0&size=20");
+  });
+
+  it("normalizes listing detail and extras currency to VND for public flow", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        id: "lst-3",
+        title: "Tesla Model 3",
+        description: "Electric sedan",
+        city: "Hanoi",
+        address: "123 EV Street",
+        basePricePerDay: "100.00",
+        currency: "USD",
+        dailyKmLimit: 250,
+        instantBook: true,
+        cancellationPolicy: "FLEXIBLE",
+        photos: [],
+        vehicleSummary: {
+          category: "SEDAN",
+          make: "Tesla",
+          model: "Model 3",
+          year: 2024,
+          transmission: "AUTO",
+          fuelType: "ELECTRIC",
+          seats: 5,
+          status: "ACTIVE",
+        },
+        extras: [{ id: "ex-1", name: "Baby seat", price: 10, currency: "USD" }],
+      }),
+    );
+
+    const detail = await getListingDetailById("lst-3");
+
+    expect(detail?.currency).toBe("VND");
+    expect(detail?.extras[0]?.currency).toBe("VND");
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/listings/lst-3");
+  });
+
+  it("falls back to VND when listing detail currency is missing", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        id: "lst-4",
+        title: "Kia Morning",
+        description: "Compact",
+        city: "HCM",
+        address: "456 Small Car Ave",
+        basePricePerDay: 450000,
+        currency: "",
+        dailyKmLimit: 150,
+        instantBook: false,
+        cancellationPolicy: "MODERATE",
+        photos: [],
+        vehicleSummary: null,
+        extras: [{ id: "ex-2", name: "GPS", price: 5, currency: null }],
+      }),
+    );
+
+    const detail = await getListingDetailById("lst-4");
+
+    expect(detail?.currency).toBe("VND");
+    expect(detail?.extras[0]?.currency).toBe("VND");
   });
 });

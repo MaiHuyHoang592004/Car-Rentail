@@ -111,8 +111,14 @@ export function LoginPageView({ redirectIntent }: LoginPageViewProps) {
               }
             >
               <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Email</label>
+                <label
+                  htmlFor="login-email"
+                  className="mb-1 block text-sm font-semibold text-foreground"
+                >
+                  Email
+                </label>
                 <input
+                  id="login-email"
                   type="email"
                   autoComplete="email"
                   {...form.register("email")}
@@ -124,8 +130,14 @@ export function LoginPageView({ redirectIntent }: LoginPageViewProps) {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-semibold text-foreground">Mật khẩu</label>
+                <label
+                  htmlFor="login-password"
+                  className="mb-1 block text-sm font-semibold text-foreground"
+                >
+                  Mật khẩu
+                </label>
                 <input
+                  id="login-password"
                   type="password"
                   autoComplete="current-password"
                   {...form.register("password")}

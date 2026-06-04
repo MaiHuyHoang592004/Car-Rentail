@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/listings",
 }));
 
+import { DEFAULT_LISTING_FILTERS } from "@/features/listings/api";
 import { AuthProvider } from "@/features/auth/auth-context";
 import { ListingsPageView } from "./listings-page-view";
 
@@ -69,6 +70,28 @@ describe("ListingsPageView", () => {
 
     await waitFor(() => expect(screen.getByText("Toyota Vios 2022")).toBeInTheDocument());
     expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/listings?sort=NEWEST&page=0&size=20");
+  });
+
+  it("hydrates initial filters passed from the route search params", async () => {
+    fetchSpy.mockResolvedValue(jsonResponse(samplePage));
+
+    wrap(
+      <ListingsPageView
+        initialFilters={{
+          ...DEFAULT_LISTING_FILTERS,
+          city: "Hanoi",
+          query: "Toyota",
+        }}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        "/api/v1/listings?query=Toyota&city=Hanoi&sort=NEWEST&page=0&size=20",
+      ),
+    );
+    expect(screen.getAllByDisplayValue("Hanoi").length).toBeGreaterThan(0);
+    expect(screen.getAllByDisplayValue("Toyota").length).toBeGreaterThan(0);
   });
 
   it("re-queries with filter params when filters change", async () => {

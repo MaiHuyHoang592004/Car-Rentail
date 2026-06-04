@@ -5,6 +5,7 @@ vi.stubEnv("COOKIE_SECURE", "");
 vi.stubEnv("COOKIE_SAME_SITE", "");
 
 const { NextResponse } = await import("next/server");
+const { getRefreshCookieName } = await import("../session-cookie-shared");
 const {
   REFRESH_COOKIE_NAME,
   ROLE_COOKIE_NAME,
@@ -66,6 +67,7 @@ describe("session-cookie helpers", () => {
     const res = NextResponse.json({});
     setRefreshCookie(res, "token");
     const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc).toContain("rentflow_refresh=token");
     expect(sc.toLowerCase()).not.toContain("secure");
   });
 
@@ -74,7 +76,20 @@ describe("session-cookie helpers", () => {
     const res = NextResponse.json({});
     setRefreshCookie(res, "token");
     const sc = res.headers.get("set-cookie") ?? "";
+    expect(sc).toContain("rentflow_refresh=token");
     expect(sc.toLowerCase()).not.toContain("secure");
+  });
+
+  it("keeps __Host- prefix only when secure cookies are enabled", () => {
+    expect(REFRESH_COOKIE_NAME).toBe("__Host-rentflow_refresh");
+    expect(getRefreshCookieName()).toBe("__Host-rentflow_refresh");
+
+    vi.stubEnv("COOKIE_SECURE", "false");
+    expect(getRefreshCookieName()).toBe("rentflow_refresh");
+
+    vi.stubEnv("COOKIE_SECURE", "");
+    vi.stubEnv("NODE_ENV", "development");
+    expect(getRefreshCookieName()).toBe("rentflow_refresh");
   });
 
   it("uses configured SameSite policy when valid", () => {

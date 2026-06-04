@@ -18,10 +18,16 @@ import { formatMoney } from "@/lib/formatters";
 
 const PAGE_SIZE = 20;
 
-export function ListingsPageView() {
+type ListingsPageViewProps = {
+  initialFilters?: ListingFilterState;
+};
+
+export function ListingsPageView({
+  initialFilters = DEFAULT_LISTING_FILTERS,
+}: ListingsPageViewProps) {
   const filterForm = useForm<ListingFilterState>({
     resolver: zodResolver(listingFilterSchema),
-    defaultValues: DEFAULT_LISTING_FILTERS,
+    defaultValues: initialFilters,
     mode: "onChange",
   });
   const filters = useWatch({ control: filterForm.control }) as ListingFilterState;
@@ -42,6 +48,11 @@ export function ListingsPageView() {
     const subscription = filterForm.watch(() => setPage(0));
     return () => subscription.unsubscribe();
   }, [filterForm]);
+
+  useEffect(() => {
+    filterForm.reset(initialFilters);
+    setPage(0);
+  }, [filterForm, initialFilters]);
 
   function handleReset() {
     filterForm.reset(DEFAULT_LISTING_FILTERS);

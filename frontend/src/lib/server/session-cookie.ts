@@ -2,7 +2,11 @@ import "server-only";
 
 import type { NextResponse } from "next/server";
 
-import { REFRESH_COOKIE_NAME, ROLE_COOKIE_NAME } from "@/lib/session-cookie-shared";
+import {
+  getRefreshCookieName,
+  REFRESH_COOKIE_NAME,
+  ROLE_COOKIE_NAME,
+} from "@/lib/session-cookie-shared";
 
 export { REFRESH_COOKIE_NAME, ROLE_COOKIE_NAME };
 
@@ -49,7 +53,7 @@ function sharedCookieOptions(maxAge: number) {
 
 export function setRefreshCookie(response: NextResponse, refreshToken: string) {
   response.cookies.set({
-    name: REFRESH_COOKIE_NAME,
+    name: getRefreshCookieName(),
     value: refreshToken,
     ...sharedCookieOptions(SEVEN_DAYS_SECONDS),
   });
@@ -57,7 +61,7 @@ export function setRefreshCookie(response: NextResponse, refreshToken: string) {
 
 export function clearRefreshCookie(response: NextResponse) {
   response.cookies.set({
-    name: REFRESH_COOKIE_NAME,
+    name: getRefreshCookieName(),
     value: "",
     ...sharedCookieOptions(0),
   });
