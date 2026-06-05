@@ -128,6 +128,16 @@ describe("proxy role-based auth", () => {
     expect(res.headers.get("x-middleware-next")).toBe("1");
   });
 
+  it("does not protect public forgot-password route", () => {
+    const res = proxy(makeRequest("/forgot-password")) as Response;
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("does not protect public reset-password route", () => {
+    const res = proxy(makeRequest("/reset-password?token=abc")) as Response;
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+  });
+
   it("does not protect verify-email api path", () => {
     const res = proxy(makeRequest("/api/v1/auth/verify-email")) as Response;
     expect(res.headers.get("x-middleware-next")).toBe("1");
