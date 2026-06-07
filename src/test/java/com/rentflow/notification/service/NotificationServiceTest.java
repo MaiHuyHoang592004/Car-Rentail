@@ -14,8 +14,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,7 +36,9 @@ class NotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        notificationService = new NotificationService(notificationRepository);
+        notificationService = new NotificationService(
+                notificationRepository,
+                Clock.fixed(Instant.parse("2026-06-07T00:00:00Z"), ZoneOffset.UTC));
     }
 
     @Test
@@ -76,6 +81,35 @@ class NotificationServiceTest {
         assertThat(page.getTotalElements()).isEqualTo(2);
         assertThat(page.getContent()).extracting(NotificationResponse::title)
                 .containsExactly("New", "Old");
+    }
+
+    @Test
+    void markReadSetsReadAtOnce() {
+        UUID userId = UUID.fromString("aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa");
+        Notification notification = notification(userId, "New", Instant.parse("2026-05-28T00:00:00Z"));
+        when(notificationRepository.findByIdAndUserId(notification.getId(), userId)).thenReturn(Optional.of(notification));
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        NotificationResponse response = notificationService.markRead(userId, notification.getId());
+
+        assertThat(response.readAt()).isEqualTo(Instant.parse("2026-06-07T00:00:00Z"));
+        verify(notificationRepository).save(notification);
+    }
+
+    @Test
+    void countUnreadDelegatesToRepository() {
+        UUID userId = UUID.fromString("aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa");
+        when(notificationRepository.countByUserIdAndReadAtIsNull(userId)).thenReturn(3L);
+
+        assertThat(notificationService.countUnread(userId)).isEqualTo(3L);
+    }
+
+    @Test
+    void markAllReadDelegatesToBulkUpdate() {
+        UUID userId = UUID.fromString("aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa");
+        when(notificationRepository.markAllRead(userId, Instant.parse("2026-06-07T00:00:00Z"))).thenReturn(2);
+
+        assertThat(notificationService.markAllRead(userId)).isEqualTo(2L);
     }
 
     private Notification notification(UUID userId, String title, Instant createdAt) {
