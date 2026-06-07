@@ -63,6 +63,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import com.rentflow.common.web.PageResponse;
+import com.rentflow.deposit.service.DepositService;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class BookingService {
@@ -98,6 +100,7 @@ public class BookingService {
     private final TransactionTemplate transactionTemplate;
     private final long holdDurationMinutes;
     private final boolean requireEmailVerification;
+    private DepositService depositService;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -152,6 +155,11 @@ public class BookingService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.holdDurationMinutes = holdDurationMinutes;
         this.requireEmailVerification = requireEmailVerification;
+    }
+
+    @Autowired(required = false)
+    void setDepositService(DepositService depositService) {
+        this.depositService = depositService;
     }
 
     @Transactional
@@ -700,6 +708,9 @@ public class BookingService {
         saveBookingExtras(booking.getId(), price.extras());
         availabilityReserver.hold(lockedAvailability, booking.getId(), holdToken, holdExpiresAt);
         emitBookingHeldSignals(booking, price.totalAmount(), price.currency());
+        if (depositService != null) {
+            depositService.createRequirementForBooking(booking, price.totalAmount(), price.currency());
+        }
 
         JsonNode priceSnapshotNode = readTree(priceSnapshotJson);
         JsonNode policySnapshotNode = readTree(policySnapshotJson);
