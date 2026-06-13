@@ -53,7 +53,7 @@ services:
       - key: RENTFLOW_FRONTEND_BASE_URL
         value: https://rentflow-web.onrender.com
       - key: RENTFLOW_FILE_SIGNED_URL_BASE
-        value: https://rentflow-api.onrender.com
+        value: https://rentflow-api-2czk.onrender.com
       - key: RENTFLOW_OUTBOX_DISPATCHER_TYPE
         value: logging
       - key: SPRING_KAFKA_BOOTSTRAP_SERVERS
@@ -83,7 +83,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: API_BACKEND_URL
-        value: https://rentflow-api.onrender.com
+        value: https://rentflow-api-2czk.onrender.com
 
   - type: keyvalue
     name: rentflow-redis
