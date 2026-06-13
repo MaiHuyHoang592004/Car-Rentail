@@ -75,7 +75,7 @@ services:
     region: singapore
     branch: HoangMH/AddFeature
     autoDeployTrigger: checksPass
-    buildCommand: cd frontend && corepack enable && pnpm install --frozen-lockfile && pnpm build
+    buildCommand: cd frontend && corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build
     startCommand: cd frontend && pnpm exec next start -H 0.0.0.0 -p $PORT
     envVars:
       - key: NODE_VERSION
